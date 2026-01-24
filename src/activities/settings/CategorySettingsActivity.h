@@ -49,6 +49,7 @@ class CategorySettingsActivity final : public ActivityWithSubactivity {
   const char* categoryName;
   const SettingInfo* settingsList;
   int settingsCount;
+  int initialSettingIndex;
   const std::function<void()> onGoBack;
 
   static void taskTrampoline(void* param);
@@ -58,11 +59,12 @@ class CategorySettingsActivity final : public ActivityWithSubactivity {
 
  public:
   CategorySettingsActivity(GfxRenderer& renderer, MappedInputManager& mappedInput, const char* categoryName,
-                           const SettingInfo* settingsList, int settingsCount, const std::function<void()>& onGoBack)
+                           const SettingInfo* settingsList, int settingsCount, const std::function<void()>& onGoBack, int initialSetting = -1)
       : ActivityWithSubactivity("CategorySettings", renderer, mappedInput),
         categoryName(categoryName),
         settingsList(settingsList),
         settingsCount(settingsCount),
+        initialSettingIndex(initialSetting),
         onGoBack(onGoBack) {}
   void onEnter() override;
   void onExit() override;

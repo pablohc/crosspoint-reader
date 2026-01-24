@@ -231,6 +231,14 @@ void onGoToSettings() {
   enterNewActivity(new SettingsActivity(renderer, mappedInputManager, onGoHome));
 }
 
+void onGoToSettingsControls() {
+  exitActivity();
+  // Open Controls settings directly (category 2), skip Settings menu
+  // Magic Key index is found dynamically to protect against future Controls settings additions
+  int magicKeyIndex = SettingsActivity::getMagicKeySettingIndex();
+  enterNewActivity(new SettingsActivity(renderer, mappedInputManager, onGoHome, 2, magicKeyIndex, true));
+}
+
 void onGoToMyLibrary() {
   exitActivity();
   enterNewActivity(new MyLibraryActivity(renderer, mappedInputManager, onGoHome, onGoToReader));
@@ -246,10 +254,14 @@ void onGoToBrowser() {
   enterNewActivity(new OpdsBookBrowserActivity(renderer, mappedInputManager, onGoHome));
 }
 
+void onGoToSleep() {
+  enterDeepSleep();
+}
+
 void onGoHome() {
   exitActivity();
   enterNewActivity(new HomeActivity(renderer, mappedInputManager, onContinueReading, onGoToMyLibrary, onGoToSettings,
-                                    onGoToFileTransfer, onGoToBrowser));
+                                    onGoToSettingsControls, onGoToFileTransfer, onGoToBrowser, onGoToSleep));
 }
 
 void setupDisplayAndFonts() {

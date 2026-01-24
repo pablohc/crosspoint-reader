@@ -8,7 +8,7 @@
 #include "MappedInputManager.h"
 #include "fontIds.h"
 
-const char* SettingsActivity::categoryNames[categoryCount] = {"Display", "Reader", "Controls", "System"};
+const char* SettingsActivity::categoryNames[SettingsActivity::categoryCount] = {"Display", "Reader", "Controls", "System"};
 
 namespace {
 constexpr int displaySettingsCount = 5;
@@ -35,14 +35,16 @@ const SettingInfo readerSettings[readerSettingsCount] = {
     SettingInfo::Toggle("Extra Paragraph Spacing", &CrossPointSettings::extraParagraphSpacing),
     SettingInfo::Toggle("Text Anti-Aliasing", &CrossPointSettings::textAntiAliasing)};
 
-constexpr int controlsSettingsCount = 4;
+constexpr int controlsSettingsCount = 5;
 const SettingInfo controlsSettings[controlsSettingsCount] = {
     SettingInfo::Enum("Front Button Layout", &CrossPointSettings::frontButtonLayout,
                       {"Bck, Cnfrm, Lft, Rght", "Lft, Rght, Bck, Cnfrm", "Lft, Bck, Cnfrm, Rght"}),
     SettingInfo::Enum("Side Button Layout (reader)", &CrossPointSettings::sideButtonLayout,
                       {"Prev, Next", "Next, Prev"}),
     SettingInfo::Toggle("Long-press Chapter Skip", &CrossPointSettings::longPressChapterSkip),
-    SettingInfo::Enum("Short Power Button Click", &CrossPointSettings::shortPwrBtn, {"Ignore", "Sleep", "Page Turn"})};
+    SettingInfo::Enum("Short Power Button Click", &CrossPointSettings::shortPwrBtn, {"Ignore", "Sleep", "Page Turn"}),
+    SettingInfo::Enum("Magic Key (Long Press)", &CrossPointSettings::magicKeyAction,
+                      {"Off", "Go to Recent", "Clear Cache", "Clear Recent List", "Index", "Sleep"})};
 
 constexpr int systemSettingsCount = 5;
 const SettingInfo systemSettings[systemSettingsCount] = {
@@ -51,6 +53,18 @@ const SettingInfo systemSettings[systemSettingsCount] = {
     SettingInfo::Action("KOReader Sync"), SettingInfo::Action("Calibre Settings"), SettingInfo::Action("Clear Cache"),
     SettingInfo::Action("Check for updates")};
 }  // namespace
+
+// Helper function to find Magic Key setting index dynamically (outside namespace)
+// This protects against future changes where new Controls settings might be added
+int SettingsActivity::getMagicKeySettingIndex() {
+  for (int i = 0; i < controlsSettingsCount; i++) {
+    if (strcmp(controlsSettings[i].name, "Magic Key (Long Press)") == 0) {
+      return i;
+    }
+  }
+  // Fallback to last setting if not found (Magic Key should be at the end)
+  return controlsSettingsCount - 1;
+}
 
 void SettingsActivity::taskTrampoline(void* param) {
   auto* self = static_cast<SettingsActivity*>(param);
@@ -61,11 +75,17 @@ void SettingsActivity::onEnter() {
   Activity::onEnter();
   renderingMutex = xSemaphoreCreateMutex();
 
-  // Reset selection to first category
-  selectedCategoryIndex = 0;
+  // Set initial category if provided
+  selectedCategoryIndex = initialCategory;
+  
+  // If skipCategoryMenu, enter category immediately without showing Settings menu
+  // Otherwise, show Settings menu and flag to enter category on selection
+  shouldEnterInitialCategory = true;
 
-  // Trigger first update
-  updateRequired = true;
+  // Only trigger update if NOT skipping menu (to avoid rendering Settings menu)
+  if (!skipCategoryMenu) {
+    updateRequired = true;
+  }
 
   xTaskCreate(&SettingsActivity::taskTrampoline, "SettingsActivityTask",
               4096,               // Stack size
@@ -91,6 +111,13 @@ void SettingsActivity::onExit() {
 void SettingsActivity::loop() {
   if (subActivity) {
     subActivity->loop();
+    return;
+  }
+
+  // Auto-enter initial category if specified
+  if (shouldEnterInitialCategory) {
+    shouldEnterInitialCategory = false;
+    enterCategory(selectedCategoryIndex);
     return;
   }
 
@@ -154,7 +181,7 @@ void SettingsActivity::enterCategory(int categoryIndex) {
                                                 settingsCount, [this] {
                                                   exitActivity();
                                                   updateRequired = true;
-                                                }));
+                                                }, initialSettingIndex));
   xSemaphoreGive(renderingMutex);
 }
 

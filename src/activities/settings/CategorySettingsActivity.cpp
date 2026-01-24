@@ -22,7 +22,8 @@ void CategorySettingsActivity::onEnter() {
   Activity::onEnter();
   renderingMutex = xSemaphoreCreateMutex();
 
-  selectedSettingIndex = 0;
+  // Use initial setting index if provided, otherwise start at 0
+  selectedSettingIndex = (initialSettingIndex >= 0 && initialSettingIndex < settingsCount) ? initialSettingIndex : 0;
   updateRequired = true;
 
   xTaskCreate(&CategorySettingsActivity::taskTrampoline, "CategorySettingsActivityTask", 4096, this, 1,

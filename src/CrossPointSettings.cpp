@@ -14,7 +14,7 @@ CrossPointSettings CrossPointSettings::instance;
 namespace {
 constexpr uint8_t SETTINGS_FILE_VERSION = 1;
 // Increment this when adding new persisted settings fields
-constexpr uint8_t SETTINGS_COUNT = 20;
+constexpr uint8_t SETTINGS_COUNT = 21;
 constexpr char SETTINGS_FILE[] = "/.crosspoint/settings.bin";
 }  // namespace
 
@@ -48,6 +48,7 @@ bool CrossPointSettings::saveToFile() const {
   serialization::writePod(outputFile, textAntiAliasing);
   serialization::writePod(outputFile, hideBatteryPercentage);
   serialization::writePod(outputFile, longPressChapterSkip);
+  serialization::writePod(outputFile, magicKeyAction);
   serialization::writePod(outputFile, hyphenationEnabled);
   outputFile.close();
 
@@ -117,6 +118,13 @@ bool CrossPointSettings::loadFromFile() {
     serialization::readPod(inputFile, hideBatteryPercentage);
     if (++settingsRead >= fileSettingsCount) break;
     serialization::readPod(inputFile, longPressChapterSkip);
+    if (++settingsRead >= fileSettingsCount) break;
+    serialization::readPod(inputFile, magicKeyAction);
+    // Validate magic key action
+    if (magicKeyAction >= 6) {  // Should match MAGIC_KEY_ACTION enum count
+      Serial.printf("[%lu] [CPS] WARNING: Invalid magicKeyAction value %d, resetting to OFF\n", millis(), magicKeyAction);
+      magicKeyAction = OFF;
+    }
     if (++settingsRead >= fileSettingsCount) break;
     serialization::readPod(inputFile, hyphenationEnabled);
     if (++settingsRead >= fileSettingsCount) break;

@@ -55,6 +55,9 @@ class CrossPointSettings {
   // Short power button press actions
   enum SHORT_PWRBTN { IGNORE = 0, SLEEP = 1, PAGE_TURN = 2 };
 
+  // Magic Key (long press) actions
+  enum MAGIC_KEY_ACTION { OFF = 0, GO_TO_RECENT = 1, CLEAR_CACHE = 2, CLEAR_RECENT_LIST = 3, INDEX = 4, SUSPEND = 5 };
+
   // Hide battery percentage
   enum HIDE_BATTERY_PERCENTAGE { HIDE_NEVER = 0, HIDE_READER = 1, HIDE_ALWAYS = 2 };
 
@@ -75,6 +78,8 @@ class CrossPointSettings {
   // Button layouts
   uint8_t frontButtonLayout = BACK_CONFIRM_LEFT_RIGHT;
   uint8_t sideButtonLayout = PREV_NEXT;
+  // Magic Key (long press) action in home screen (default: OFF)
+  uint8_t magicKeyAction = OFF;
   // Reader font settings
   uint8_t fontFamily = BOOKERLY;
   uint8_t fontSize = MEDIUM;

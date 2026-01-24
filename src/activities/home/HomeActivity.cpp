@@ -165,6 +165,13 @@ void HomeActivity::loop() {
 
   const int menuCount = getMenuItemCount();
 
+  // Magic Button - long press BACK (>500ms) to execute configured action
+  if (mappedInput.wasReleased(MappedInputManager::Button::Back) && 
+      mappedInput.getHeldTime() > 500) {
+    executeMagicButtonAction();
+    return;
+  }
+
   if (mappedInput.wasReleased(MappedInputManager::Button::Confirm)) {
     // Calculate dynamic indices based on which options are available
     int idx = 0;
@@ -541,7 +548,26 @@ void HomeActivity::render() {
     renderer.drawText(UI_10_FONT_ID, textX, textY, label, !selected);
   }
 
-  const auto labels = mappedInput.mapLabels("", "Select", "Up", "Down");
+  // Build button hints - Magic Key label on left, Select on right
+  const auto magicKeyLabel = [&]() {
+    switch (SETTINGS.magicKeyAction) {
+      case CrossPointSettings::MAGIC_KEY_ACTION::OFF:
+        return "Magic Key";
+      case CrossPointSettings::MAGIC_KEY_ACTION::GO_TO_RECENT:
+        return "Recent";
+      case CrossPointSettings::MAGIC_KEY_ACTION::CLEAR_CACHE:
+        return "ClrCache";
+      case CrossPointSettings::MAGIC_KEY_ACTION::CLEAR_RECENT_LIST:
+        return "ClrRecent";
+      case CrossPointSettings::MAGIC_KEY_ACTION::INDEX:
+        return "Index";
+      case CrossPointSettings::MAGIC_KEY_ACTION::SUSPEND:
+        return "Sleep";
+      default:
+        return "Magic Key";
+    }
+  }();
+  const auto labels = mappedInput.mapLabels(magicKeyLabel, "Select", "Up", "Down");
   renderer.drawButtonHints(UI_10_FONT_ID, labels.btn1, labels.btn2, labels.btn3, labels.btn4);
 
   const bool showBatteryPercentage =
@@ -553,4 +579,92 @@ void HomeActivity::render() {
   ScreenComponents::drawBattery(renderer, batteryX, 10, showBatteryPercentage);
 
   renderer.displayBuffer();
+}
+void HomeActivity::executeMagicButtonAction() {
+  // Validate magic key action value
+  const uint8_t actionValue = SETTINGS.magicKeyAction;
+  if (actionValue >= 6) {  // Should match MAGIC_KEY_ACTION enum count
+    Serial.printf("[%lu] [HOME] ERROR: Invalid Magic Key action value: %d\n", millis(), actionValue);
+    SETTINGS.magicKeyAction = CrossPointSettings::MAGIC_KEY_ACTION::OFF;
+    SETTINGS.saveToFile();
+    return;
+  }
+  
+  const auto action = static_cast<CrossPointSettings::MAGIC_KEY_ACTION>(actionValue);
+  
+  switch (action) {
+    case CrossPointSettings::MAGIC_KEY_ACTION::OFF: {
+      Serial.printf("[%lu] [HOME] Magic Key: Opening Settings > Controls\n", millis());
+      // Open Settings directly to Controls section
+      onSettingsControlsOpen();
+      break;
+    }
+    case CrossPointSettings::MAGIC_KEY_ACTION::GO_TO_RECENT: {
+      Serial.printf("[%lu] [HOME] Magic Key: Go to Recent\n", millis());
+      onMyLibraryOpen();
+      break;
+    }
+    case CrossPointSettings::MAGIC_KEY_ACTION::CLEAR_CACHE: {
+      Serial.printf("[%lu] [HOME] Magic Key: Clear Cache - starting\n", millis());
+      
+      // Clear cache directories (epub_, xtc_)
+      auto root = SdMan.open("/.crosspoint");
+      if (root && root.isDirectory()) {
+        char name[128];
+        int clearedCount = 0;
+        int failedCount = 0;
+        
+        for (auto file = root.openNextFile(); file; file = root.openNextFile()) {
+          file.getName(name, sizeof(name));
+          String itemName(name);
+          
+          if (file.isDirectory() && (itemName.startsWith("epub_") || itemName.startsWith("xtc_"))) {
+            String fullPath = "/.crosspoint/" + itemName;
+            Serial.printf("[%lu] [HOME] Removing cache: %s\n", millis(), fullPath.c_str());
+            
+            file.close();
+            
+            if (SdMan.removeDir(fullPath.c_str())) {
+              clearedCount++;
+            } else {
+              Serial.printf("[%lu] [HOME] Failed to remove: %s\n", millis(), fullPath.c_str());
+              failedCount++;
+            }
+          } else {
+            file.close();
+          }
+        }
+        root.close();
+        
+        Serial.printf("[%lu] [HOME] Cache cleared: %d removed, %d failed\n", millis(), clearedCount, failedCount);
+      } else {
+        Serial.printf("[%lu] [HOME] ERROR: Cannot open /.crosspoint directory\n", millis());
+      }
+      break;
+    }
+    case CrossPointSettings::MAGIC_KEY_ACTION::CLEAR_RECENT_LIST: {
+      Serial.printf("[%lu] [HOME] Magic Key: Clear Recent List\n", millis());
+      // Delete the recent books file to clear the list
+      if (SdMan.remove("/.crosspoint/recent_books.bin")) {
+        Serial.printf("[%lu] [HOME] Recent list cleared successfully\n", millis());
+      } else {
+        Serial.printf("[%lu] [HOME] ERROR: Failed to clear recent list\n", millis());
+      }
+      break;
+    }
+    case CrossPointSettings::MAGIC_KEY_ACTION::INDEX: {
+      Serial.printf("[%lu] [HOME] Magic Key: Index (TODO)\n", millis());
+      // TODO: Implement Index action
+      break;
+    }
+    case CrossPointSettings::MAGIC_KEY_ACTION::SUSPEND: {
+      Serial.printf("[%lu] [HOME] Magic Key: Sleep\n", millis());
+      onSleepOpen();
+      break;
+    }
+    default: {
+      Serial.printf("[%lu] [HOME] ERROR: Unexpected Magic Key action: %d\n", millis(), action);
+      break;
+    }
+  }
 }

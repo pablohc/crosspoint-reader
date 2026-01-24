@@ -17,6 +17,10 @@ class SettingsActivity final : public ActivityWithSubactivity {
   SemaphoreHandle_t renderingMutex = nullptr;
   bool updateRequired = false;
   int selectedCategoryIndex = 0;  // Currently selected category
+  int initialCategory = 0;  // Initial category to open (default: 0)
+  int initialSettingIndex = -1;  // Initial setting to highlight (-1 = none)
+  bool shouldEnterInitialCategory = false;  // Flag to enter initial category on first loop
+  bool skipCategoryMenu = false;  // If true, go directly to initialCategory without showing menu
   const std::function<void()> onGoHome;
 
   static constexpr int categoryCount = 4;
@@ -29,9 +33,13 @@ class SettingsActivity final : public ActivityWithSubactivity {
 
  public:
   explicit SettingsActivity(GfxRenderer& renderer, MappedInputManager& mappedInput,
-                            const std::function<void()>& onGoHome)
-      : ActivityWithSubactivity("Settings", renderer, mappedInput), onGoHome(onGoHome) {}
+                            const std::function<void()>& onGoHome, int initialCat = 0, int initialSetting = -1, bool skipMenu = false)
+      : ActivityWithSubactivity("Settings", renderer, mappedInput), onGoHome(onGoHome), initialCategory(initialCat), initialSettingIndex(initialSetting), skipCategoryMenu(skipMenu) {}
   void onEnter() override;
   void onExit() override;
   void loop() override;
+  
+  // Static helper to find Magic Key setting index dynamically
+  // Protects against future Controls settings additions
+  static int getMagicKeySettingIndex();
 };

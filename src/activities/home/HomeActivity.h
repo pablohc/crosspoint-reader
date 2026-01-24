@@ -24,8 +24,10 @@ class HomeActivity final : public Activity {
   const std::function<void()> onContinueReading;
   const std::function<void()> onMyLibraryOpen;
   const std::function<void()> onSettingsOpen;
+  const std::function<void()> onSettingsControlsOpen;
   const std::function<void()> onFileTransferOpen;
   const std::function<void()> onOpdsBrowserOpen;
+  const std::function<void()> onSleepOpen;
 
   static void taskTrampoline(void* param);
   [[noreturn]] void displayTaskLoop();
@@ -34,18 +36,22 @@ class HomeActivity final : public Activity {
   bool storeCoverBuffer();    // Store frame buffer for cover image
   bool restoreCoverBuffer();  // Restore frame buffer from stored cover
   void freeCoverBuffer();     // Free the stored cover buffer
+  void executeMagicButtonAction();  // Execute magic button long press action
 
  public:
   explicit HomeActivity(GfxRenderer& renderer, MappedInputManager& mappedInput,
                         const std::function<void()>& onContinueReading, const std::function<void()>& onMyLibraryOpen,
-                        const std::function<void()>& onSettingsOpen, const std::function<void()>& onFileTransferOpen,
-                        const std::function<void()>& onOpdsBrowserOpen)
+                        const std::function<void()>& onSettingsOpen, const std::function<void()>& onSettingsControlsOpen,
+                        const std::function<void()>& onFileTransferOpen,
+                        const std::function<void()>& onOpdsBrowserOpen, const std::function<void()>& onSleepOpen)
       : Activity("Home", renderer, mappedInput),
         onContinueReading(onContinueReading),
         onMyLibraryOpen(onMyLibraryOpen),
         onSettingsOpen(onSettingsOpen),
+        onSettingsControlsOpen(onSettingsControlsOpen),
         onFileTransferOpen(onFileTransferOpen),
-        onOpdsBrowserOpen(onOpdsBrowserOpen) {}
+        onOpdsBrowserOpen(onOpdsBrowserOpen),
+        onSleepOpen(onSleepOpen) {}
   void onEnter() override;
   void onExit() override;
   void loop() override;
