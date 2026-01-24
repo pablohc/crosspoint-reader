@@ -465,7 +465,7 @@ void TxtReaderActivity::renderPage() {
   renderStatusBar(orientedMarginRight, orientedMarginBottom, orientedMarginLeft);
 
   if (pagesUntilFullRefresh <= 1) {
-    renderer.displayBuffer(EInkDisplay::HALF_REFRESH);
+    renderer.displayBuffer(EInkDisplay::FAST_REFRESH);
     pagesUntilFullRefresh = SETTINGS.getRefreshFrequency();
   } else {
     renderer.displayBuffer();

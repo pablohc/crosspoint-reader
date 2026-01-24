@@ -300,13 +300,8 @@ void EpubReaderActivity::renderScreen() {
       const int barX = boxXWithBar + (boxWidthWithBar - barWidth) / 2;
       const int barY = boxY + renderer.getLineHeight(UI_12_FONT_ID) + boxMargin * 2;
 
-      // Always show "Indexing..." text first
-      {
-        renderer.fillRect(boxXNoBar, boxY, boxWidthNoBar, boxHeightNoBar, false);
-        renderer.drawText(UI_12_FONT_ID, boxXNoBar + boxMargin, boxY + boxMargin, "Indexing...");
-        renderer.drawRect(boxXNoBar + 5, boxY + 5, boxWidthNoBar - 10, boxHeightNoBar - 10);
-        renderer.displayBuffer();
-      }
+      // Progress UI - only shown if construction takes long (>50KB)
+      // Skip initial display to avoid 421ms wait before content processing starts
 
       // Setup callback - only called for chapters >= 50KB, redraws with progress bar
       auto progressSetup = [this, boxXWithBar, boxWidthWithBar, boxHeightWithBar, barX, barY] {
@@ -391,7 +386,7 @@ void EpubReaderActivity::renderContents(std::unique_ptr<Page> page, const int or
   page->render(renderer, SETTINGS.getReaderFontId(), orientedMarginLeft, orientedMarginTop);
   renderStatusBar(orientedMarginRight, orientedMarginBottom, orientedMarginLeft);
   if (pagesUntilFullRefresh <= 1) {
-    renderer.displayBuffer(EInkDisplay::HALF_REFRESH);
+    renderer.displayBuffer(EInkDisplay::FAST_REFRESH);
     pagesUntilFullRefresh = SETTINGS.getRefreshFrequency();
   } else {
     renderer.displayBuffer();
