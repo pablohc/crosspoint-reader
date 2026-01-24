@@ -80,12 +80,11 @@ void SettingsActivity::onEnter() {
   
   // If skipCategoryMenu, enter category immediately without showing Settings menu
   // Otherwise, show Settings menu and flag to enter category on selection
-  shouldEnterInitialCategory = true;
+  shouldEnterInitialCategory = skipCategoryMenu;
 
-  // Only trigger update if NOT skipping menu (to avoid rendering Settings menu)
-  if (!skipCategoryMenu) {
-    updateRequired = true;
-  }
+  // Trigger update if NOT skipping menu (to show Settings menu)
+  // If skipping, will enter category immediately without rendering menu
+  updateRequired = !skipCategoryMenu;
 
   xTaskCreate(&SettingsActivity::taskTrampoline, "SettingsActivityTask",
               4096,               // Stack size
