@@ -306,7 +306,6 @@ void EpubReaderActivity::renderScreen() {
         renderer.drawText(UI_12_FONT_ID, boxXNoBar + boxMargin, boxY + boxMargin, "Indexing...");
         renderer.drawRect(boxXNoBar + 5, boxY + 5, boxWidthNoBar - 10, boxHeightNoBar - 10);
         renderer.displayBuffer();
-        pagesUntilFullRefresh = 0;
       }
 
       // Setup callback - only called for chapters >= 50KB, redraws with progress bar
