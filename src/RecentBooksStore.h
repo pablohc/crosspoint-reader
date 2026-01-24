@@ -23,6 +23,9 @@ class RecentBooksStore {
   // Get the count of recent books
   int getCount() const { return static_cast<int>(recentBooks.size()); }
 
+  // Clear all recent books and save to file
+  bool clear();
+
   bool saveToFile() const;
 
   bool loadFromFile();

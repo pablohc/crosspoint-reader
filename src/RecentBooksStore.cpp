@@ -32,6 +32,11 @@ void RecentBooksStore::addBook(const std::string& path) {
   saveToFile();
 }
 
+bool RecentBooksStore::clear() {
+  recentBooks.clear();
+  return saveToFile();
+}
+
 bool RecentBooksStore::saveToFile() const {
   // Make sure the directory exists
   SdMan.mkdir("/.crosspoint");

@@ -7,6 +7,7 @@
 
 #include "CalibreSettingsActivity.h"
 #include "ClearCacheActivity.h"
+#include "ClearRecentListActivity.h"
 #include "CrossPointSettings.h"
 #include "KOReaderSettingsActivity.h"
 #include "MappedInputManager.h"
@@ -115,6 +116,14 @@ void CategorySettingsActivity::toggleCurrentSetting() {
       xSemaphoreTake(renderingMutex, portMAX_DELAY);
       exitActivity();
       enterNewActivity(new ClearCacheActivity(renderer, mappedInput, [this] {
+        exitActivity();
+        updateRequired = true;
+      }));
+      xSemaphoreGive(renderingMutex);
+    } else if (strcmp(setting.name, "Clear Recent List") == 0) {
+      xSemaphoreTake(renderingMutex, portMAX_DELAY);
+      exitActivity();
+      enterNewActivity(new ClearRecentListActivity(renderer, mappedInput, [this] {
         exitActivity();
         updateRequired = true;
       }));
