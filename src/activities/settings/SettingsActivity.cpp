@@ -50,20 +50,29 @@ constexpr int systemSettingsCount = 5;
 const SettingInfo systemSettings[systemSettingsCount] = {
     SettingInfo::Enum("Time to Sleep", &CrossPointSettings::sleepTimeout,
                       {"1 min", "5 min", "10 min", "15 min", "30 min"}),
-    SettingInfo::Action("KOReader Sync"), SettingInfo::Action("Calibre Settings"), SettingInfo::Action("Clear Cache"),
+    SettingInfo::Action("KOReader Sync"), 
+    SettingInfo::Action("Calibre Settings"), 
+    SettingInfo::Action("Clear Cache"),
     SettingInfo::Action("Check for updates")};
 }  // namespace
 
-// Helper function to find Magic Key setting index dynamically (outside namespace)
-// This protects against future changes where new Controls settings might be added
-int SettingsActivity::getMagicKeySettingIndex() {
-  for (int i = 0; i < controlsSettingsCount; i++) {
-    if (strcmp(controlsSettings[i].name, "Magic Key (Long Press)") == 0) {
-      return i;
+  // Helper function to find Magic Key setting index dynamically
+    // This protects against future changes where new Controls settings might be added
+    int getMagicKeySettingIndex() {
+        for (int i = 0; i < controlsSettingsCount; i++) {
+            if (strstr(controlsSettings[i].name, "Magic") != nullptr) {
+                Serial.printf("[%lu] [SETTINGS] Found Magic setting at index %d: %s\n", millis(), i, controlsSettings[i].name);
+                return i;
+            }
+        }
+        // Fallback to last setting if not found (Magic Key should be at the end)
+        Serial.printf("[%lu] [SETTINGS] Magic setting not found, using fallback index %d\n", millis(), controlsSettingsCount - 1);
+        return controlsSettingsCount - 1;
     }
-  }
-  // Fallback to last setting if not found (Magic Key should be at the end)
-  return controlsSettingsCount - 1;
+
+// Wrapper function to access the namespace function
+int SettingsActivity::getMagicKeySettingIndex() {
+    return ::getMagicKeySettingIndex();
 }
 
 void SettingsActivity::taskTrampoline(void* param) {
@@ -176,11 +185,15 @@ void SettingsActivity::enterCategory(int categoryIndex) {
       break;
   }
 
+  // Use initialSettingIndex only once, then reset it
+  int settingIndexToUse = initialSettingIndex;
+  initialSettingIndex = -1;  // Reset for future category navigation
+
   enterNewActivity(new CategorySettingsActivity(renderer, mappedInput, categoryNames[categoryIndex], settingsList,
                                                 settingsCount, [this] {
                                                   exitActivity();
                                                   updateRequired = true;
-                                                }, initialSettingIndex));
+                                                }, settingIndexToUse));
   xSemaphoreGive(renderingMutex);
 }
 

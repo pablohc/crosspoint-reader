@@ -645,7 +645,7 @@ void HomeActivity::executeMagicButtonAction() {
     case CrossPointSettings::MAGIC_KEY_ACTION::CLEAR_RECENT_LIST: {
       Serial.printf("[%lu] [HOME] Magic Key: Clear Recent List\n", millis());
       // Delete the recent books file to clear the list
-      if (SdMan.remove("/.crosspoint/recent_books.bin")) {
+      if (SdMan.remove("/.crosspoint/recent.bin")) {
         Serial.printf("[%lu] [HOME] Recent list cleared successfully\n", millis());
       } else {
         Serial.printf("[%lu] [HOME] ERROR: Failed to clear recent list\n", millis());

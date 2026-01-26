@@ -38,8 +38,9 @@ class SettingsActivity final : public ActivityWithSubactivity {
   void onEnter() override;
   void onExit() override;
   void loop() override;
-  
+
   // Static helper to find Magic Key setting index dynamically
   // Protects against future Controls settings additions
   static int getMagicKeySettingIndex();
+
 };
