@@ -357,7 +357,7 @@ void KeyboardEntryActivity::render() const {
   renderer.drawButtonHints(UI_10_FONT_ID, labels.btn1, labels.btn2, labels.btn3, labels.btn4);
 
   // Draw side button hints for Up/Down navigation
-  renderer.drawSideButtonHints(UI_10_FONT_ID, "Up", "Down");
+  renderer.drawSideButtonHints(UI_10_FONT_ID, ">", "<");
 
   renderer.displayBuffer();
 }

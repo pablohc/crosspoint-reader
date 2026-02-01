@@ -500,10 +500,10 @@ void GfxRenderer::drawButtonHints(const int fontId, const char* btn1, const char
     // Only draw if the label is non-empty
     if (labels[i] != nullptr && labels[i][0] != '\0') {
       const int x = buttonPositions[i];
-      fillRect(x, pageHeight - buttonY, buttonWidth, buttonHeight, false);
-      drawRect(x, pageHeight - buttonY, buttonWidth, buttonHeight);
+      // fillRect(x, pageHeight - buttonY, buttonWidth, buttonHeight, false);
+      // drawRect(x, pageHeight - buttonY, buttonWidth, buttonHeight);
       const int textWidth = getTextWidth(fontId, labels[i]);
-      const int textX = x + (buttonWidth - 1 - textWidth) / 2;
+      const int textX = x + (buttonWidth - textWidth) / 2;
       drawText(fontId, textX, pageHeight - buttonY + textYOffset, labels[i]);
     }
   }
@@ -521,9 +521,12 @@ void GfxRenderer::drawSideButtonHints(const int fontId, const char* topBtn, cons
 
   const char* labels[] = {topBtn, bottomBtn};
 
-  // Draw the shared border for both buttons as one unit
+  // Remove button borders - only show text
   const int x = screenWidth - buttonX - buttonWidth;
 
+  // Border drawing removed - buttons now show only text without frames
+  // Previous code for drawing borders has been commented out
+  /*
   // Draw top button outline (3 sides, bottom open)
   if (topBtn != nullptr && topBtn[0] != '\0') {
     drawLine(x, topButtonY, x + buttonWidth - 1, topButtonY);                                       // Top
@@ -543,6 +546,7 @@ void GfxRenderer::drawSideButtonHints(const int fontId, const char* topBtn, cons
              topButtonY + 2 * buttonHeight - 1);                                                             // Right
     drawLine(x, topButtonY + 2 * buttonHeight - 1, x + buttonWidth - 1, topButtonY + 2 * buttonHeight - 1);  // Bottom
   }
+  */
 
   // Draw text for each button
   for (int i = 0; i < 2; i++) {
