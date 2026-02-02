@@ -17,7 +17,7 @@ constexpr int TAB_BAR_Y = 15;
 constexpr int CONTENT_START_Y = 60;
 constexpr int LINE_HEIGHT = 30;
 constexpr int LEFT_MARGIN = 20;
-constexpr int RIGHT_MARGIN = 40;  // Extra space for scroll indicator
+constexpr int RIGHT_MARGIN = 20;
 
 // Timing thresholds
 constexpr int SKIP_PAGE_MS = 700;
@@ -36,7 +36,7 @@ void sortFileList(std::vector<std::string>& strs) {
 
 int MyLibraryActivity::getPageItems() const {
   const int screenHeight = renderer.getScreenHeight();
-  const int bottomBarHeight = 60;  // Space for button hints
+  const int bottomBarHeight = 30;  // Space for button hints (reduced from 60 to 30)
   const int availableHeight = screenHeight - CONTENT_START_Y - bottomBarHeight;
   int items = availableHeight / LINE_HEIGHT;
   if (items < 1) {
@@ -314,10 +314,14 @@ void MyLibraryActivity::render() const {
     renderFilesTab();
   }
 
-  // Draw scroll indicator
-  const int screenHeight = renderer.getScreenHeight();
-  const int contentHeight = screenHeight - CONTENT_START_Y - 60;  // 60 for bottom bar
-  ScreenComponents::drawScrollIndicator(renderer, getCurrentPage(), getTotalPages(), CONTENT_START_Y, contentHeight);
+  // Draw Page Fraction only when content exceeds screen size
+  const int itemCount = getCurrentItemCount();
+  const int pageItems = getPageItems();
+  if (itemCount > pageItems) {
+    const int screenHeight = renderer.getScreenHeight();
+    const int contentHeight = screenHeight - CONTENT_START_Y - 45;  // 45 for bottom bar (reduced from 60)
+    ScreenComponents::drawPageFraction(renderer, getCurrentPage(), getTotalPages(), CONTENT_START_Y, contentHeight);
+  }
 
   // Draw side button hints (up/down navigation on right side)
   // Note: text is rotated 90° CW, so ">" appears as "^" and "<" appears as "v"
@@ -342,8 +346,8 @@ void MyLibraryActivity::renderRecentTab() const {
 
   const auto pageStartIndex = selectorIndex / pageItems * pageItems;
 
-  // Draw selection highlight
-  renderer.fillRect(0, CONTENT_START_Y + (selectorIndex % pageItems) * LINE_HEIGHT - 2, pageWidth - RIGHT_MARGIN,
+  // Draw selection highlight - extended to full screen width
+  renderer.fillRect(0, CONTENT_START_Y + (selectorIndex % pageItems) * LINE_HEIGHT - 2, pageWidth,
                     LINE_HEIGHT);
 
   // Draw items
@@ -366,8 +370,8 @@ void MyLibraryActivity::renderFilesTab() const {
 
   const auto pageStartIndex = selectorIndex / pageItems * pageItems;
 
-  // Draw selection highlight
-  renderer.fillRect(0, CONTENT_START_Y + (selectorIndex % pageItems) * LINE_HEIGHT - 2, pageWidth - RIGHT_MARGIN,
+  // Draw selection highlight - extended to full screen width
+  renderer.fillRect(0, CONTENT_START_Y + (selectorIndex % pageItems) * LINE_HEIGHT - 2, pageWidth,
                     LINE_HEIGHT);
 
   // Draw items

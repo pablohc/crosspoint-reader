@@ -548,7 +548,7 @@ void GfxRenderer::drawSideButtonHints(const int fontId, const char* topBtn, cons
   }
   */
 
-  // Draw text for each button
+  // Draw text for each button with 4-direction white outline
   for (int i = 0; i < 2; i++) {
     if (labels[i] != nullptr && labels[i][0] != '\0') {
       const int y = topButtonY + i * buttonHeight;
@@ -561,6 +561,13 @@ void GfxRenderer::drawSideButtonHints(const int fontId, const char* topBtn, cons
       const int textX = x + (buttonWidth - textHeight) / 2;
       const int textY = y + (buttonHeight + textWidth) / 2;
 
+      // Draw 4-direction outline (up, down, left, right)
+      drawTextRotated90CW(fontId, textX - 1, textY, labels[i], false);     // left
+      drawTextRotated90CW(fontId, textX + 1, textY, labels[i], false);     // right
+      drawTextRotated90CW(fontId, textX, textY - 1, labels[i], false);     // up
+      drawTextRotated90CW(fontId, textX, textY + 1, labels[i], false);     // down
+
+      // Draw the main text in black (over the outline)
       drawTextRotated90CW(fontId, textX, textY, labels[i]);
     }
   }

@@ -83,42 +83,33 @@ int ScreenComponents::drawTabBar(const GfxRenderer& renderer, const int y, const
   return tabBarHeight;
 }
 
-void ScreenComponents::drawScrollIndicator(const GfxRenderer& renderer, const int currentPage, const int totalPages,
-                                           const int contentTop, const int contentHeight) {
+void ScreenComponents::drawPageFraction(const GfxRenderer& renderer, const int currentPage, const int totalPages,
+                                        const int contentTop, const int contentHeight) {
   if (totalPages <= 1) {
     return;  // No need for indicator if only one page
   }
 
   const int screenWidth = renderer.getScreenWidth();
   constexpr int indicatorWidth = 20;
-  constexpr int arrowSize = 6;
   constexpr int margin = 15;  // Offset from right edge
 
   const int centerX = screenWidth - indicatorWidth / 2 - margin;
   const int indicatorTop = contentTop + 60;  // Offset to avoid overlapping side button hints
   const int indicatorBottom = contentTop + contentHeight - 30;
 
-  // Draw up arrow at top (^) - narrow point at top, wide base at bottom
-  for (int i = 0; i < arrowSize; ++i) {
-    const int lineWidth = 1 + i * 2;
-    const int startX = centerX - i;
-    renderer.drawLine(startX, indicatorTop + i, startX + lineWidth - 1, indicatorTop + i);
-  }
-
-  // Draw down arrow at bottom (v) - wide base at top, narrow point at bottom
-  for (int i = 0; i < arrowSize; ++i) {
-    const int lineWidth = 1 + (arrowSize - 1 - i) * 2;
-    const int startX = centerX - (arrowSize - 1 - i);
-    renderer.drawLine(startX, indicatorBottom - arrowSize + 1 + i, startX + lineWidth - 1,
-                      indicatorBottom - arrowSize + 1 + i);
-  }
-
-  // Draw page fraction in the middle (e.g., "1/3")
+  // Draw page fraction only (e.g., "1/3") - arrows removed
   const std::string pageText = std::to_string(currentPage) + "/" + std::to_string(totalPages);
   const int textWidth = renderer.getTextWidth(SMALL_FONT_ID, pageText.c_str());
   const int textX = centerX - textWidth / 2;
   const int textY = (indicatorTop + indicatorBottom) / 2 - renderer.getLineHeight(SMALL_FONT_ID) / 2;
 
+  // Draw 4-direction outline (up, down, left, right)
+  renderer.drawText(SMALL_FONT_ID, textX - 1, textY, pageText.c_str(), false);  // left
+  renderer.drawText(SMALL_FONT_ID, textX + 1, textY, pageText.c_str(), false);  // right
+  renderer.drawText(SMALL_FONT_ID, textX, textY - 1, pageText.c_str(), false);  // up
+  renderer.drawText(SMALL_FONT_ID, textX, textY + 1, pageText.c_str(), false);  // down
+
+  // Draw the main text in black (over the outline)
   renderer.drawText(SMALL_FONT_ID, textX, textY, pageText.c_str());
 }
 
