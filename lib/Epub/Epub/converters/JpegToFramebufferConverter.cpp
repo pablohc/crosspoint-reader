@@ -119,7 +119,27 @@ bool JpegToFramebufferConverter::decodeToFramebuffer(const std::string& imagePat
   int mcuX = 0;
   int mcuY = 0;
 
+  // Calculate early exit point: stop decoding when we've processed enough MCU rows
+  // Only useful if scale factor is very small (heavy downscaling)
+  int maxMcuYNeeded = imageInfo.m_MCUSPerCol;  // Default: process all
+  if (scale < 0.5) {
+    // For significant downscaling, calculate minimum MCU rows needed
+    int pixelsNeeded = destHeight;
+    int mcuPixelContribution = (int)(imageInfo.m_MCUHeight * scale);
+    if (mcuPixelContribution > 0) {
+      maxMcuYNeeded = (pixelsNeeded + mcuPixelContribution - 1) / mcuPixelContribution;
+      maxMcuYNeeded = (maxMcuYNeeded * 110) / 100;  // 10% margin for safety
+    }
+  }
+
   while (mcuY < imageInfo.m_MCUSPerCol) {
+    // Early exit for heavy downscaling: if we've processed enough MCU rows, stop
+    if (mcuY >= maxMcuYNeeded && scale < 0.5) {
+      Serial.printf("[%lu] [JPG] Early exit: processed %d/%d MCU rows (scale %.2f), saving decode time\n", millis(),
+                    mcuY, imageInfo.m_MCUSPerCol, scale);
+      break;
+    }
+
     status = pjpeg_decode_mcu();
     if (status == PJPG_NO_MORE_BLOCKS) {
       break;

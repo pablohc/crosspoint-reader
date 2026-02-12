@@ -121,28 +121,6 @@ void EpubReaderActivity::onEnter() {
 void EpubReaderActivity::onExit() {
   ActivityWithSubactivity::onExit();
 
-  // Generate PXC thumbnail before destroying epub (while cache is still fresh)
-  // This makes HOME instant next time we return
-  if (epub) {
-    try {
-      auto metrics = UITheme::getInstance().getMetrics();
-      int coverHeight = metrics.homeCoverHeight;
-      
-      Serial.printf("[%lu] [ERS] Generating PXC thumbnail before exit\n", millis());
-      
-      // This will decode JPEG on-the-fly and save PXC
-      bool success = epub->generateThumbPxc(coverHeight, &renderer);
-      
-      if (success) {
-        Serial.printf("[%lu] [ERS] PXC thumbnail generated at exit\n", millis());
-      } else {
-        Serial.printf("[%lu] [ERS] PXC generation at exit: deferred to HOME\n", millis());
-      }
-    } catch (...) {
-      Serial.printf("[%lu] [ERS] Error generating PXC at exit\n", millis());
-    }
-  }
-
   // Reset orientation back to portrait for the rest of the UI
   renderer.setOrientation(GfxRenderer::Orientation::Portrait);
 
@@ -732,6 +710,29 @@ void EpubReaderActivity::renderContents(std::unique_ptr<Page> page, const int or
 
   // restore the bw data
   renderer.restoreBwBuffer();
+
+  // Generate PXC thumbnail after first page render (matches ImageBlock pattern)
+  // This happens immediately after displayBuffer, still inside the mutex
+  if (pendingThumbnailGeneration && epub) {
+    pendingThumbnailGeneration = false;
+    Serial.printf("[%lu] [ERS] Starting PXC generation (right after page render)\n", millis());
+    try {
+      auto metrics = UITheme::getInstance().getMetrics();
+      int coverHeight = metrics.homeCoverHeight;
+      uint32_t startTime = millis();
+
+      bool success = epub->generateThumbPxc(coverHeight, &renderer);
+
+      uint32_t elapsed = millis() - startTime;
+      if (success) {
+        Serial.printf("[%lu] [ERS] PXC generation completed in %lu ms\n", millis(), elapsed);
+      } else {
+        Serial.printf("[%lu] [ERS] PXC generation did not complete (first-time decode)\n", millis());
+      }
+    } catch (const std::exception& e) {
+      Serial.printf("[%lu] [ERS] PXC generation failed: %s\n", millis(), e.what());
+    }
+  }
 }
 
 void EpubReaderActivity::renderStatusBar(const int orientedMarginRight, const int orientedMarginBottom,

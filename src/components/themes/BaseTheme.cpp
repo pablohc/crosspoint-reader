@@ -24,8 +24,8 @@ constexpr int homeMenuMargin = 20;
 constexpr int homeMarginTop = 30;
 
 // Helper function to render from PXC cache file
-bool renderFromPxcCache(GfxRenderer& renderer, const std::string& cachePath,
-                         int destX, int destY, int maxWidth, int maxHeight) {
+bool renderFromPxcCache(GfxRenderer& renderer, const std::string& cachePath, int destX, int destY, int maxWidth,
+                        int maxHeight) {
   FsFile cacheFile;
   if (!Storage.openFileForRead("HOME", cachePath, cacheFile)) {
     return false;
@@ -33,18 +33,18 @@ bool renderFromPxcCache(GfxRenderer& renderer, const std::string& cachePath,
 
   // Read header
   uint16_t cachedWidth, cachedHeight;
-  if (cacheFile.read(&cachedWidth, 2) != 2 ||
-      cacheFile.read(&cachedHeight, 2) != 2) {
+  if (cacheFile.read(&cachedWidth, 2) != 2 || cacheFile.read(&cachedHeight, 2) != 2) {
     cacheFile.close();
     return false;
   }
 
-  // Verify dimensions (allow 1px tolerance for rounding)
+  // Verify dimensions (allow variance for different theme layouts)
+  // Different themes may have slightly different cover dimensions due to layout
   int widthDiff = abs(cachedWidth - maxWidth);
   int heightDiff = abs(cachedHeight - maxHeight);
-  if (widthDiff > 1 || heightDiff > 1) {
-    Serial.printf("[%lu] [HOME] PXC dimension mismatch: %dx%d vs %dx%d\n",
-                  millis(), cachedWidth, cachedHeight, maxWidth, maxHeight);
+  if (widthDiff > 6 || heightDiff > 1) {
+    Serial.printf("[%lu] [HOME] PXC dimension mismatch: %dx%d vs %dx%d\n", millis(), cachedWidth, cachedHeight,
+                  maxWidth, maxHeight);
     cacheFile.close();
     return false;
   }
@@ -53,8 +53,7 @@ bool renderFromPxcCache(GfxRenderer& renderer, const std::string& cachePath,
   int renderX = destX + (maxWidth - cachedWidth) / 2;
   int renderY = destY + (maxHeight - cachedHeight) / 2;
 
-  Serial.printf("[%lu] [HOME] Loading PXC cache: %s (%dx%d)\n",
-                millis(), cachePath.c_str(), cachedWidth, cachedHeight);
+  Serial.printf("[%lu] [HOME] Loading PXC cache: %s (%dx%d)\n", millis(), cachePath.c_str(), cachedWidth, cachedHeight);
 
   // Read and render row by row
   const int bytesPerRow = (cachedWidth + 3) / 4;
@@ -91,8 +90,8 @@ bool renderFromPxcCache(GfxRenderer& renderer, const std::string& cachePath,
 
 // Decode JPEG on-the-fly and render directly to framebuffer
 // This matches ImageBlock pattern: instant visual feedback while caching in background
-bool decodeAndRenderToPxc(GfxRenderer& renderer, const std::string& jpegPath, const std::string& pxcPath,
-                          int destX, int destY, int maxWidth, int maxHeight) {
+bool decodeAndRenderToPxc(GfxRenderer& renderer, const std::string& jpegPath, const std::string& pxcPath, int destX,
+                          int destY, int maxWidth, int maxHeight) {
   // Get decoder for JPEG
   ImageToFramebufferDecoder* decoder = ImageDecoderFactory::getDecoder(jpegPath);
   if (!decoder) {
@@ -109,10 +108,10 @@ bool decodeAndRenderToPxc(GfxRenderer& renderer, const std::string& jpegPath, co
   config.maxWidth = maxWidth;
   config.maxHeight = maxHeight;
   config.useGrayscale = true;
-  config.useDithering = true;        // Quality dithering
+  config.useDithering = true;  // Quality dithering
   config.performanceMode = false;
   config.useExactDimensions = true;
-  config.cachePath = pxcPath;        // Decoder will auto-save PXC while rendering
+  config.cachePath = pxcPath;  // Decoder will auto-save PXC while rendering
 
   uint32_t decodeStart = millis();
   bool success = decoder->decodeToFramebuffer(jpegPath, renderer, config);
@@ -434,31 +433,8 @@ void BaseTheme::drawRecentBookCover(GfxRenderer& renderer, Rect rect, const std:
         }
       }
 
-      // If PXC doesn't exist, try to decode JPEG on-the-fly (ImageBlock pattern)
-      if (!coverLoaded) {
-        // Check for extracted JPEG/PNG from generateThumbPxc()
-        // coverBmpPath is like: /.crosspoint/epub_xxx/thumb_400.bmp
-        // Extracted JPEG is at: /.crosspoint/epub_xxx/.cover.jpg
-        std::string cacheDirPath = coverBmpPath;
-        size_t lastSlash = cacheDirPath.rfind('/');
-        if (lastSlash != std::string::npos) {
-          cacheDirPath = cacheDirPath.substr(0, lastSlash);  // Remove filename, get directory
-        }
-        
-        std::string jpegPath = cacheDirPath + "/.cover.jpg";
-        std::string pngPath = cacheDirPath + "/.cover.png";
-        
-        // Try JPEG first
-        if (Storage.exists(jpegPath.c_str())) {
-          Serial.printf("[%lu] [HOME] Decoding extracted JPEG on-the-fly: %s\n", millis(), jpegPath.c_str());
-          coverLoaded = decodeAndRenderToPxc(renderer, jpegPath, pxcPath, bookX, bookY, bookWidth, bookHeight);
-        }
-        // Try PNG if JPEG didn't work
-        else if (Storage.exists(pngPath.c_str())) {
-          Serial.printf("[%lu] [HOME] Decoding extracted PNG on-the-fly: %s\n", millis(), pngPath.c_str());
-          coverLoaded = decodeAndRenderToPxc(renderer, pngPath, pxcPath, bookX, bookY, bookWidth, bookHeight);
-        }
-      }
+      // Note: JPEG on-the-fly decode happens in Reader exit (EpubReaderActivity), not in HOME
+      // HOME should only show PXC if available, or fall back to BMP/empty
 
       // Fallback to BMP for backward compatibility
       if (!coverLoaded) {

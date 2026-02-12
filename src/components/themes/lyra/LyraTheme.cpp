@@ -12,12 +12,81 @@
 #include "fontIds.h"
 #include "util/StringUtils.h"
 
+// For PXC rendering helper
+#include "Epub/converters/DitherUtils.h"
+
 // Internal constants
 namespace {
 constexpr int batteryPercentSpacing = 4;
 constexpr int hPaddingInSelection = 8;
 constexpr int cornerRadius = 6;
 constexpr int topHintButtonY = 345;
+
+// Helper function to render from PXC cache file
+bool renderFromPxcCache(GfxRenderer& renderer, const std::string& cachePath, int destX, int destY, int maxWidth,
+                        int maxHeight) {
+  FsFile cacheFile;
+  if (!Storage.openFileForRead("HOME", cachePath, cacheFile)) {
+    return false;
+  }
+
+  // Read header
+  uint16_t cachedWidth, cachedHeight;
+  if (cacheFile.read(&cachedWidth, 2) != 2 || cacheFile.read(&cachedHeight, 2) != 2) {
+    cacheFile.close();
+    return false;
+  }
+
+  // Verify dimensions (allow variance for different theme layouts)
+  // Different themes may have slightly different cover dimensions due to layout
+  int widthDiff = abs(cachedWidth - maxWidth);
+  int heightDiff = abs(cachedHeight - maxHeight);
+  if (widthDiff > 6 || heightDiff > 1) {
+    Serial.printf("[%lu] [HOME] PXC dimension mismatch: %dx%d vs %dx%d\n", millis(), cachedWidth, cachedHeight,
+                  maxWidth, maxHeight);
+    cacheFile.close();
+    return false;
+  }
+
+  // Center image in destination area
+  int renderX = destX + (maxWidth - cachedWidth) / 2;
+  int renderY = destY + (maxHeight - cachedHeight) / 2;
+
+  Serial.printf("[%lu] [HOME] Loading PXC cache: %s (%dx%d)\n", millis(), cachePath.c_str(), cachedWidth, cachedHeight);
+
+  // Read and render row by row
+  const int bytesPerRow = (cachedWidth + 3) / 4;
+  uint8_t* rowBuffer = (uint8_t*)malloc(bytesPerRow);
+  if (!rowBuffer) {
+    Serial.printf("[%lu] [HOME] Failed to allocate row buffer\n", millis());
+    cacheFile.close();
+    return false;
+  }
+
+  for (int row = 0; row < cachedHeight; row++) {
+    if (cacheFile.read(rowBuffer, bytesPerRow) != bytesPerRow) {
+      Serial.printf("[%lu] [HOME] PXC read error at row %d\n", millis(), row);
+      free(rowBuffer);
+      cacheFile.close();
+      return false;
+    }
+
+    int rowY = renderY + row;
+    for (int col = 0; col < cachedWidth; col++) {
+      int byteIdx = col / 4;
+      int bitShift = 6 - (col % 4) * 2;  // MSB first
+      uint8_t pixelValue = (rowBuffer[byteIdx] >> bitShift) & 0x03;
+
+      drawPixelWithRenderMode(renderer, renderX + col, rowY, pixelValue);
+    }
+  }
+
+  free(rowBuffer);
+  cacheFile.close();
+  Serial.printf("[%lu] [HOME] PXC render complete\n", millis());
+  return true;
+}
+
 }  // namespace
 
 void LyraTheme::drawBattery(const GfxRenderer& renderer, Rect rect, const bool showPercentage) const {
@@ -276,29 +345,57 @@ void LyraTheme::drawRecentBookCover(GfxRenderer& renderer, Rect rect, const std:
         std::string coverPath = recentBooks[i].coverBmpPath;
         bool hasCover = true;
         int tileX = LyraMetrics::values.contentSidePadding + tileWidth * i;
+        int coverDrawX = tileX + hPaddingInSelection;
+        int coverDrawY = tileY + hPaddingInSelection;
+        int coverDrawWidth = tileWidth - 2 * hPaddingInSelection;
+        int coverDrawHeight = LyraMetrics::values.homeCoverHeight;
+
         if (coverPath.empty()) {
           hasCover = false;
         } else {
           const std::string coverBmpPath = UITheme::getCoverThumbPath(coverPath, LyraMetrics::values.homeCoverHeight);
 
-          // First time: load cover from SD and render
-          FsFile file;
-          if (Storage.openFileForRead("HOME", coverBmpPath, file)) {
-            Bitmap bitmap(file);
-            if (bitmap.parseHeaders() == BmpReaderError::Ok) {
-              float coverHeight = static_cast<float>(bitmap.getHeight());
-              float coverWidth = static_cast<float>(bitmap.getWidth());
-              float ratio = coverWidth / coverHeight;
-              const float tileRatio = static_cast<float>(tileWidth - 2 * hPaddingInSelection) /
-                                      static_cast<float>(LyraMetrics::values.homeCoverHeight);
-              float cropX = 1.0f - (tileRatio / ratio);
+          // Try PXC cache first (new format)
+          std::string pxcPath = coverBmpPath;
+          size_t dotPos = pxcPath.rfind('.');
+          if (dotPos != std::string::npos) {
+            pxcPath = pxcPath.substr(0, dotPos) + ".pxc";
+          }
 
-              renderer.drawBitmap(bitmap, tileX + hPaddingInSelection, tileY + hPaddingInSelection,
-                                  tileWidth - 2 * hPaddingInSelection, LyraMetrics::values.homeCoverHeight, cropX);
-            } else {
-              hasCover = false;
+          bool coverLoaded = false;
+
+          // Try PXC first (faster, better quality)
+          if (Storage.exists(pxcPath.c_str())) {
+            Serial.printf("[%lu] [HOME] Loading PXC cache: %s\n", millis(), pxcPath.c_str());
+            coverLoaded =
+                renderFromPxcCache(renderer, pxcPath, coverDrawX, coverDrawY, coverDrawWidth, coverDrawHeight);
+            if (coverLoaded) {
+              Serial.printf("[%lu] [HOME] PXC render successful\n", millis());
             }
-            file.close();
+          }
+
+          // Fallback to BMP for backward compatibility (if PXC not available)
+          if (!coverLoaded) {
+            FsFile file;
+            if (Storage.openFileForRead("HOME", coverBmpPath, file)) {
+              Bitmap bitmap(file);
+              if (bitmap.parseHeaders() == BmpReaderError::Ok) {
+                Serial.printf("[%lu] [HOME] Rendering BMP fallback\n", millis());
+                float coverHeight = static_cast<float>(bitmap.getHeight());
+                float coverWidth = static_cast<float>(bitmap.getWidth());
+                float ratio = coverWidth / coverHeight;
+                const float tileRatio = static_cast<float>(coverDrawWidth) / static_cast<float>(coverDrawHeight);
+                float cropX = 1.0f - (tileRatio / ratio);
+
+                renderer.drawBitmap(bitmap, coverDrawX, coverDrawY, coverDrawWidth, coverDrawHeight, cropX);
+                coverLoaded = true;
+              }
+              file.close();
+            }
+          }
+
+          if (!coverLoaded) {
+            hasCover = false;
           }
         }
 
