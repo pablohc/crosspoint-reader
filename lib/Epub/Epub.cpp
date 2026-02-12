@@ -1,6 +1,7 @@
 #include "Epub.h"
 
 #include <FsHelpers.h>
+#include <GfxRenderer.h>
 #include <HalStorage.h>
 #include <HardwareSerial.h>
 #include <JpegToBmpConverter.h>
@@ -10,6 +11,9 @@
 #include "Epub/parsers/ContentOpfParser.h"
 #include "Epub/parsers/TocNavParser.h"
 #include "Epub/parsers/TocNcxParser.h"
+
+#include "Epub/converters/ImageDecoderFactory.h"
+#include "Epub/converters/PixelCache.h"
 
 bool Epub::findContentOpfFile(std::string* contentOpfFile) const {
   const auto containerPath = "META-INF/container.xml";
@@ -577,6 +581,113 @@ bool Epub::generateThumbBmp(int height) const {
   Storage.openFileForWrite("EBP", getThumbBmpPath(height), thumbBmp);
   thumbBmp.close();
   return false;
+}
+
+std::string Epub::getThumbPxcPath(int height) const {
+  return cachePath + "/thumb_" + std::to_string(height) + ".pxc";
+}
+
+bool Epub::generateThumbPxc(int height, GfxRenderer* renderer) const {
+  std::string pxcPath = getThumbPxcPath(height);
+
+  // Already generated, return true
+  if (Storage.exists(pxcPath.c_str())) {
+    Serial.printf("[%lu] [EBP] PXC cache already exists: %s\n", millis(), pxcPath.c_str());
+    return true;
+  }
+
+  if (!bookMetadataCache || !bookMetadataCache->isLoaded()) {
+    Serial.printf("[%lu] [EBP] Cannot generate thumb PXC, cache not loaded\n", millis());
+    return false;
+  }
+
+  const auto coverImageHref = bookMetadataCache->coreMetadata.coverItemHref;
+  if (coverImageHref.empty()) {
+    Serial.printf("[%lu] [EBP] No known cover image for thumbnail\n", millis());
+    return false;
+  }
+
+  // Determine cover image extension
+  std::string coverExt = ".jpg";  // default
+  size_t dotPos = coverImageHref.rfind('.');
+  if (dotPos != std::string::npos) {
+    coverExt = coverImageHref.substr(dotPos);
+    // Normalize to lowercase
+    for (auto& c : coverExt) {
+      c = tolower(c);
+    }
+  }
+
+  // Extract cover image from EPUB to cache directory
+  std::string coverTempPath;
+  if (coverExt == ".jpg" || coverExt == ".jpeg") {
+    coverTempPath = getCachePath() + "/.cover.jpg";
+  } else if (coverExt == ".png") {
+    coverTempPath = getCachePath() + "/.cover.png";
+  } else {
+    Serial.printf("[%lu] [EBP] Unsupported cover format: %s\n", millis(), coverExt.c_str());
+    return false;
+  }
+
+  // Extract cover image if not already present
+  if (!Storage.exists(coverTempPath.c_str())) {
+    FsFile coverFile;
+    if (!Storage.openFileForWrite("EBP", coverTempPath, coverFile)) {
+      Serial.printf("[%lu] [EBP] Failed to create cover image file: %s\n", millis(), coverTempPath.c_str());
+      return false;
+    }
+
+    bool extracted = readItemContentsToStream(coverImageHref, coverFile, 1024);
+    coverFile.close();
+
+    if (!extracted) {
+      Serial.printf("[%lu] [EBP] Failed to extract cover image from EPUB\n", millis());
+      Storage.remove(coverTempPath.c_str());
+      return false;
+    }
+
+    Serial.printf("[%lu] [EBP] Cover image extracted: %s\n", millis(), coverTempPath.c_str());
+  } else {
+    Serial.printf("[%lu] [EBP] Cover image already exists: %s\n", millis(), coverTempPath.c_str());
+  }
+
+  // If renderer is provided, use decoder to generate PXC
+  if (renderer) {
+    ImageToFramebufferDecoder* decoder = ImageDecoderFactory::getDecoder(coverTempPath);
+    if (!decoder) {
+      Serial.printf("[%lu] [EBP] No decoder available for: %s\n", millis(), coverTempPath.c_str());
+      return false;
+    }
+
+    RenderConfig config;
+    config.x = 0;
+    config.y = 0;
+    config.maxWidth = height * 0.6;   // Maintain aspect ratio (assumed 3:5)
+    config.maxHeight = height;
+    config.useGrayscale = true;
+    config.useDithering = true;
+    config.performanceMode = false;
+    config.useExactDimensions = true;
+    config.cachePath = pxcPath;  // Decoder will write PXC file here
+
+    Serial.printf("[%lu] [EBP] Starting PXC generation: %dx%d at %s\n", 
+                  millis(), config.maxWidth, config.maxHeight, pxcPath.c_str());
+
+    bool success = decoder->decodeToFramebuffer(coverTempPath, *renderer, config);
+
+    if (success) {
+      Serial.printf("[%lu] [EBP] PXC cache generated successfully: %s\n", millis(), pxcPath.c_str());
+      return true;
+    } else {
+      Serial.printf("[%lu] [EBP] PXC generation failed, removing incomplete file\n", millis());
+      Storage.remove(pxcPath.c_str());
+      return false;
+    }
+  } else {
+    // No renderer provided: just extract image and defer PXC creation to first render
+    Serial.printf("[%lu] [EBP] PXC deferred to render (no renderer available), triggering BMP fallback\n", millis());
+    return false;
+  }
 }
 
 uint8_t* Epub::readItemContentsToBytes(const std::string& itemHref, size_t* size, const bool trailingNullByte) const {

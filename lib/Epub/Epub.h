@@ -58,6 +58,8 @@ class Epub {
   std::string getThumbBmpPath() const;
   std::string getThumbBmpPath(int height) const;
   bool generateThumbBmp(int height) const;
+  std::string getThumbPxcPath(int height) const;
+  bool generateThumbPxc(int height, class GfxRenderer* renderer = nullptr) const;
   uint8_t* readItemContentsToBytes(const std::string& itemHref, size_t* size = nullptr,
                                    bool trailingNullByte = false) const;
   bool readItemContentsToStream(const std::string& itemHref, Print& out, size_t chunkSize) const;

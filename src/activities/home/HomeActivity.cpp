@@ -61,26 +61,50 @@ void HomeActivity::loadRecentCovers(int coverHeight) {
   Rect popupRect;
 
   int progress = 0;
+  Serial.printf("[%lu] [HOME] loadRecentCovers: starting, %d books\n", millis(), recentBooks.size());
+
   for (RecentBook& book : recentBooks) {
+    Serial.printf("[%lu] [HOME] Processing book: %s, coverPath: '%s'\n", millis(), book.path.c_str(), book.coverBmpPath.c_str());
+
     if (!book.coverBmpPath.empty()) {
       std::string coverPath = UITheme::getCoverThumbPath(book.coverBmpPath, coverHeight);
-      if (!Storage.exists(coverPath.c_str())) {
+      std::string pxcPath = coverPath;
+      size_t dotPos = pxcPath.rfind('.');
+      if (dotPos != std::string::npos) {
+        pxcPath = pxcPath.substr(0, dotPos) + ".pxc";
+      }
+
+      Serial.printf("[%lu] [HOME] Checking caches: BMP=%s, PXC=%s\n", millis(), coverPath.c_str(), pxcPath.c_str());
+
+      // Check if either cache exists
+      if (!Storage.exists(coverPath.c_str()) && !Storage.exists(pxcPath.c_str())) {
+        Serial.printf("[%lu] [HOME] No cache found, generating...\n", millis());
         // If epub, try to load the metadata for title/author and cover
         if (StringUtils::checkFileExtension(book.path, ".epub")) {
           Epub epub(book.path, "/.crosspoint");
           // Skip loading css since we only need metadata here
           epub.load(false, true);
 
-          // Try to generate thumbnail image for Continue Reading card
-          if (!showingLoading) {
-            showingLoading = true;
-            popupRect = GUI.drawPopup(renderer, "Loading...");
-          }
-          GUI.fillPopupProgress(renderer, popupRect, 10 + progress * (90 / recentBooks.size()));
-          bool success = epub.generateThumbBmp(coverHeight);
+          // Extract cover image for fast first render (decode happens in drawRecentBookCover)
+          // This matches the ImageBlock pattern used in Reader: instant feedback
+          bool success = epub.generateThumbPxc(coverHeight);  // No renderer - just extracts JPEG
+          
           if (!success) {
+            Serial.printf("[%lu] [HOME] Failed to extract cover image\n", millis());
             RECENT_BOOKS.updateBook(book.path, book.title, book.author, "");
             book.coverBmpPath = "";
+          }
+
+          if (success) {
+            // Update the cover path to point to the cache
+            // Use getThumbBmpPath as base (drawRecentBookCover will try .pxc first)
+            RECENT_BOOKS.updateBook(book.path, book.title, book.author, epub.getThumbBmpPath(coverHeight));
+            book.coverBmpPath = epub.getThumbBmpPath(coverHeight);
+            Serial.printf("[%lu] [HOME] Cover cache updated: %s\n", millis(), book.coverBmpPath.c_str());
+          } else {
+            RECENT_BOOKS.updateBook(book.path, book.title, book.author, "");
+            book.coverBmpPath = "";
+            Serial.printf("[%lu] [HOME] Cover generation failed\n", millis());
           }
           coverRendered = false;
           updateRequired = true;
@@ -104,13 +128,18 @@ void HomeActivity::loadRecentCovers(int coverHeight) {
             updateRequired = true;
           }
         }
+      } else {
+        Serial.printf("[%lu] [HOME] Cache already exists\n", millis());
       }
+    } else {
+      Serial.printf("[%lu] [HOME] Skipping book - empty coverBmpPath\n", millis());
     }
     progress++;
   }
 
   recentsLoaded = true;
   recentsLoading = false;
+  Serial.printf("[%lu] [HOME] loadRecentCovers: complete, updateRequired=%d\n", millis(), updateRequired);
 }
 
 void HomeActivity::onEnter() {
@@ -240,6 +269,24 @@ void HomeActivity::displayTaskLoop() {
     if (updateRequired) {
       updateRequired = false;
       xSemaphoreTake(renderingMutex, portMAX_DELAY);
+
+      // Reload recentBooks from store if covers were just generated
+      if (recentsLoaded) {
+        const auto& storedBooks = RECENT_BOOKS.getBooks();
+        recentBooks.clear();
+        recentBooks.reserve(std::min(static_cast<int>(storedBooks.size()),
+                                      static_cast<int>(UITheme::getInstance().getMetrics().homeRecentBooksCount)));
+        for (const RecentBook& book : storedBooks) {
+          if (recentBooks.size() >= UITheme::getInstance().getMetrics().homeRecentBooksCount) {
+            break;
+          }
+          if (Storage.exists(book.path.c_str())) {
+            recentBooks.push_back(book);
+          }
+        }
+        Serial.printf("[%lu] [HOME] Reloaded %d recent books from store\n", millis(), recentBooks.size());
+      }
+
       render();
       xSemaphoreGive(renderingMutex);
     }

@@ -12,11 +12,121 @@
 #include "components/UITheme.h"
 #include "fontIds.h"
 
+// For PXC rendering
+#include "Epub/converters/DitherUtils.h"
+#include "Epub/converters/ImageDecoderFactory.h"
+#include "Epub/converters/PixelCache.h"
+
 // Internal constants
 namespace {
 constexpr int batteryPercentSpacing = 4;
 constexpr int homeMenuMargin = 20;
 constexpr int homeMarginTop = 30;
+
+// Helper function to render from PXC cache file
+bool renderFromPxcCache(GfxRenderer& renderer, const std::string& cachePath,
+                         int destX, int destY, int maxWidth, int maxHeight) {
+  FsFile cacheFile;
+  if (!Storage.openFileForRead("HOME", cachePath, cacheFile)) {
+    return false;
+  }
+
+  // Read header
+  uint16_t cachedWidth, cachedHeight;
+  if (cacheFile.read(&cachedWidth, 2) != 2 ||
+      cacheFile.read(&cachedHeight, 2) != 2) {
+    cacheFile.close();
+    return false;
+  }
+
+  // Verify dimensions (allow 1px tolerance for rounding)
+  int widthDiff = abs(cachedWidth - maxWidth);
+  int heightDiff = abs(cachedHeight - maxHeight);
+  if (widthDiff > 1 || heightDiff > 1) {
+    Serial.printf("[%lu] [HOME] PXC dimension mismatch: %dx%d vs %dx%d\n",
+                  millis(), cachedWidth, cachedHeight, maxWidth, maxHeight);
+    cacheFile.close();
+    return false;
+  }
+
+  // Center image in destination area
+  int renderX = destX + (maxWidth - cachedWidth) / 2;
+  int renderY = destY + (maxHeight - cachedHeight) / 2;
+
+  Serial.printf("[%lu] [HOME] Loading PXC cache: %s (%dx%d)\n",
+                millis(), cachePath.c_str(), cachedWidth, cachedHeight);
+
+  // Read and render row by row
+  const int bytesPerRow = (cachedWidth + 3) / 4;
+  uint8_t* rowBuffer = (uint8_t*)malloc(bytesPerRow);
+  if (!rowBuffer) {
+    Serial.printf("[%lu] [HOME] Failed to allocate row buffer\n", millis());
+    cacheFile.close();
+    return false;
+  }
+
+  for (int row = 0; row < cachedHeight; row++) {
+    if (cacheFile.read(rowBuffer, bytesPerRow) != bytesPerRow) {
+      Serial.printf("[%lu] [HOME] PXC read error at row %d\n", millis(), row);
+      free(rowBuffer);
+      cacheFile.close();
+      return false;
+    }
+
+    int rowY = renderY + row;
+    for (int col = 0; col < cachedWidth; col++) {
+      int byteIdx = col / 4;
+      int bitShift = 6 - (col % 4) * 2;  // MSB first
+      uint8_t pixelValue = (rowBuffer[byteIdx] >> bitShift) & 0x03;
+
+      drawPixelWithRenderMode(renderer, renderX + col, rowY, pixelValue);
+    }
+  }
+
+  free(rowBuffer);
+  cacheFile.close();
+  Serial.printf("[%lu] [HOME] PXC render complete\n", millis());
+  return true;
+}
+
+// Decode JPEG on-the-fly and render directly to framebuffer
+// This matches ImageBlock pattern: instant visual feedback while caching in background
+bool decodeAndRenderToPxc(GfxRenderer& renderer, const std::string& jpegPath, const std::string& pxcPath,
+                          int destX, int destY, int maxWidth, int maxHeight) {
+  // Get decoder for JPEG
+  ImageToFramebufferDecoder* decoder = ImageDecoderFactory::getDecoder(jpegPath);
+  if (!decoder) {
+    Serial.printf("[%lu] [HOME] No decoder available for: %s\n", millis(), jpegPath.c_str());
+    return false;
+  }
+
+  Serial.printf("[%lu] [HOME] Decoding JPEG on-the-fly: %s\n", millis(), jpegPath.c_str());
+
+  // Configure decode to render directly to screen AND cache PXC
+  RenderConfig config;
+  config.x = destX;
+  config.y = destY;
+  config.maxWidth = maxWidth;
+  config.maxHeight = maxHeight;
+  config.useGrayscale = true;
+  config.useDithering = true;        // Quality dithering
+  config.performanceMode = false;
+  config.useExactDimensions = true;
+  config.cachePath = pxcPath;        // Decoder will auto-save PXC while rendering
+
+  uint32_t decodeStart = millis();
+  bool success = decoder->decodeToFramebuffer(jpegPath, renderer, config);
+  uint32_t decodeTime = millis() - decodeStart;
+
+  if (success) {
+    Serial.printf("[%lu] [HOME] JPEG decoded and rendered in %lu ms, PXC cached\n", millis(), decodeTime);
+    return true;
+  } else {
+    Serial.printf("[%lu] [HOME] Failed to decode JPEG\n", millis());
+    return false;
+  }
+}
+
 }  // namespace
 
 void BaseTheme::drawBattery(const GfxRenderer& renderer, Rect rect, const bool showPercentage) const {
@@ -306,51 +416,101 @@ void BaseTheme::drawRecentBookCover(GfxRenderer& renderer, Rect rect, const std:
       const std::string coverBmpPath =
           UITheme::getCoverThumbPath(recentBooks[0].coverBmpPath, BaseMetrics::values.homeCoverHeight);
 
-      // First time: load cover from SD and render
-      FsFile file;
-      if (Storage.openFileForRead("HOME", coverBmpPath, file)) {
-        Bitmap bitmap(file);
-        if (bitmap.parseHeaders() == BmpReaderError::Ok) {
-          Serial.printf("Rendering bmp\n");
-          // Calculate position to center image within the book card
-          int coverX, coverY;
+      // Try PXC cache first (new format from PR #556)
+      std::string pxcPath = coverBmpPath;
+      size_t dotPos = pxcPath.rfind('.');
+      if (dotPos != std::string::npos) {
+        pxcPath = pxcPath.substr(0, dotPos) + ".pxc";
+      }
 
-          if (bitmap.getWidth() > bookWidth || bitmap.getHeight() > bookHeight) {
-            const float imgRatio = static_cast<float>(bitmap.getWidth()) / static_cast<float>(bitmap.getHeight());
-            const float boxRatio = static_cast<float>(bookWidth) / static_cast<float>(bookHeight);
+      bool coverLoaded = false;
 
-            if (imgRatio > boxRatio) {
-              coverX = bookX;
-              coverY = bookY + (bookHeight - static_cast<int>(bookWidth / imgRatio)) / 2;
-            } else {
-              coverX = bookX + (bookWidth - static_cast<int>(bookHeight * imgRatio)) / 2;
-              coverY = bookY;
-            }
-          } else {
-            coverX = bookX + (bookWidth - bitmap.getWidth()) / 2;
-            coverY = bookY + (bookHeight - bitmap.getHeight()) / 2;
-          }
-
-          // Draw the cover image centered within the book card
-          renderer.drawBitmap(bitmap, coverX, coverY, bookWidth, bookHeight);
-
-          // Draw border around the card
-          renderer.drawRect(bookX, bookY, bookWidth, bookHeight);
-
-          // No bookmark ribbon when cover is shown - it would just cover the art
-
-          // Store the buffer with cover image for fast navigation
-          coverBufferStored = storeCoverBuffer();
-          coverRendered = true;
-
-          // First render: if selected, draw selection indicators now
-          if (bookSelected) {
-            Serial.printf("Drawing selection\n");
-            renderer.drawRect(bookX + 1, bookY + 1, bookWidth - 2, bookHeight - 2);
-            renderer.drawRect(bookX + 2, bookY + 2, bookWidth - 4, bookHeight - 4);
-          }
+      // Try PXC first (faster, better quality)
+      if (Storage.exists(pxcPath.c_str())) {
+        Serial.printf("[%lu] [HOME] Loading PXC cache: %s\n", millis(), pxcPath.c_str());
+        coverLoaded = renderFromPxcCache(renderer, pxcPath, bookX, bookY, bookWidth, bookHeight);
+        if (coverLoaded) {
+          Serial.printf("[%lu] [HOME] PXC render successful\n", millis());
         }
-        file.close();
+      }
+
+      // If PXC doesn't exist, try to decode JPEG on-the-fly (ImageBlock pattern)
+      if (!coverLoaded) {
+        // Check for extracted JPEG/PNG from generateThumbPxc()
+        // coverBmpPath is like: /.crosspoint/epub_xxx/thumb_400.bmp
+        // Extracted JPEG is at: /.crosspoint/epub_xxx/.cover.jpg
+        std::string cacheDirPath = coverBmpPath;
+        size_t lastSlash = cacheDirPath.rfind('/');
+        if (lastSlash != std::string::npos) {
+          cacheDirPath = cacheDirPath.substr(0, lastSlash);  // Remove filename, get directory
+        }
+        
+        std::string jpegPath = cacheDirPath + "/.cover.jpg";
+        std::string pngPath = cacheDirPath + "/.cover.png";
+        
+        // Try JPEG first
+        if (Storage.exists(jpegPath.c_str())) {
+          Serial.printf("[%lu] [HOME] Decoding extracted JPEG on-the-fly: %s\n", millis(), jpegPath.c_str());
+          coverLoaded = decodeAndRenderToPxc(renderer, jpegPath, pxcPath, bookX, bookY, bookWidth, bookHeight);
+        }
+        // Try PNG if JPEG didn't work
+        else if (Storage.exists(pngPath.c_str())) {
+          Serial.printf("[%lu] [HOME] Decoding extracted PNG on-the-fly: %s\n", millis(), pngPath.c_str());
+          coverLoaded = decodeAndRenderToPxc(renderer, pngPath, pxcPath, bookX, bookY, bookWidth, bookHeight);
+        }
+      }
+
+      // Fallback to BMP for backward compatibility
+      if (!coverLoaded) {
+        FsFile file;
+        if (Storage.openFileForRead("HOME", coverBmpPath, file)) {
+          Bitmap bitmap(file);
+          if (bitmap.parseHeaders() == BmpReaderError::Ok) {
+            Serial.printf("[%lu] [HOME] Rendering BMP fallback\n", millis());
+            // Calculate position to center image within the book card
+            int coverX, coverY;
+
+            if (bitmap.getWidth() > bookWidth || bitmap.getHeight() > bookHeight) {
+              const float imgRatio = static_cast<float>(bitmap.getWidth()) / static_cast<float>(bitmap.getHeight());
+              const float boxRatio = static_cast<float>(bookWidth) / static_cast<float>(bookHeight);
+
+              if (imgRatio > boxRatio) {
+                coverX = bookX;
+                coverY = bookY + (bookHeight - static_cast<int>(bookWidth / imgRatio)) / 2;
+              } else {
+                coverX = bookX + (bookWidth - static_cast<int>(bookHeight * imgRatio)) / 2;
+                coverY = bookY;
+              }
+            } else {
+              coverX = bookX + (bookWidth - bitmap.getWidth()) / 2;
+              coverY = bookY + (bookHeight - bitmap.getHeight()) / 2;
+            }
+
+            // Draw the cover image centered within the book card
+            renderer.drawBitmap(bitmap, coverX, coverY, bookWidth, bookHeight);
+            coverLoaded = true;
+          }
+          file.close();
+        }
+      }
+
+      // Common post-render logic
+      if (coverLoaded) {
+        // Draw border around the card
+        renderer.drawRect(bookX, bookY, bookWidth, bookHeight);
+
+        // No bookmark ribbon when cover is shown - it would just cover the art
+
+        // Store the buffer with cover image for fast navigation
+        coverBufferStored = storeCoverBuffer();
+        coverRendered = true;
+
+        // First render: if selected, draw selection indicators now
+        if (bookSelected) {
+          Serial.printf("[%lu] [HOME] Drawing selection\n", millis());
+          renderer.drawRect(bookX + 1, bookY + 1, bookWidth - 2, bookHeight - 2);
+          renderer.drawRect(bookX + 2, bookY + 2, bookWidth - 4, bookHeight - 4);
+        }
       }
     }
 
