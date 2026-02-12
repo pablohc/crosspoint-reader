@@ -20,7 +20,7 @@ constexpr int cornerRadius = 6;
 constexpr int topHintButtonY = 345;
 }  // namespace
 
-void LyraTheme::drawBattery(const GfxRenderer& renderer, Rect rect, const bool showPercentage) const {
+void LyraTheme::drawBatteryLeft(const GfxRenderer& renderer, Rect rect, const bool showPercentage) const {
   // Left aligned: icon on left, percentage on right (reader mode)
   const uint16_t percentage = battery.readPercentage();
   const int y = rect.y + 6;
@@ -57,7 +57,7 @@ void LyraTheme::drawBattery(const GfxRenderer& renderer, Rect rect, const bool s
   }
 }
 
-void LyraTheme::drawBatteryUi(const GfxRenderer& renderer, Rect rect, const bool showPercentage) const {
+void LyraTheme::drawBatteryRight(const GfxRenderer& renderer, Rect rect, const bool showPercentage) const {
   // Right aligned: percentage on left, icon on right (UI headers)
   const uint16_t percentage = battery.readPercentage();
   const int y = rect.y + 6;
@@ -67,6 +67,9 @@ void LyraTheme::drawBatteryUi(const GfxRenderer& renderer, Rect rect, const bool
   if (showPercentage) {
     const auto percentageText = std::to_string(percentage) + "%";
     textWidth = renderer.getTextWidth(SMALL_FONT_ID, percentageText.c_str());
+    // Clear the area where we're going to draw the text to prevent ghosting
+    const auto textHeight = renderer.getTextHeight(SMALL_FONT_ID);
+    renderer.fillRect(rect.x - textWidth - batteryPercentSpacing, rect.y, textWidth, textHeight, false);
     // Draw text to the left of the icon
     renderer.drawText(SMALL_FONT_ID, rect.x - textWidth - batteryPercentSpacing, rect.y, percentageText.c_str());
   }
@@ -102,11 +105,11 @@ void LyraTheme::drawHeader(const GfxRenderer& renderer, Rect rect, const char* t
 
   const bool showBatteryPercentage =
       SETTINGS.hideBatteryPercentage != CrossPointSettings::HIDE_BATTERY_PERCENTAGE::HIDE_ALWAYS;
-  // Position icon at right edge, drawBatteryUi will place text to the left
+  // Position icon at right edge, drawBatteryRight will place text to the left
   const int batteryX = rect.x + rect.width - 12 - LyraMetrics::values.batteryWidth;
-  drawBatteryUi(renderer,
-                Rect{batteryX, rect.y + 5, LyraMetrics::values.batteryWidth, LyraMetrics::values.batteryHeight},
-                showBatteryPercentage);
+  drawBatteryRight(renderer,
+                   Rect{batteryX, rect.y + 5, LyraMetrics::values.batteryWidth, LyraMetrics::values.batteryHeight},
+                   showBatteryPercentage);
 
   if (title) {
     auto truncatedTitle = renderer.truncatedText(

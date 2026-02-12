@@ -42,7 +42,7 @@ void drawBatteryIcon(const GfxRenderer& renderer, int x, int y, int battWidth, i
 }
 }  // namespace
 
-void BaseTheme::drawBattery(const GfxRenderer& renderer, Rect rect, const bool showPercentage) const {
+void BaseTheme::drawBatteryLeft(const GfxRenderer& renderer, Rect rect, const bool showPercentage) const {
   // Left aligned: icon on left, percentage on right (reader mode)
   const uint16_t percentage = battery.readPercentage();
   const int y = rect.y + 6;
@@ -56,7 +56,7 @@ void BaseTheme::drawBattery(const GfxRenderer& renderer, Rect rect, const bool s
   drawBatteryIcon(renderer, rect.x, y, BaseMetrics::values.batteryWidth, rect.height, percentage);
 }
 
-void BaseTheme::drawBatteryUi(const GfxRenderer& renderer, Rect rect, const bool showPercentage) const {
+void BaseTheme::drawBatteryRight(const GfxRenderer& renderer, Rect rect, const bool showPercentage) const {
   // Right aligned: percentage on left, icon on right (UI headers)
   // rect.x is already positioned for the icon (drawHeader calculated it)
   const uint16_t percentage = battery.readPercentage();
@@ -66,6 +66,9 @@ void BaseTheme::drawBatteryUi(const GfxRenderer& renderer, Rect rect, const bool
   if (showPercentage) {
     const auto percentageText = std::to_string(percentage) + "%";
     textWidth = renderer.getTextWidth(SMALL_FONT_ID, percentageText.c_str());
+    // Clear the area where we're going to draw the text to prevent ghosting
+    const auto textHeight = renderer.getTextHeight(SMALL_FONT_ID);
+    renderer.fillRect(rect.x - textWidth - batteryPercentSpacing, rect.y, textWidth, textHeight, false);
     // Draw text to the left of the icon
     renderer.drawText(SMALL_FONT_ID, rect.x - textWidth - batteryPercentSpacing, rect.y, percentageText.c_str());
   }
@@ -250,11 +253,11 @@ void BaseTheme::drawList(const GfxRenderer& renderer, Rect rect, int itemCount, 
 void BaseTheme::drawHeader(const GfxRenderer& renderer, Rect rect, const char* title) const {
   const bool showBatteryPercentage =
       SETTINGS.hideBatteryPercentage != CrossPointSettings::HIDE_BATTERY_PERCENTAGE::HIDE_ALWAYS;
-  // Position icon at right edge, drawBatteryUi will place text to the left
+  // Position icon at right edge, drawBatteryRight will place text to the left
   const int batteryX = rect.x + rect.width - 12 - BaseMetrics::values.batteryWidth;
-  drawBatteryUi(renderer,
-                Rect{batteryX, rect.y + 5, BaseMetrics::values.batteryWidth, BaseMetrics::values.batteryHeight},
-                showBatteryPercentage);
+  drawBatteryRight(renderer,
+                   Rect{batteryX, rect.y + 5, BaseMetrics::values.batteryWidth, BaseMetrics::values.batteryHeight},
+                   showBatteryPercentage);
 
   if (title) {
     int padding = rect.width - batteryX + BaseMetrics::values.batteryWidth;
