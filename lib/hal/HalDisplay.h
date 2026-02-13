@@ -34,6 +34,10 @@ class HalDisplay {
   void displayBuffer(RefreshMode mode = RefreshMode::FAST_REFRESH, bool turnOffScreen = false);
   void refreshDisplay(RefreshMode mode = RefreshMode::FAST_REFRESH, bool turnOffScreen = false);
 
+  // EXPERIMENTAL: Display only a rectangular region
+  void displayWindow(uint16_t x, uint16_t y, uint16_t w, uint16_t h,
+                     RefreshMode mode = RefreshMode::FAST_REFRESH, bool turnOffScreen = false);
+
   // Power management
   void deepSleep();
 

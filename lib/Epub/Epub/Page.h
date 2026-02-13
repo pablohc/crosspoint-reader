@@ -49,6 +49,9 @@ class PageImage final : public PageElement {
   bool serialize(FsFile& file) override;
   PageElementTag getTag() const override { return TAG_PageImage; }
   static std::unique_ptr<PageImage> deserialize(FsFile& file);
+
+  // Helper to get image block dimensions (needed for bounding box calculation)
+  ImageBlock* getImageBlock() const { return imageBlock.get(); }
 };
 
 class Page {
@@ -64,4 +67,9 @@ class Page {
     return std::any_of(elements.begin(), elements.end(),
                        [](const std::shared_ptr<PageElement>& el) { return el->getTag() == TAG_PageImage; });
   }
+
+  // Get the bounding box of all images on this page.
+  // Returns true if page has images and fills out the bounding box coordinates.
+  // If no images, returns false.
+  bool getImageBoundingBox(int& outX, int& outY, int& outWidth, int& outHeight) const;
 };
