@@ -694,13 +694,19 @@ void EpubReaderActivity::renderContents(std::unique_ptr<Page> page, const int or
   if (forceFullRefresh) {
     int imgX, imgY, imgW, imgH;
     if (page->getImageBoundingBox(imgX, imgY, imgW, imgH)) {
-      Serial.printf("[%lu] [ERS] Image page detected, using fast double-refresh (bbox: %d,%d %dx%d)\n",
-                   millis(), imgX, imgY, imgW, imgH);
+      // Calculate screen coordinates (page bbox + margin offsets)
+      int screenX = imgX + orientedMarginLeft;
+      int screenY = imgY + orientedMarginTop;
+      Serial.printf("[%lu] [ERS] Image page detected, using fast double-refresh "
+                   "(page bbox: %d,%d %dx%d, screen: %d,%d %dx%d)\n",
+                   millis(), imgX, imgY, imgW, imgH, screenX, screenY, imgW, imgH);
 
 #if USE_IMAGE_DOUBLE_FAST_REFRESH == 0
       // Method A: Fill blank area + two FAST_REFRESH operations
+      // IMPORTANT: Bounding box coordinates are relative to page origin (0,0),
+      // but we need to add the margin offsets to match where page->render() draws.
       // 1. Fill blank area over image region (white)
-      renderer.fillRect(imgX, imgY, imgW, imgH, false);
+      renderer.fillRect(imgX + orientedMarginLeft, imgY + orientedMarginTop, imgW, imgH, false);
       // 2. First fast refresh - shows blank area immediately
       renderer.displayBuffer(HalDisplay::FAST_REFRESH);
       // 3. Re-render page (image + text)
@@ -718,7 +724,8 @@ void EpubReaderActivity::renderContents(std::unique_ptr<Page> page, const int or
       page->render(renderer, SETTINGS.getReaderFontId(), orientedMarginLeft, orientedMarginTop);
       renderStatusBar(orientedMarginRight, orientedMarginBottom, orientedMarginLeft);
       // 3. Display only the image window with fast refresh
-      renderer.displayWindow(imgX, imgY, imgW, imgH, HalDisplay::FAST_REFRESH);
+      // IMPORTANT: Add margin offsets to match page coordinate system
+      renderer.displayWindow(imgX + orientedMarginLeft, imgY + orientedMarginTop, imgW, imgH, HalDisplay::FAST_REFRESH);
 #endif
     } else {
       // Fallback: Image bbox not available, use standard half refresh
