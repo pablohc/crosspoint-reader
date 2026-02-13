@@ -688,10 +688,19 @@ void EpubReaderActivity::renderContents(std::unique_ptr<Page> page, const int or
   page->render(renderer, SETTINGS.getReaderFontId(), orientedMarginLeft, orientedMarginTop);
   renderStatusBar(orientedMarginRight, orientedMarginBottom, orientedMarginLeft);
 
-  // OPTIMIZATION: For image pages with anti-aliasing, use fast double-refresh technique
-  // to reduce perceived lag. Instead of one slow HALF_REFRESH (~1700ms), do two
-  // FAST_REFRESH operations (~300-500ms each) which feels snappier.
-  if (forceFullRefresh) {
+  // Check if half-refresh is needed (either entering Reader or pages counter reached)
+  // These cases need half-refresh regardless of image content
+  if (pagesUntilFullRefresh <= 1) {
+    // Half-refresh needed (entry to Reader or periodic refresh)
+    // Use standard half-refresh which already cleans the screen
+    renderer.displayBuffer(HalDisplay::HALF_REFRESH);
+    pagesUntilFullRefresh = SETTINGS.getRefreshFrequency();
+  } else if (forceFullRefresh) {
+    // OPTIMIZATION: For image pages with anti-aliasing, use fast double-refresh technique
+    // to reduce perceived lag. Instead of one slow HALF_REFRESH (~1700ms), do two
+    // FAST_REFRESH operations (~300-500ms each) which feels snappier.
+    // Only reaches here when: hasImages + antiAliasing + pagesUntilFullRefresh > 1
+    // Meaning: screen is already clean from previous refreshes, no need for half-refresh
     int imgX, imgY, imgW, imgH;
     if (page->getImageBoundingBox(imgX, imgY, imgW, imgH)) {
       // Calculate screen coordinates (page bbox + margin offsets)
@@ -706,6 +715,7 @@ void EpubReaderActivity::renderContents(std::unique_ptr<Page> page, const int or
       // IMPORTANT: Bounding box coordinates are relative to page origin (0,0),
       // but we need to add the margin offsets to match where page->render() draws.
       // 1. Fill blank area over image region (white)
+      // Note: Screen is already clean (pagesUntilFullRefresh > 1), so fillRect is safe
       renderer.fillRect(imgX + orientedMarginLeft, imgY + orientedMarginTop, imgW, imgH, false);
       // 2. First fast refresh - shows blank area immediately
       renderer.displayBuffer(HalDisplay::FAST_REFRESH);
@@ -732,11 +742,11 @@ void EpubReaderActivity::renderContents(std::unique_ptr<Page> page, const int or
       Serial.printf("[%lu] [ERS] Image page but no bbox, using standard half refresh\n", millis());
       renderer.displayBuffer(HalDisplay::HALF_REFRESH);
     }
-    pagesUntilFullRefresh = SETTINGS.getRefreshFrequency();
-  } else if (pagesUntilFullRefresh <= 1) {
-    renderer.displayBuffer(HalDisplay::HALF_REFRESH);
-    pagesUntilFullRefresh = SETTINGS.getRefreshFrequency();
+    // Decrement page counter regardless of image content
+    pagesUntilFullRefresh--;
   } else {
+    // Normal page without images, or images without anti-aliasing
+    // Use fast refresh for smoother page turns
     renderer.displayBuffer();
     pagesUntilFullRefresh--;
   }
