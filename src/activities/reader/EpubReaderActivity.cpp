@@ -16,6 +16,11 @@
 #include "components/UITheme.h"
 #include "fontIds.h"
 
+// Image refresh optimization strategy:
+// 0 = Use double FAST_REFRESH technique (default, feels snappier)
+// 1 = Use displayWindow() for partial refresh (experimental)
+#define USE_IMAGE_DOUBLE_FAST_REFRESH 0
+
 namespace {
 // pagesPerRefresh now comes from SETTINGS.getRefreshFrequency()
 constexpr unsigned long skipChapterMs = 700;
@@ -672,13 +677,56 @@ void EpubReaderActivity::saveProgress(int spineIndex, int currentPage, int pageC
 void EpubReaderActivity::renderContents(std::unique_ptr<Page> page, const int orientedMarginTop,
                                         const int orientedMarginRight, const int orientedMarginBottom,
                                         const int orientedMarginLeft) {
-  // Force full refresh for pages with images when anti-aliasing is on,
+  // Determine if this page needs special image handling
+  bool pageHasImages = page->hasImages();
+  bool useAntiAliasing = SETTINGS.textAntiAliasing;
+
+  // Force half refresh for pages with images when anti-aliasing is on,
   // as grayscale tones require half refresh to display correctly
-  bool forceFullRefresh = page->hasImages() && SETTINGS.textAntiAliasing;
+  bool forceFullRefresh = pageHasImages && useAntiAliasing;
 
   page->render(renderer, SETTINGS.getReaderFontId(), orientedMarginLeft, orientedMarginTop);
   renderStatusBar(orientedMarginRight, orientedMarginBottom, orientedMarginLeft);
-  if (forceFullRefresh || pagesUntilFullRefresh <= 1) {
+
+  // OPTIMIZATION: For image pages with anti-aliasing, use fast double-refresh technique
+  // to reduce perceived lag. Instead of one slow HALF_REFRESH (~1700ms), do two
+  // FAST_REFRESH operations (~300-500ms each) which feels snappier.
+  if (forceFullRefresh) {
+    int imgX, imgY, imgW, imgH;
+    if (page->getImageBoundingBox(imgX, imgY, imgW, imgH)) {
+      Serial.printf("[%lu] [ERS] Image page detected, using fast double-refresh (bbox: %d,%d %dx%d)\n",
+                   millis(), imgX, imgY, imgW, imgH);
+
+#if USE_IMAGE_DOUBLE_FAST_REFRESH == 0
+      // Method A: Fill blank area + two FAST_REFRESH operations
+      // 1. Fill blank area over image region (white)
+      renderer.fillRect(imgX, imgY, imgW, imgH, false);
+      // 2. First fast refresh - shows blank area immediately
+      renderer.displayBuffer(HalDisplay::FAST_REFRESH);
+      // 3. Re-render page (image + text)
+      page->render(renderer, SETTINGS.getReaderFontId(), orientedMarginLeft, orientedMarginTop);
+      renderStatusBar(orientedMarginRight, orientedMarginBottom, orientedMarginLeft);
+      // 4. Second fast refresh - shows actual content
+      renderer.displayBuffer(HalDisplay::FAST_REFRESH);
+#else
+      // Method B (experimental): Use displayWindow() for partial refresh
+      // This is cleaner but depends on EInkDisplay supporting window operations
+      Serial.printf("[%lu] [ERS] Using experimental displayWindow() method\n", millis());
+      // 1. First fast refresh - shows current content in image area
+      renderer.displayBuffer(HalDisplay::FAST_REFRESH);
+      // 2. Re-render page (image + text)
+      page->render(renderer, SETTINGS.getReaderFontId(), orientedMarginLeft, orientedMarginTop);
+      renderStatusBar(orientedMarginRight, orientedMarginBottom, orientedMarginLeft);
+      // 3. Display only the image window with fast refresh
+      renderer.displayWindow(imgX, imgY, imgW, imgH, HalDisplay::FAST_REFRESH);
+#endif
+    } else {
+      // Fallback: Image bbox not available, use standard half refresh
+      Serial.printf("[%lu] [ERS] Image page but no bbox, using standard half refresh\n", millis());
+      renderer.displayBuffer(HalDisplay::HALF_REFRESH);
+    }
+    pagesUntilFullRefresh = SETTINGS.getRefreshFrequency();
+  } else if (pagesUntilFullRefresh <= 1) {
     renderer.displayBuffer(HalDisplay::HALF_REFRESH);
     pagesUntilFullRefresh = SETTINGS.getRefreshFrequency();
   } else {

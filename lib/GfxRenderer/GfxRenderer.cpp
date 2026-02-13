@@ -659,6 +659,21 @@ void GfxRenderer::displayBuffer(const HalDisplay::RefreshMode refreshMode) const
   display.displayBuffer(refreshMode, fadingFix);
 }
 
+// EXPERIMENTAL: Display only a rectangular region with specified refresh mode
+void GfxRenderer::displayWindow(int x, int y, int width, int height, HalDisplay::RefreshMode mode) const {
+  Serial.printf("[%lu] [GFX] Displaying window at (%d,%d) size (%dx%d) with mode %d\n",
+                millis(), x, y, width, height, mode);
+
+  // Validate bounds
+  if (x < 0 || y < 0 || x + width > getScreenWidth() || y + height > getScreenHeight()) {
+    Serial.printf("[%lu] [GFX] ERROR: Window bounds exceed display dimensions!\n", millis());
+    return;
+  }
+
+  // Use public HalDisplay::displayWindow() method instead of accessing private einkDisplay
+  display.displayWindow(x, y, width, height, mode, fadingFix);
+}
+
 std::string GfxRenderer::truncatedText(const int fontId, const char* text, const int maxWidth,
                                        const EpdFontFamily::Style style) const {
   if (!text || maxWidth <= 0) return "";
