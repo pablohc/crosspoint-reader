@@ -660,6 +660,23 @@ void GfxRenderer::displayBuffer(const HalDisplay::RefreshMode refreshMode) const
   display.displayBuffer(refreshMode, fadingFix);
 }
 
+// EXPERIMENTAL: Display only a rectangular region with specified refresh mode
+void GfxRenderer::displayWindow(int x, int y, int width, int height,
+                                HalDisplay::RefreshMode mode) const {
+  LOG_DBG("GFX", "Displaying window at (%d,%d) size (%dx%d) with mode %d", x, y, width, height,
+          static_cast<int>(mode));
+
+  // Validate bounds
+  if (x < 0 || y < 0 || x + width > getScreenWidth() || y + height > getScreenHeight()) {
+    LOG_ERR("GFX", "Window bounds exceed display dimensions!");
+    return;
+  }
+
+  display.displayWindow(static_cast<uint16_t>(x), static_cast<uint16_t>(y),
+                        static_cast<uint16_t>(width), static_cast<uint16_t>(height), mode,
+                        fadingFix);
+}
+
 std::string GfxRenderer::truncatedText(const int fontId, const char* text, const int maxWidth,
                                        const EpdFontFamily::Style style) const {
   if (!text || maxWidth <= 0) return "";

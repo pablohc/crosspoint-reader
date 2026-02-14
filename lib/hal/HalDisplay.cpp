@@ -32,6 +32,13 @@ void HalDisplay::displayBuffer(HalDisplay::RefreshMode mode, bool turnOffScreen)
   einkDisplay.displayBuffer(convertRefreshMode(mode), turnOffScreen);
 }
 
+// EXPERIMENTAL: Display only a rectangular region
+void HalDisplay::displayWindow(uint16_t x, uint16_t y, uint16_t w, uint16_t h,
+                               HalDisplay::RefreshMode mode, bool turnOffScreen) {
+  (void)mode;  // EInkDisplay::displayWindow does not take mode yet
+  einkDisplay.displayWindow(x, y, w, h, turnOffScreen);
+}
+
 void HalDisplay::refreshDisplay(HalDisplay::RefreshMode mode, bool turnOffScreen) {
   einkDisplay.refreshDisplay(convertRefreshMode(mode), turnOffScreen);
 }

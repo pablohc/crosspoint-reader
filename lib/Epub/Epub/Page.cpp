@@ -94,3 +94,50 @@ std::unique_ptr<Page> Page::deserialize(FsFile& file) {
 
   return page;
 }
+
+bool Page::getImageBoundingBox(int& outX, int& outY, int& outWidth, int& outHeight) const {
+  bool firstImage = true;
+  for (const auto& el : elements) {
+    if (el->getTag() == TAG_PageImage) {
+      PageImage* pi = static_cast<PageImage*>(el.get());
+      ImageBlock* ib = pi->getImageBlock();
+
+      if (firstImage) {
+        // Initialize with first image bounds
+        outX = pi->xPos;
+        outY = pi->yPos;
+        outWidth = ib->getWidth();
+        outHeight = ib->getHeight();
+        firstImage = false;
+      } else {
+        // Expand bounding box to include this image
+        int imgX = pi->xPos;
+        int imgY = pi->yPos;
+        int imgW = ib->getWidth();
+        int imgH = ib->getHeight();
+
+        // Expand right boundary
+        if (imgX + imgW > outX + outWidth) {
+          outWidth = (imgX + imgW) - outX;
+        }
+        // Expand left boundary
+        if (imgX < outX) {
+          int oldRight = outX + outWidth;
+          outX = imgX;
+          outWidth = oldRight - outX;
+        }
+        // Expand bottom boundary
+        if (imgY + imgH > outY + outHeight) {
+          outHeight = (imgY + imgH) - outY;
+        }
+        // Expand top boundary
+        if (imgY < outY) {
+          int oldBottom = outY + outHeight;
+          outY = imgY;
+          outHeight = oldBottom - outY;
+        }
+      }
+    }
+  }
+  return !firstImage;  // Return true if at least one image was found
+}
