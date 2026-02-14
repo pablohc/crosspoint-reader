@@ -32,7 +32,7 @@ inline std::vector<SettingInfo> getSettingsList() {
       // --- Reader ---
       SettingInfo::Enum("Font Family", &CrossPointSettings::fontFamily, {"Bookerly"},
                         "fontFamily", "Reader"),
-      SettingInfo::Enum("Font Size", &CrossPointSettings::fontSize, {"Small", "Medium", "Large", "X Large"}, "fontSize",
+      SettingInfo::Enum("Font Size", &CrossPointSettings::fontSize, {"Small", "Medium"}, "fontSize",
                         "Reader"),
       SettingInfo::Enum("Line Spacing", &CrossPointSettings::lineSpacing, {"Tight", "Normal", "Wide"}, "lineSpacing",
                         "Reader"),

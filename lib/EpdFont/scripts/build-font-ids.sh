@@ -26,24 +26,6 @@ ruby -rdigest -e 'puts [
 ].map{|f| Digest::SHA256.hexdigest(File.read(f)).to_i(16) }.sum % (2 ** 32) - (2 ** 31)'
 ))"
 
-echo "#define BOOKERLY_16_FONT_ID ($(
-ruby -rdigest -e 'puts [
-  "./bookerly_16_regular.h",
-  "./bookerly_16_bold.h",
-  "./bookerly_16_bolditalic.h",
-  "./bookerly_16_italic.h",
-].map{|f| Digest::SHA256.hexdigest(File.read(f)).to_i(16) }.sum % (2 ** 32) - (2 ** 31)'
-))"
-
-echo "#define BOOKERLY_18_FONT_ID ($(
-ruby -rdigest -e 'puts [
-  "./bookerly_18_regular.h",
-  "./bookerly_18_bold.h",
-  "./bookerly_18_bolditalic.h",
-  "./bookerly_18_italic.h",
-].map{|f| Digest::SHA256.hexdigest(File.read(f)).to_i(16) }.sum % (2 ** 32) - (2 ** 31)'
-))"
-
 echo "#define UI_10_FONT_ID ($(
 ruby -rdigest -e 'puts [
   "./ubuntu_10_regular.h",
