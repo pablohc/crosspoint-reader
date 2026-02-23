@@ -14,15 +14,13 @@
 inline std::vector<SettingInfo> getSettingsList() {
   return {
       // --- Display ---
-      SettingInfo::Enum(StrId::STR_SLEEP_SCREEN, &CrossPointSettings::sleepScreen,
-                        {StrId::STR_DARK, StrId::STR_LIGHT, StrId::STR_CUSTOM, StrId::STR_COVER, StrId::STR_NONE_OPT,
-                         StrId::STR_COVER_CUSTOM},
-                        "sleepScreen", StrId::STR_CAT_DISPLAY),
-      SettingInfo::Enum(StrId::STR_SLEEP_COVER_MODE, &CrossPointSettings::sleepScreenCoverMode,
-                        {StrId::STR_FIT, StrId::STR_CROP}, "sleepScreenCoverMode", StrId::STR_CAT_DISPLAY),
-      SettingInfo::Enum(StrId::STR_SLEEP_COVER_FILTER, &CrossPointSettings::sleepScreenCoverFilter,
-                        {StrId::STR_NONE_OPT, StrId::STR_FILTER_CONTRAST, StrId::STR_INVERTED},
-                        "sleepScreenCoverFilter", StrId::STR_CAT_DISPLAY),
+      SettingInfo::Enum(
+          StrId::STR_SLEEP_SCREEN, &CrossPointSettings::sleepScreen,
+          {StrId::STR_LOGO, StrId::STR_CUSTOM, StrId::STR_COVER_FIT, StrId::STR_COVER_CROP, StrId::STR_NONE_OPT},
+          "sleepScreen", StrId::STR_CAT_DISPLAY),
+      SettingInfo::Enum(StrId::STR_SLEEP_SCREEN_FILTER, &CrossPointSettings::sleepScreenFilter,
+                        {StrId::STR_FILTER_NONE, StrId::STR_FILTER_CONTRAST, StrId::STR_FILTER_NEGATIVE},
+                        "sleepScreenFilter", StrId::STR_CAT_DISPLAY),
       SettingInfo::Enum(
           StrId::STR_STATUS_BAR, &CrossPointSettings::statusBar,
           {StrId::STR_NONE_OPT, StrId::STR_NO_PROGRESS, StrId::STR_STATUS_BAR_FULL_PERCENT,

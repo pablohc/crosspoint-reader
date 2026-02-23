@@ -48,8 +48,7 @@ bool JsonSettingsIO::saveSettings(const CrossPointSettings& s, const char* path)
   JsonDocument doc;
 
   doc["sleepScreen"] = s.sleepScreen;
-  doc["sleepScreenCoverMode"] = s.sleepScreenCoverMode;
-  doc["sleepScreenCoverFilter"] = s.sleepScreenCoverFilter;
+  doc["sleepScreenFilter"] = s.sleepScreenFilter;
   doc["statusBar"] = s.statusBar;
   doc["extraParagraphSpacing"] = s.extraParagraphSpacing;
   doc["textAntiAliasing"] = s.textAntiAliasing;
@@ -94,11 +93,9 @@ bool JsonSettingsIO::loadSettings(CrossPointSettings& s, const char* json, bool*
   using S = CrossPointSettings;
   auto clamp = [](uint8_t val, uint8_t maxVal, uint8_t def) -> uint8_t { return val < maxVal ? val : def; };
 
-  s.sleepScreen = clamp(doc["sleepScreen"] | (uint8_t)S::DARK, S::SLEEP_SCREEN_MODE_COUNT, S::DARK);
-  s.sleepScreenCoverMode =
-      clamp(doc["sleepScreenCoverMode"] | (uint8_t)S::FIT, S::SLEEP_SCREEN_COVER_MODE_COUNT, S::FIT);
-  s.sleepScreenCoverFilter =
-      clamp(doc["sleepScreenCoverFilter"] | (uint8_t)S::NO_FILTER, S::SLEEP_SCREEN_COVER_FILTER_COUNT, S::NO_FILTER);
+  s.sleepScreen = clamp(doc["sleepScreen"] | (uint8_t)S::LOGO, S::SLEEP_SCREEN_MODE_COUNT, S::LOGO);
+  s.sleepScreenFilter =
+      clamp(doc["sleepScreenFilter"] | (uint8_t)S::NO_FILTER, S::SLEEP_SCREEN_FILTER_COUNT, S::NO_FILTER);
   s.statusBar = clamp(doc["statusBar"] | (uint8_t)S::FULL, S::STATUS_BAR_MODE_COUNT, S::FULL);
   s.extraParagraphSpacing = doc["extraParagraphSpacing"] | (uint8_t)1;
   s.textAntiAliasing = doc["textAntiAliasing"] | (uint8_t)1;

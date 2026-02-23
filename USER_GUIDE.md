@@ -1,4 +1,4 @@
-# CrossPoint User Guide
+#CrossPoint User Guide
 
 Welcome to the **CrossPoint** firmware. This guide outlines the hardware controls, navigation, and reading features of the device.
 
@@ -105,19 +105,15 @@ CrossPoint supports sending books from Calibre using the CrossPoint Reader devic
 
 The Settings screen allows you to configure the device's behavior. There are a few settings you can adjust:
 - **Sleep Screen**: Which sleep screen to display when the device sleeps:
-  - "Dark" (default) - The default dark Crosspoint logo sleep screen
-  - "Light" - The same default sleep screen, on a white background
+  - "Logo" (default) - The Crosspoint logo sleep screen
   - "Custom" - Custom images from the SD card; see [Sleep Screen](#36-sleep-screen) below for more information
-  - "Cover" - The book cover image (Note: this is experimental and may not work as expected)
+  - "Cover (Fit)" - The book cover image scaled to fit the screen; if no cover is available, falls back to Custom images (Note: this is experimental and may not work as expected)
+  - "Cover (Crop)" - The book cover image scaled to fill the screen (cropped if necessary); if no cover is available, falls back to Custom images (Note: this is experimental and may not work as expected)
   - "None" - A blank screen
-  - "Cover + Custom" - The book cover image, fallbacks to "Custom" behavior
-- **Sleep Screen Cover Mode**: How to display the book cover when "Cover" sleep screen is selected:
-  - "Fit" (default) - Scale the image down to fit centered on the screen, padding with white borders as necessary
-  - "Crop" - Scale the image down and crop as necessary to try to to fill the screen (Note: this is experimental and may not work as expected)
-- **Sleep Screen Cover Filter**: What filter will be applied to the book cover when "Cover" sleep screen is selected 
-  - "None" (default) - The cover image will be converted to a grayscale image and displayed as it is
+- **Sleep Screen Filter**: What filter will be applied to the sleep screen (applies to all modes)
+  - "None" (default) - The image will be displayed with grayscale (for images) or dark (for Logo/Blank)
   - "Contrast" - The image will be displayed as a black & white image without grayscale conversion
-  - "Inverted" - The image will be inverted as in white&black and will be displayed without grayscale conversion
+  - "Negative" - The image will be inverted (white becomes black). For Logo/Blank this produces a "Light" mode effect.
 - **Status Bar**: Configure the status bar displayed while reading:
   - "None" - No status bar
   - "No Progress" - Show status bar without reading progress

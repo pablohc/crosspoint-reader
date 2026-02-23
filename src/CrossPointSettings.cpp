@@ -163,7 +163,11 @@ bool CrossPointSettings::loadFromBinaryFile() {
     if (++settingsRead >= fileSettingsCount) break;
     serialization::readPod(inputFile, screenMargin);
     if (++settingsRead >= fileSettingsCount) break;
-    readAndValidate(inputFile, sleepScreenCoverMode, SLEEP_SCREEN_COVER_MODE_COUNT);
+    // Skip deprecated sleepScreenCoverMode (read but discard)
+    {
+      uint8_t dummy;
+      readAndValidate(inputFile, dummy, 3);  // SLEEP_SCREEN_COVER_MODE_COUNT = 2, use 3 for safety
+    }
     if (++settingsRead >= fileSettingsCount) break;
     {
       std::string urlStr;
@@ -194,7 +198,7 @@ bool CrossPointSettings::loadFromBinaryFile() {
       opdsPassword[sizeof(opdsPassword) - 1] = '\0';
     }
     if (++settingsRead >= fileSettingsCount) break;
-    readAndValidate(inputFile, sleepScreenCoverFilter, SLEEP_SCREEN_COVER_FILTER_COUNT);
+    readAndValidate(inputFile, sleepScreenFilter, SLEEP_SCREEN_FILTER_COUNT);
     if (++settingsRead >= fileSettingsCount) break;
     serialization::readPod(inputFile, uiTheme);
     if (++settingsRead >= fileSettingsCount) break;

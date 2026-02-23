@@ -21,11 +21,12 @@ void SleepActivity::onEnter() {
   switch (SETTINGS.sleepScreen) {
     case (CrossPointSettings::SLEEP_SCREEN_MODE::BLANK):
       return renderBlankSleepScreen();
+    case (CrossPointSettings::SLEEP_SCREEN_MODE::COVER_FIT):
+      return renderCoverSleepScreen(false);
+    case (CrossPointSettings::SLEEP_SCREEN_MODE::COVER_CROP):
+      return renderCoverSleepScreen(true);
     case (CrossPointSettings::SLEEP_SCREEN_MODE::CUSTOM):
       return renderCustomSleepScreen();
-    case (CrossPointSettings::SLEEP_SCREEN_MODE::COVER):
-    case (CrossPointSettings::SLEEP_SCREEN_MODE::COVER_CUSTOM):
-      return renderCoverSleepScreen();
     default:
       return renderDefaultSleepScreen();
   }
@@ -118,15 +119,15 @@ void SleepActivity::renderDefaultSleepScreen() const {
   renderer.drawCenteredText(UI_10_FONT_ID, pageHeight / 2 + 70, tr(STR_CROSSPOINT), true, EpdFontFamily::BOLD);
   renderer.drawCenteredText(SMALL_FONT_ID, pageHeight / 2 + 95, tr(STR_SLEEPING));
 
-  // Make sleep screen dark unless light is selected in settings
-  if (SETTINGS.sleepScreen != CrossPointSettings::SLEEP_SCREEN_MODE::LIGHT) {
+  // Logo sleep screen is dark (inverted), unless Inverted filter is active (produces "Light" mode)
+  if (SETTINGS.sleepScreenFilter != CrossPointSettings::SLEEP_SCREEN_FILTER::NEGATIVE) {
     renderer.invertScreen();
   }
 
   renderer.displayBuffer(HalDisplay::HALF_REFRESH);
 }
 
-void SleepActivity::renderBitmapSleepScreen(const Bitmap& bitmap) const {
+void SleepActivity::renderBitmapSleepScreen(const Bitmap& bitmap, bool cropped) const {
   int x, y;
   const auto pageWidth = renderer.getScreenWidth();
   const auto pageHeight = renderer.getScreenHeight();
@@ -141,7 +142,7 @@ void SleepActivity::renderBitmapSleepScreen(const Bitmap& bitmap) const {
     LOG_DBG("SLP", "bitmap ratio: %f, screen ratio: %f", ratio, screenRatio);
     if (ratio > screenRatio) {
       // image wider than viewport ratio, scaled down image needs to be centered vertically
-      if (SETTINGS.sleepScreenCoverMode == CrossPointSettings::SLEEP_SCREEN_COVER_MODE::CROP) {
+      if (cropped) {
         cropX = 1.0f - (screenRatio / ratio);
         LOG_DBG("SLP", "Cropping bitmap x: %f", cropX);
         ratio = (1.0f - cropX) * static_cast<float>(bitmap.getWidth()) / static_cast<float>(bitmap.getHeight());
@@ -151,7 +152,7 @@ void SleepActivity::renderBitmapSleepScreen(const Bitmap& bitmap) const {
       LOG_DBG("SLP", "Centering with ratio %f to y=%d", ratio, y);
     } else {
       // image taller than viewport ratio, scaled down image needs to be centered horizontally
-      if (SETTINGS.sleepScreenCoverMode == CrossPointSettings::SLEEP_SCREEN_COVER_MODE::CROP) {
+      if (cropped) {
         cropY = 1.0f - (ratio / screenRatio);
         LOG_DBG("SLP", "Cropping bitmap y: %f", cropY);
         ratio = static_cast<float>(bitmap.getWidth()) / ((1.0f - cropY) * static_cast<float>(bitmap.getHeight()));
@@ -169,12 +170,12 @@ void SleepActivity::renderBitmapSleepScreen(const Bitmap& bitmap) const {
   LOG_DBG("SLP", "drawing to %d x %d", x, y);
   renderer.clearScreen();
 
-  const bool hasGreyscale = bitmap.hasGreyscale() &&
-                            SETTINGS.sleepScreenCoverFilter == CrossPointSettings::SLEEP_SCREEN_COVER_FILTER::NO_FILTER;
+  const bool hasGreyscale =
+      bitmap.hasGreyscale() && SETTINGS.sleepScreenFilter == CrossPointSettings::SLEEP_SCREEN_FILTER::NO_FILTER;
 
   renderer.drawBitmap(bitmap, x, y, pageWidth, pageHeight, cropX, cropY);
 
-  if (SETTINGS.sleepScreenCoverFilter == CrossPointSettings::SLEEP_SCREEN_COVER_FILTER::INVERTED_BLACK_AND_WHITE) {
+  if (SETTINGS.sleepScreenFilter == CrossPointSettings::SLEEP_SCREEN_FILTER::NEGATIVE) {
     renderer.invertScreen();
   }
 
@@ -198,23 +199,13 @@ void SleepActivity::renderBitmapSleepScreen(const Bitmap& bitmap) const {
   }
 }
 
-void SleepActivity::renderCoverSleepScreen() const {
-  void (SleepActivity::*renderNoCoverSleepScreen)() const;
-  switch (SETTINGS.sleepScreen) {
-    case (CrossPointSettings::SLEEP_SCREEN_MODE::COVER_CUSTOM):
-      renderNoCoverSleepScreen = &SleepActivity::renderCustomSleepScreen;
-      break;
-    default:
-      renderNoCoverSleepScreen = &SleepActivity::renderDefaultSleepScreen;
-      break;
-  }
-
+void SleepActivity::renderCoverSleepScreen(bool cropped) const {
+  // COVER Mode now fallback to CUSTOM Mode
   if (APP_STATE.openEpubPath.empty()) {
-    return (this->*renderNoCoverSleepScreen)();
+    return renderCustomSleepScreen();
   }
 
   std::string coverBmpPath;
-  bool cropped = SETTINGS.sleepScreenCoverMode == CrossPointSettings::SLEEP_SCREEN_COVER_MODE::CROP;
 
   // Check if the current book is XTC, TXT, or EPUB
   if (StringUtils::checkFileExtension(APP_STATE.openEpubPath, ".xtc") ||
@@ -223,12 +214,12 @@ void SleepActivity::renderCoverSleepScreen() const {
     Xtc lastXtc(APP_STATE.openEpubPath, "/.crosspoint");
     if (!lastXtc.load()) {
       LOG_ERR("SLP", "Failed to load last XTC");
-      return (this->*renderNoCoverSleepScreen)();
+      return renderCustomSleepScreen();
     }
 
     if (!lastXtc.generateCoverBmp()) {
       LOG_ERR("SLP", "Failed to generate XTC cover bmp");
-      return (this->*renderNoCoverSleepScreen)();
+      return renderCustomSleepScreen();
     }
 
     coverBmpPath = lastXtc.getCoverBmpPath();
@@ -237,12 +228,12 @@ void SleepActivity::renderCoverSleepScreen() const {
     Txt lastTxt(APP_STATE.openEpubPath, "/.crosspoint");
     if (!lastTxt.load()) {
       LOG_ERR("SLP", "Failed to load last TXT");
-      return (this->*renderNoCoverSleepScreen)();
+      return renderCustomSleepScreen();
     }
 
     if (!lastTxt.generateCoverBmp()) {
       LOG_ERR("SLP", "No cover image found for TXT file");
-      return (this->*renderNoCoverSleepScreen)();
+      return renderCustomSleepScreen();
     }
 
     coverBmpPath = lastTxt.getCoverBmpPath();
@@ -252,17 +243,17 @@ void SleepActivity::renderCoverSleepScreen() const {
     // Skip loading css since we only need metadata here
     if (!lastEpub.load(true, true)) {
       LOG_ERR("SLP", "Failed to load last epub");
-      return (this->*renderNoCoverSleepScreen)();
+      return renderCustomSleepScreen();
     }
 
     if (!lastEpub.generateCoverBmp(cropped)) {
       LOG_ERR("SLP", "Failed to generate cover bmp");
-      return (this->*renderNoCoverSleepScreen)();
+      return renderCustomSleepScreen();
     }
 
     coverBmpPath = lastEpub.getCoverBmpPath(cropped);
   } else {
-    return (this->*renderNoCoverSleepScreen)();
+    return renderCustomSleepScreen();
   }
 
   FsFile file;
@@ -270,17 +261,21 @@ void SleepActivity::renderCoverSleepScreen() const {
     Bitmap bitmap(file);
     if (bitmap.parseHeaders() == BmpReaderError::Ok) {
       LOG_DBG("SLP", "Rendering sleep cover: %s", coverBmpPath.c_str());
-      renderBitmapSleepScreen(bitmap);
+      renderBitmapSleepScreen(bitmap, cropped);
       file.close();
       return;
     }
     file.close();
   }
 
-  return (this->*renderNoCoverSleepScreen)();
+  return renderCustomSleepScreen();
 }
 
 void SleepActivity::renderBlankSleepScreen() const {
   renderer.clearScreen();
+  // Apply Negative filter (inverts blank screen)
+  if (SETTINGS.sleepScreenFilter == CrossPointSettings::SLEEP_SCREEN_FILTER::NEGATIVE) {
+    renderer.invertScreen();
+  }
   renderer.displayBuffer(HalDisplay::HALF_REFRESH);
 }
