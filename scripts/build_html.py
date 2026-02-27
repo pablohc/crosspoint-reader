@@ -34,7 +34,7 @@ def minify_html(html: str) -> str:
 
 for root, _, files in os.walk(SRC_DIR):
     for file in files:
-        if file.endswith(".html"):
+        if file.endswith(".html") or file.endswith(".js"):
             html_path = os.path.join(root, file)
             with open(html_path, "r", encoding="utf-8") as f:
                 html_content = f.read()
@@ -46,7 +46,8 @@ for root, _, files in os.walk(SRC_DIR):
             # IMPORTANT: we don't use brotli because Firefox doesn't support brotli with insecured context (only supported on HTTPS)
             compressed = gzip.compress(minified.encode('utf-8'), compresslevel=9)
 
-            base_name = f"{os.path.splitext(file)[0]}Html"
+            # Replace dots with underscores in base_name for valid C identifier
+            base_name = f"{os.path.splitext(file)[0]}Html".replace(".", "_")
             header_path = os.path.join(root, f"{base_name}.generated.h")
 
             with open(header_path, "w", encoding="utf-8") as h:
