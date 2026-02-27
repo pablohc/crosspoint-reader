@@ -1187,8 +1187,7 @@ function uploadFile() {
         progressFill.style.backgroundColor = '#4caf50';
         progressText.textContent = 'All uploads complete!';
         setTimeout(() => {
-          closeUploadModal();
-          hydrate();
+          window.location.reload();
         }, 1000);
       } else {
         progressFill.style.backgroundColor = '#e74c3c';
@@ -1196,9 +1195,7 @@ function uploadFile() {
         progressText.textContent = `${files.length - failedFiles.length}/${files.length} uploaded. Failed: ${failedList}`;
         failedUploadsGlobal = failedFiles;
         setTimeout(() => {
-          closeUploadModal();
-          showFailedUploadsBanner();
-          hydrate();
+          window.location.reload();
         }, 2000);
       }
       return;
