@@ -4,6 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>CrossPoint Reader - Files</title>
+  <script src="/js/jszip.min.js"></script>
   <style>
     :root {
       --font-color: #333;
@@ -246,6 +247,42 @@
     .upload-btn:disabled {
       background-color: #95a5a6;
       cursor: not-allowed;
+    }
+    /* Convert options */
+    .convert-options {
+      margin-top: 15px;
+      padding: 12px;
+      background-color: var(--accent-color-10);
+      border-radius: 6px;
+      border: 1px solid var(--accent-color);
+    }
+    .convert-checkbox {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      cursor: pointer;
+      user-select: none;
+    }
+    .convert-checkbox input[type="checkbox"] {
+      width: 18px;
+      height: 18px;
+      cursor: pointer;
+    }
+    .convert-info {
+      font-size: 0.85em;
+      color: var(--label-color);
+      margin-top: 8px;
+      line-height: 1.4;
+    }
+    .convert-settings {
+      font-size: 0.8em;
+      color: var(--label-color);
+      margin-top: 6px;
+      padding-left: 26px;
+    }
+    .convert-settings span {
+      display: inline-block;
+      margin-right: 10px;
     }
     .file-info {
       color: var(--label-color);
@@ -696,6 +733,21 @@
     <div class="upload-form">
       <p class="file-info">Select a file to upload to <strong id="uploadPathDisplay"></strong></p>
       <input type="file" id="fileInput" onchange="validateFile()" multiple>
+      <div class="convert-options">
+        <label class="convert-checkbox">
+          <input type="checkbox" id="convertBeforeUpload" onchange="toggleConvertOptions()">
+          <span>🔄 Convert EPUB images before upload</span>
+        </label>
+        <div class="convert-info" id="convertInfo" style="display:none;">
+          Optimizes images for e-ink displays (480x800 max, grayscale, 85% JPEG quality, fixes SVG covers)
+        </div>
+        <div class="convert-settings" id="convertSettings" style="display:none;">
+          <span>🎨 Grayscale</span>
+          <span>📏 Max 480×800px</span>
+          <span>📦 85% JPEG</span>
+          <span>🔧 Fix SVG</span>
+        </div>
+      </div>
       <button id="uploadBtn" class="upload-btn" onclick="uploadFile()" disabled>Upload</button>
       <div id="progress-container">
         <div id="progress-bar"><div id="progress-fill"></div></div>
@@ -907,6 +959,15 @@
     document.getElementById('progress-container').style.display = 'none';
     document.getElementById('progress-fill').style.width = '0%';
     document.getElementById('progress-fill').style.backgroundColor = '#27ae60';
+    document.getElementById('convertBeforeUpload').checked = false;
+    document.getElementById('convertInfo').style.display = 'none';
+    document.getElementById('convertSettings').style.display = 'none';
+  }
+
+  function toggleConvertOptions() {
+    const checked = document.getElementById('convertBeforeUpload').checked;
+    document.getElementById('convertInfo').style.display = checked ? 'block' : 'none';
+    document.getElementById('convertSettings').style.display = checked ? 'block' : 'none';
   }
 
   function openFolderModal() {
@@ -1016,6 +1077,291 @@ let failedUploadsGlobal = [];
 let wsConnection = null;
 const WS_PORT = 81;
 const WS_CHUNK_SIZE = 4096; // 4KB chunks - smaller for ESP32 stability
+
+// ============================================================================
+// EPUB Image Conversion Functions (from Baseline JPEG Converter)
+// ============================================================================
+
+// Conversion settings (fixed as per user requirements)
+const MAX_WIDTH = 480;
+const MAX_HEIGHT = 800;
+const JPEG_QUALITY = 85;  // 85%
+const ENABLE_GRAYSCALE = true;  // true-grayscale
+
+// Fix SVG cover - converts SVG-wrapped covers to plain HTML img tags
+function fixSvgCover(content) {
+  if (!content.includes('<svg') || !content.includes('xlink:href')) {
+    return { c: content, fixed: false, count: 0 };
+  }
+  if (!content.includes('calibre:cover') && !content.includes('name="cover"') && !content.includes('<title>Cover</title>')) {
+    return { c: content, fixed: false, count: 0 };
+  }
+  const match = content.match(/xlink:href=["']([^"']+)["']/);
+  if (!match) return { c: content, fixed: false, count: 0 };
+
+  return {
+    c: `<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops" lang="en" xml:lang="en">
+<head><meta content="text/html; charset=UTF-8" http-equiv="default-style"/><title>Cover</title></head>
+<body><section epub:type="cover"><img alt="Cover" src="${match[1]}"/></section></body>
+</html>`,
+    fixed: true,
+    count: 1
+  };
+}
+
+// Fix SVG-wrapped images - unwrap SVG and replace with plain img
+function fixSvgWrappedImages(content) {
+  if (!content.includes('<svg') || !content.includes('xlink:href')) {
+    return { c: content, fixed: false, count: 0 };
+  }
+  let fixedCount = 0;
+  const svgImageRegex = /<svg\b[^>]*>[\s\S]*?<image\b[^>]*xlink:href=["']([^"']+)["'][^>]*>[\s\S]*?<\/svg>/gi;
+
+  const newContent = content.replace(svgImageRegex, (match, href) => {
+    fixedCount++;
+    const imageTagMatch = match.match(/<image\b[^>]*>/i);
+    const svgTagMatch = match.match(/<svg\b[^>]*>/i);
+
+    const getDim = (tag, attr) => {
+      if (!tag) return null;
+      const m = tag.match(new RegExp(attr + '=["\']([^"\']+)["\']', 'i'));
+      return m ? m[1] : null;
+    };
+
+    let width = getDim(imageTagMatch && imageTagMatch[0], 'width') || getDim(svgTagMatch && svgTagMatch[0], 'width');
+    let height = getDim(imageTagMatch && imageTagMatch[0], 'height') || getDim(svgTagMatch && svgTagMatch[0], 'height');
+
+    let attrs = '';
+    if (width) attrs += ` width="${width}"`;
+    if (height) attrs += ` height="${height}"`;
+
+    return `<img src="${href}" alt=""${attrs} />`;
+  });
+
+  return { c: newContent, fixed: fixedCount > 0, count: fixedCount };
+}
+
+// Ensure cover meta tag exists in OPF
+function ensureCoverMeta(opfContent) {
+  let coverId = null, m;
+
+  // Try 1: properties="cover-image"
+  if (m = opfContent.match(/<item[^>]+id="([^"]+)"[^>]+properties="[^"]*cover-image[^"]*"/)) coverId = m[1];
+  if (!coverId && (m = opfContent.match(/<item[^>]+properties="[^"]*cover-image[^"]*"[^>]+id="([^"]+)"/))) coverId = m[1];
+
+  // Try 2: href contains "cover" and is an image
+  if (!coverId && (m = opfContent.match(/<item[^>]+id="([^"]+)"[^>]+href="[^"]*cover[^"]*"[^>]*media-type="image\//i))) coverId = m[1];
+  if (!coverId && (m = opfContent.match(/<item[^>]+href="[^"]*cover[^"]*"[^>]+id="([^"]+)"[^>]*media-type="image\//i))) coverId = m[1];
+
+  // Try 3: id contains "cover" and is an image
+  if (!coverId && (m = opfContent.match(/<item[^>]+id="([^"]*cover[^"]*)"[^>]+media-type="image\//i))) coverId = m[1];
+  if (!coverId && (m = opfContent.match(/<item[^>]+media-type="image\/[^"]*"[^>]+id="([^"]*cover[^"]*)"[^>]*/i))) coverId = m[1];
+
+  if (!coverId) return { o: opfContent, fixed: false };
+
+  // Check if cover meta exists
+  const metaMatch = opfContent.match(/<meta\s+name=["']cover["']\s+content=["']([^"']+)["']/) ||
+                    opfContent.match(/<meta\s+content=["']([^"']+)["']\s+name=["']cover["']/);
+  if (metaMatch) {
+    const currentValue = metaMatch[1];
+    if (currentValue.includes('/')) {
+      opfContent = opfContent.replace(/<meta\s+name=["']cover["']\s+content=["'][^"']+["']\s*\/?>/g, `<meta name="cover" content="${coverId}" />`);
+      opfContent = opfContent.replace(/<meta\s+content=["'][^"']+["']\s+name=["']cover["']\s*\/?>/g, `<meta name="cover" content="${coverId}" />`);
+      return { o: opfContent, fixed: true };
+    }
+    if (currentValue !== coverId) {
+      opfContent = opfContent.replace(/<meta\s+name=["']cover["']\s+content=["'][^"']+["']\s*\/?>/g, `<meta name="cover" content="${coverId}" />`);
+      opfContent = opfContent.replace(/<meta\s+content=["'][^"']+["']\s+name=["']cover["']\s*\/?>/g, `<meta name="cover" content="${coverId}" />`);
+      return { o: opfContent, fixed: true };
+    }
+    return { o: opfContent, fixed: false };
+  }
+
+  // Add missing cover meta
+  const idx = opfContent.indexOf('</metadata>');
+  if (idx !== -1) {
+    return { o: opfContent.substring(0, idx) + `    <meta name="cover" content="${coverId}"/>\n  </metadata>` + opfContent.substring(idx + 11), fixed: true };
+  }
+  return { o: opfContent, fixed: false };
+}
+
+// Apply grayscale to canvas image data
+function applyGrayscale(ctx, width, height) {
+  if (!ENABLE_GRAYSCALE) return;
+  const imageData = ctx.getImageData(0, 0, width, height);
+  const data = imageData.data;
+  for (let i = 0; i < data.length; i += 4) {
+    const r = data[i];
+    const g = data[i + 1];
+    const b = data[i + 2];
+    const l = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+    data[i] = data[i + 1] = data[i + 2] = l;
+  }
+  ctx.putImageData(imageData, 0, 0);
+}
+
+// Process single image - returns array of {data, suffix} objects
+async function processImage(data) {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(new Blob([data]));
+    const img = new Image();
+    img.onload = async () => {
+      URL.revokeObjectURL(url);
+      const origW = img.width, origH = img.height;
+
+      // Check if scaling is needed
+      const fitsInScreen = origW <= MAX_WIDTH && origH <= MAX_HEIGHT;
+
+      if (fitsInScreen) {
+        // Image already fits - just convert to JPEG with grayscale
+        const c = document.createElement('canvas');
+        c.width = origW;
+        c.height = origH;
+        const ctx = c.getContext('2d');
+        ctx.fillStyle = '#FFF';
+        ctx.fillRect(0, 0, origW, origH);
+        ctx.drawImage(img, 0, 0);
+        applyGrayscale(ctx, origW, origH);
+
+        const blob = await new Promise(res => c.toBlob(res, 'image/jpeg', JPEG_QUALITY / 100));
+        const arrBuf = await blob.arrayBuffer();
+        resolve([{ data: arrBuf, suffix: '' }]);
+      } else {
+        // Scale to fit 480x800
+        const scale = Math.min(MAX_WIDTH / origW, MAX_HEIGHT / origH);
+        const newW = Math.round(origW * scale);
+        const newH = Math.round(origH * scale);
+
+        const c = document.createElement('canvas');
+        c.width = newW;
+        c.height = newH;
+        const ctx = c.getContext('2d');
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'high';
+        ctx.fillStyle = '#FFF';
+        ctx.fillRect(0, 0, newW, newH);
+        ctx.drawImage(img, 0, 0, newW, newH);
+        applyGrayscale(ctx, newW, newH);
+
+        const blob = await new Promise(res => c.toBlob(res, 'image/jpeg', JPEG_QUALITY / 100));
+        const arrBuf = await blob.arrayBuffer();
+        resolve([{ data: arrBuf, suffix: '' }]);
+      }
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('Load failed')); };
+    img.src = url;
+  });
+}
+
+// Convert EPUB file - returns converted blob
+async function convertEpubFile(file, progressCallback) {
+  const zip = await JSZip.loadAsync(file);
+  const renamed = {};
+  zip.forEach(p => {
+    const l = p.toLowerCase();
+    if (l.match(/\.(png|gif|webp|bmp|jpeg)$/)) {
+      renamed[p] = p.replace(/\.(png|gif|webp|bmp|jpeg)$/i, '.jpg');
+    }
+  });
+
+  const out = new JSZip();
+  const entries = Object.entries(zip.files);
+  const splitImages = {};
+  const xhtmlFiles = {};
+  let opfPath = null, opfContent = null;
+  let svgFix = 0;
+
+  // Write mimetype FIRST per EPUB OCF spec
+  if (zip.files['mimetype']) {
+    const mimetypeData = await zip.files['mimetype'].async('arraybuffer');
+    out.file('mimetype', mimetypeData, { compression: 'STORE', createFolders: false });
+  }
+
+  // First pass: process images
+  for (let i = 0; i < entries.length; i++) {
+    const [path, fileObj] = entries[i];
+    if (fileObj.dir || path === 'mimetype') continue;
+    const low = path.toLowerCase();
+
+    if (low.match(/\.(png|gif|webp|bmp|jpg|jpeg)$/)) {
+      const data = await fileObj.async('arraybuffer');
+      const parts = await processImage(data);
+
+      const baseName = path.replace(/\.[^.]+$/, '');
+      const newExt = '.jpg';
+
+      if (parts.length === 1 && parts[0].suffix === '') {
+        const newPath = renamed[path] || path.replace(/\.[^.]+$/, newExt);
+        out.file(newPath, parts[0].data, { compression: 'DEFLATE', createFolders: false });
+      } else {
+        for (const part of parts) {
+          const partName = baseName.split('/').pop() + part.suffix + newExt;
+          const partPath = (path.includes('/') ? path.substring(0, path.lastIndexOf('/') + 1) : '') + partName;
+          out.file(partPath, part.data, { compression: 'DEFLATE', createFolders: false });
+        }
+      }
+    } else if (low.match(/\.(xhtml|html|htm)$/)) {
+      xhtmlFiles[path] = await fileObj.async('string');
+    } else if (low.endsWith('.opf')) {
+      opfPath = path;
+      opfContent = await fileObj.async('string');
+    }
+
+    if (progressCallback) progressCallback((i / entries.length) * 60);
+  }
+
+  // Second pass: update XHTML
+  for (const [path, content] of Object.entries(xhtmlFiles)) {
+    let t = content;
+    const r = fixSvgCover(t);
+    if (r.fixed) { t = r.c; svgFix += r.count || 1; }
+
+    const r2 = fixSvgWrappedImages(t);
+    if (r2.fixed) { t = r2.c; svgFix += r2.count || 1; }
+
+    for (const [o, n] of Object.entries(renamed)) {
+      t = t.split(o.split('/').pop()).join(n.split('/').pop());
+    }
+
+    out.file(path, t, { compression: 'DEFLATE', createFolders: false });
+  }
+
+  // Third pass: update OPF
+  if (opfContent) {
+    let t = opfContent;
+    for (const [o, n] of Object.entries(renamed)) {
+      t = t.split(o.split('/').pop()).join(n.split('/').pop());
+    }
+    t = t.replace(/href="([^"]+\.jpg)"([^>]*)media-type="image\/(png|gif|webp|bmp)"/g, 'href="$1"$2media-type="image/jpeg"');
+    t = t.replace(/media-type="image\/(png|gif|webp|bmp)"([^>]*)href="([^"]+\.jpg)"/g, 'media-type="image/jpeg"$2href="$3"');
+    if (svgFix) t = t.replace(/\s+svg(?=["'\s>])/g, '');
+
+    const cm = ensureCoverMeta(t);
+    if (cm.fixed) t = cm.o;
+    out.file(opfPath, t, { compression: 'DEFLATE', createFolders: false });
+  }
+
+  // Copy remaining files
+  for (const [path, fileObj] of entries) {
+    if (fileObj.dir || path === 'mimetype') continue;
+    const low = path.toLowerCase();
+    if (low.match(/\.(png|gif|webp|bmp|jpg|jpeg)$/) || low.match(/\.(xhtml|html|htm)$/) || low.endsWith('.opf')) continue;
+
+    let data = await fileObj.async('arraybuffer');
+    if (low.endsWith('.css') || low.endsWith('.ncx')) {
+      let t = new TextDecoder().decode(data);
+      for (const [o, n] of Object.entries(renamed)) {
+        t = t.split(o.split('/').pop()).join(n.split('/').pop());
+      }
+      data = new TextEncoder().encode(t);
+    }
+    out.file(path, data, { compression: 'DEFLATE', createFolders: false });
+  }
+
+  return await out.generateAsync({ type: 'blob', mimeType: 'application/epub+zip' });
+}
 
 // Get WebSocket URL based on current page location
 function getWsUrl() {
@@ -1162,6 +1508,7 @@ function uploadFileHTTP(file, onProgress, onComplete, onError) {
 function uploadFile() {
   const fileInput = document.getElementById('fileInput');
   const files = Array.from(fileInput.files);
+  const convertEnabled = document.getElementById('convertBeforeUpload').checked;
 
   if (files.length === 0) {
     alert('Please select at least one file!');
@@ -1204,17 +1551,24 @@ function uploadFile() {
       return;
     }
 
-    const file = files[currentIndex];
+    let file = files[currentIndex];
+    const originalFile = file;
     progressFill.style.width = '0%';
     progressFill.style.backgroundColor = '#27ae60';
+
+    // Check if file is an EPUB and conversion is enabled
+    const isEpub = file.name.toLowerCase().endsWith('.epub');
+    const needsConversion = isEpub && convertEnabled;
+
     const methodText = useWebSocket ? ' [WS]' : ' [HTTP]';
-    progressText.textContent = `Uploading ${file.name} (${currentIndex + 1}/${files.length})${methodText}`;
+    const stageText = needsConversion ? 'Converting & uploading' : 'Uploading';
+    progressText.textContent = `${stageText} ${file.name} (${currentIndex + 1}/${files.length})${methodText}`;
 
     const onProgress = (loaded, total) => {
       const percent = Math.round((loaded / total) * 100);
       progressFill.style.width = percent + '%';
-      const speed = ''; // Could calculate speed here
-      progressText.textContent = `Uploading ${file.name} (${currentIndex + 1}/${files.length})${methodText} — ${percent}%`;
+      const prefix = needsConversion ? 'Converting & uploading' : 'Uploading';
+      progressText.textContent = `${prefix} ${file.name} (${currentIndex + 1}/${files.length})${methodText} — ${percent}%`;
     };
 
     const onComplete = () => {
@@ -1223,12 +1577,32 @@ function uploadFile() {
     };
 
     const onError = (error) => {
-      failedFiles.push({ name: file.name, error: error, file: file });
+      failedFiles.push({ name: file.name, error: error, file: originalFile });
       currentIndex++;
       uploadNextFile();
     };
 
     try {
+      // Convert EPUB if needed
+      if (needsConversion) {
+        progressFill.style.backgroundColor = '#9b59b6'; // Purple for conversion
+        progressText.textContent = `Converting ${file.name} (${currentIndex + 1}/${files.length})...`;
+
+        try {
+          const convertedBlob = await convertEpubFile(file, (percent) => {
+            progressFill.style.width = (percent * 0.5) + '%'; // Conversion takes first 50%
+          });
+
+          // Create new File from converted blob
+          file = new File([convertedBlob], file.name, { type: 'application/epub+zip' });
+          progressFill.style.backgroundColor = '#27ae60'; // Back to green for upload
+        } catch (convError) {
+          console.error('Conversion error:', convError);
+          // If conversion fails, try uploading original file
+          progressText.textContent = `Conversion failed, uploading original ${file.name}...`;
+        }
+      }
+
       if (useWebSocket) {
         await uploadFileWebSocket(file, onProgress, null, null);
         onComplete();
