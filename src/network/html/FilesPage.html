@@ -306,6 +306,9 @@
       width: 0%;
       transition: width 0.3s;
     }
+    #progress-fill.no-transition {
+      transition: none !important;
+    }
     #progress-text {
       text-align: center;
       margin-top: 5px;
@@ -814,7 +817,7 @@
 
     let files = [];
     try {
-      const response = await fetch('/api/files?path=' + encodeURIComponent(currentPath));
+      const response = await fetch('/api/files?path=' + encodeURIComponent(currentPath) + '&_=' + Date.now());
       if (!response.ok) {
         throw new Error('Failed to load files: ' + response.status + ' ' + response.statusText);
       }
@@ -1205,8 +1208,13 @@ function uploadFile() {
     }
 
     const file = files[currentIndex];
+    // Reset progress bar instantly without transition when starting a new file
+    progressFill.classList.add('no-transition');
     progressFill.style.width = '0%';
     progressFill.style.backgroundColor = '#27ae60';
+    // Re-enable transition after a brief delay
+    setTimeout(() => progressFill.classList.remove('no-transition'), 50);
+
     const methodText = useWebSocket ? ' [WS]' : ' [HTTP]';
     progressText.textContent = `Uploading ${file.name} (${currentIndex + 1}/${files.length})${methodText}`;
 
