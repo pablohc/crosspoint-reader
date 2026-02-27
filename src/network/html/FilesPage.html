@@ -814,7 +814,7 @@
 
     let files = [];
     try {
-      const response = await fetch('/api/files?path=' + encodeURIComponent(currentPath));
+      const response = await fetch('/api/files?path=' + encodeURIComponent(currentPath) + '&_=' + Date.now());
       if (!response.ok) {
         throw new Error('Failed to load files: ' + response.status + ' ' + response.statusText);
       }
