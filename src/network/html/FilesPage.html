@@ -1148,32 +1148,32 @@ function ensureCoverMeta(opfContent) {
   let coverId = null, m;
 
   // Try 1: properties="cover-image"
-  if (m = opfContent.match(/<item[^>]+id="([^"]+)"[^>]+properties="[^"]*cover-image[^"]*"/)) coverId = m[1];
-  if (!coverId && (m = opfContent.match(/<item[^>]+properties="[^"]*cover-image[^"]*"[^>]+id="([^"]+)"/))) coverId = m[1];
+  if (m = opfContent.match(/<\w+:?item[^>]+id="([^"]+)"[^>]+properties="[^"]*cover-image[^"]*"/)) coverId = m[1];
+  if (!coverId && (m = opfContent.match(/<\w+:?item[^>]+properties="[^"]*cover-image[^"]*"[^>]+id="([^"]+)"/))) coverId = m[1];
 
-  // Try 2: href contains "cover" and is an image
-  if (!coverId && (m = opfContent.match(/<item[^>]+id="([^"]+)"[^>]+href="[^"]*cover[^"]*"[^>]*media-type="image\//i))) coverId = m[1];
-  if (!coverId && (m = opfContent.match(/<item[^>]+href="[^"]*cover[^"]*"[^>]+id="([^"]+)"[^>]*media-type="image\//i))) coverId = m[1];
+  // Try 2: href contains "cover" and is an image (handle any attribute order)
+  if (!coverId && (m = opfContent.match(/<\w+:?item[^>]*id="([^"]+)"[^>]*href="[^"]*cover[^"]*"[^>]*media-type="image\//i))) coverId = m[1];
+  if (!coverId && (m = opfContent.match(/<\w+:?item[^>]*href="[^"]*cover[^"]*"[^>]*id="([^"]+)"[^>]*media-type="image\//i))) coverId = m[1];
 
-  // Try 3: id contains "cover" and is an image
-  if (!coverId && (m = opfContent.match(/<item[^>]+id="([^"]*cover[^"]*)"[^>]+media-type="image\//i))) coverId = m[1];
-  if (!coverId && (m = opfContent.match(/<item[^>]+media-type="image\/[^"]*"[^>]+id="([^"]*cover[^"]*)"[^>]*/i))) coverId = m[1];
+  // Try 3: id contains "cover" and is an image (handle any attribute order with namespace)
+  if (!coverId && (m = opfContent.match(/<\w+:?item[^>]*id="([^"]*cover[^"]*)"[^>]*media-type="image\//i))) coverId = m[1];
+  if (!coverId && (m = opfContent.match(/<\w+:?item[^>]*media-type="image\/[^"]*"[^>]*id="([^"]*cover[^"]*)"/i))) coverId = m[1];
 
   if (!coverId) return { o: opfContent, fixed: false };
 
-  // Check if cover meta exists
-  const metaMatch = opfContent.match(/<meta\s+name=["']cover["']\s+content=["']([^"']+)["']/) ||
-                    opfContent.match(/<meta\s+content=["']([^"']+)["']\s+name=["']cover["']/);
+  // Check if cover meta exists (handle namespaces like opf:meta)
+  const metaMatch = opfContent.match(/<\w+:?meta\s+name=["']cover["']\s+content=["']([^"']+)["']/) ||
+                    opfContent.match(/<\w+:?meta\s+content=["']([^"']+)["']\s+name=["']cover["']/);
   if (metaMatch) {
     const currentValue = metaMatch[1];
     if (currentValue.includes('/')) {
-      opfContent = opfContent.replace(/<meta\s+name=["']cover["']\s+content=["'][^"']+["']\s*\/?>/g, `<meta name="cover" content="${coverId}" />`);
-      opfContent = opfContent.replace(/<meta\s+content=["'][^"']+["']\s+name=["']cover["']\s*\/?>/g, `<meta name="cover" content="${coverId}" />`);
+      opfContent = opfContent.replace(/<\w+:?meta\s+name=["']cover["']\s+content=["'][^"']+["']\s*\/?>/g, `<meta name="cover" content="${coverId}" />`);
+      opfContent = opfContent.replace(/<\w+:?meta\s+content=["'][^"']+["']\s+name=["']cover["']\s*\/?>/g, `<meta name="cover" content="${coverId}" />`);
       return { o: opfContent, fixed: true };
     }
     if (currentValue !== coverId) {
-      opfContent = opfContent.replace(/<meta\s+name=["']cover["']\s+content=["'][^"']+["']\s*\/?>/g, `<meta name="cover" content="${coverId}" />`);
-      opfContent = opfContent.replace(/<meta\s+content=["'][^"']+["']\s+name=["']cover["']\s*\/?>/g, `<meta name="cover" content="${coverId}" />`);
+      opfContent = opfContent.replace(/<\w+:?meta\s+name=["']cover["']\s+content=["'][^"']+["']\s*\/?>/g, `<meta name="cover" content="${coverId}" />`);
+      opfContent = opfContent.replace(/<\w+:?meta\s+content=["'][^"']+["']\s+name=["']cover["']\s*\/?>/g, `<meta name="cover" content="${coverId}" />`);
       return { o: opfContent, fixed: true };
     }
     return { o: opfContent, fixed: false };
