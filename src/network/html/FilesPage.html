@@ -1074,11 +1074,10 @@ function uploadFileWebSocket(file, onProgress, onComplete, onError) {
             ws.send(buffer);
             offset += chunkSize;
 
-            // Update local progress - cap at 95% since server still needs to write
-            // Final 100% shown when server confirms DONE
+            // Update local progress with real transfer progress
+            // Server will confirm 100% with DONE message
             if (onProgress) {
-              const cappedOffset = Math.min(offset, Math.floor(totalSize * 0.95));
-              onProgress(cappedOffset, totalSize);
+              onProgress(offset, totalSize);
             }
           }
 
@@ -1239,11 +1238,13 @@ function uploadFile() {
     try {
       if (useWebSocket) {
         await uploadFileWebSocket(file, onProgress, null, null);
-        onComplete();
       } else {
         await uploadFileHTTP(file, onProgress, null, null);
-        onComplete();
       }
+      // Ensure progress bar shows 100% before moving to next file
+      progressFill.style.width = '100%';
+      progressText.textContent = `Upload complete: ${file.name}`;
+      onComplete();
     } catch (error) {
       console.error('Upload error:', error);
       if (useWebSocket && error.message === 'WebSocket connection failed') {
@@ -1253,10 +1254,13 @@ function uploadFile() {
         // Retry this file with HTTP
         try {
           await uploadFileHTTP(file, onProgress, null, null);
-          onComplete();
         } catch (httpError) {
           onError(httpError.message);
         }
+        // Ensure progress bar shows 100% before moving to next file
+        progressFill.style.width = '100%';
+        progressText.textContent = `Upload complete: ${file.name}`;
+        onComplete();
       } else {
         onError(error.message);
       }
