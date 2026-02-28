@@ -1381,7 +1381,7 @@
     // Update active preset
     document.querySelectorAll('.quality-preset').forEach(btn => {
       btn.classList.remove('active');
-      if (parseInt(btn.dataset.value) === value) {
+      if (parseInt(btn.dataset.value, 10) === value) {
         btn.classList.add('active');
       }
     });
@@ -1398,7 +1398,7 @@
     document.getElementById('qualityDisplaySimple').textContent = '📦 ' + quality + '% JPEG';
 
     // Update converter variables (used by processImage and applyGrayscale)
-    JPEG_QUALITY = parseInt(quality);
+    JPEG_QUALITY = parseInt(quality, 10);
     ENABLE_GRAYSCALE = true; // Always grayscale for e-ink
   }
 
@@ -1439,7 +1439,7 @@
         updateQualitySettings();
       };
       qualityInput.onchange = function() {
-        let v = Math.max(1, Math.min(95, parseInt(this.value) || 85));
+        let v = Math.max(1, Math.min(95, parseInt(this.value, 10) || 85));
         this.value = v;
         qualitySlider.value = v;
         deselectPresets();
