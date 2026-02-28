@@ -1978,8 +1978,9 @@ async function convertEpubFile(file, progressCallback) {
     for (const [o, n] of Object.entries(renamed)) {
       t = t.split(o.split('/').pop()).join(n.split('/').pop());
     }
-    t = t.replace(/href="([^"]+\.jpg)"([^>]*)media-type="image\/(png|gif|webp|bmp)"/g, 'href="$1"$2media-type="image/jpeg"');
-    t = t.replace(/media-type="image\/(png|gif|webp|bmp)"([^>]*)href="([^"]+\.jpg)"/g, 'media-type="image/jpeg"$2href="$3"');
+    // Replace image media-types for converted files (handles any attribute order)
+    t = t.replace(/(<item\b[^>]*href="[^"]+\.jpg"[^>]*)media-type="image\/(png|gif|webp|bmp)"/g, '$1media-type="image/jpeg"');
+    t = t.replace(/(<item\b[^>]*)media-type="image\/(png|gif|webp|bmp)"([^>]*href="[^"]+\.jpg")/g, '$1media-type="image/jpeg"$3');
     if (svgFix) t = t.replace(/\s+svg(?=["'\s>])/g, '');
 
     // Calculate OPF directory for relative paths

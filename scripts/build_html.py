@@ -39,15 +39,20 @@ for root, _, files in os.walk(SRC_DIR):
             with open(html_path, "r", encoding="utf-8") as f:
                 html_content = f.read()
 
-            # minified = regex.sub("\g<1>", html_content)
-            minified = minify_html(html_content)
+            # Only minify HTML files; JS files are typically pre-minified (e.g., jszip.min.js)
+            if file.endswith(".html"):
+                minified = minify_html(html_content)
+            else:
+                minified = html_content
 
             # Compress with gzip (compresslevel 9 is maximum compression)
             # IMPORTANT: we don't use brotli because Firefox doesn't support brotli with insecured context (only supported on HTTPS)
             compressed = gzip.compress(minified.encode('utf-8'), compresslevel=9)
 
             # Replace dots with underscores in base_name for valid C identifier
-            base_name = f"{os.path.splitext(file)[0]}Html".replace(".", "_")
+            # Use appropriate suffix based on file type
+            suffix = "Html" if file.endswith(".html") else "Js"
+            base_name = f"{os.path.splitext(file)[0]}{suffix}".replace(".", "_")
             header_path = os.path.join(root, f"{base_name}.generated.h")
 
             with open(header_path, "w", encoding="utf-8") as h:
