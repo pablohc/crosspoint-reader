@@ -1395,6 +1395,47 @@
   // get current path from query parameter
   const currentPath = decodeURIComponent(new URLSearchParams(window.location.search).get('path') || '/');
 
+  // Network status monitoring
+  let isNetworkOnline = navigator.onLine;
+  let networkRetryTimeout = null;
+  let pendingRetries = [];
+
+  // Add network status listeners
+  window.addEventListener('online', () => {
+    console.log('[Network] Online event fired');
+    isNetworkOnline = true;
+
+    // Clear any existing retry timeout
+    if (networkRetryTimeout) {
+      clearTimeout(networkRetryTimeout);
+      networkRetryTimeout = null;
+    }
+
+    // Show network restored message
+    showNotification('Network connection restored', 'success');
+
+    // Process pending retries
+    if (pendingRetries.length > 0) {
+      showNotification(`Retrying ${pendingRetries.length} failed uploads...`, 'info');
+      processPendingRetries();
+    }
+  });
+
+  window.addEventListener('offline', () => {
+    console.log('[Network] Offline event fired');
+    isNetworkOnline = false;
+    showNotification('Network connection lost', 'warning');
+
+    // Cancel any pending retry attempts
+    if (networkRetryTimeout) {
+      clearTimeout(networkRetryTimeout);
+      networkRetryTimeout = null;
+    }
+  });
+
+  // Initialize network status
+  console.log('[Network] Initial status:', isNetworkOnline ? 'online' : 'offline');
+
   function escapeHtml(unsafe) {
     return unsafe
       .replaceAll("&", "&amp;")
@@ -1402,6 +1443,54 @@
       .replaceAll(">", "&gt;")
       .replaceAll('"', "&quot;")
       .replaceAll("'", "&#039;");
+  }
+
+  function showNotification(message, type = 'info') {
+    // Create notification element if it doesn't exist
+    let notification = document.getElementById('notification');
+    if (!notification) {
+      notification = document.createElement('div');
+      notification.id = 'notification';
+      notification.style.cssText = `
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        padding: 12px 20px;
+        border-radius: 4px;
+        color: white;
+        font-weight: 500;
+        z-index: 10000;
+        max-width: 300px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+        transition: all 0.3s ease;
+      `;
+      document.body.appendChild(notification);
+    }
+
+    // Set styles based on type
+    const styles = {
+      'success': 'background-color: #27ae60;',
+      'error': 'background-color: #e74c3c;',
+      'warning': 'background-color: #f39c12;',
+      'info': 'background-color: #3498db;'
+    };
+    notification.style.cssText += styles[type] || styles['info'];
+    notification.textContent = message;
+
+    // Show notification
+    notification.style.opacity = '1';
+    notification.style.transform = 'translateX(0)';
+
+    // Auto-hide after 5 seconds
+    setTimeout(() => {
+      notification.style.opacity = '0';
+      notification.style.transform = 'translateX(100%)';
+      setTimeout(() => {
+        if (notification.parentNode) {
+          notification.parentNode.removeChild(notification);
+        }
+      }, 300);
+    }, 5000);
   }
 
   function formatFileSize(bytes) {
@@ -3168,23 +3257,51 @@ function uploadFile() {
 
       failedFiles.push({ name: file.name, error: error, file: originalFile });
 
-      // If network error, mark all remaining files as failed and show retry banner
+      // If network error, check if we should retry or mark as failed
       if (error.includes('connection failed') || error.includes('Network error') ||
           error.includes('timeout') || error.includes('disconnected')) {
-        // Add all remaining files to failed list
-        const remainingFiles = files.slice(currentIndex + 1);
-        remainingFiles.forEach(remainingFile => {
-          failedFiles.push({
-            name: remainingFile.name,
-            error: 'Network error - upload interrupted',
-            file: remainingFile
-          });
-        });
+        if (isNetworkOnline) {
+          // Network is currently online, treat as a hard failure
+          console.log(`[Network] Network error with online status: ${error}`);
 
-        // Show retry banner immediately with all failed files
-        failedUploadsGlobal = failedUploadsGlobal.concat(failedFiles);
-        closeUploadModal();
-        showFailedUploadsBanner();
+          // Add all remaining files to failed list
+          const remainingFiles = files.slice(currentIndex + 1);
+          remainingFiles.forEach(remainingFile => {
+            failedFiles.push({
+              name: remainingFile.name,
+              error: 'Network error - upload interrupted',
+              file: remainingFile
+            });
+          });
+
+          // Show retry banner immediately with all failed files
+          failedUploadsGlobal = failedUploadsGlobal.concat(failedFiles);
+          closeUploadModal();
+          showFailedUploadsBanner();
+        } else {
+          // Network is offline, schedule retries for all failed files
+          console.log(`[Network] Network offline, scheduling retries for ${failedFiles.length + 1} files`);
+
+          // Add current file to pending retries
+          addToPendingRetries(originalFile, error);
+
+          // Add all remaining files to pending retries
+          const remainingFiles = files.slice(currentIndex + 1);
+          remainingFiles.forEach(remainingFile => {
+            addToPendingRetries(remainingFile, 'Network error - upload interrupted');
+          });
+
+          // Show notification about offline uploads
+          showNotification(`Network offline - ${failedFiles.length + remainingFiles.length} uploads will be retried when connection is restored`, 'warning');
+
+          // Close modal and reset
+          closeUploadModal();
+
+          // If we have pending retries, schedule a retry attempt
+          if (pendingRetries.length > 0) {
+            scheduleRetryRetry(originalFile, error);
+          }
+        }
         return;
       }
 
@@ -3523,6 +3640,65 @@ function retryAllFailedUploads() {
       pickerSection.style.display = 'none';
     }
     imagePickerVisible = false;
+  }
+
+  // Network-aware retry functions
+  function addToPendingRetries(file, error) {
+    if (!isNetworkOnline) {
+      pendingRetries.push({ file, error, timestamp: Date.now() });
+      console.log(`[Network] Added to pending retries: ${file.name}, total pending: ${pendingRetries.length}`);
+    }
+  }
+
+  function processPendingRetries() {
+    if (pendingRetries.length === 0 || !isNetworkOnline) return;
+
+    console.log(`[Network] Processing ${pendingRetries.length} pending retries...`);
+
+    // Clear the pending retries array
+    const retriesToProcess = [...pendingRetries];
+    pendingRetries = [];
+
+    // Process each retry
+    retriesToProcess.forEach(retry => {
+      console.log(`[Network] Retrying: ${retry.file.name}`);
+
+      // Create a DataTransfer for this single file
+      const dt = new DataTransfer();
+      dt.items.add(retry.file);
+
+      const fileInput = document.getElementById('fileInput');
+      fileInput.files = dt.files;
+
+      // Trigger upload immediately
+      openUploadModal();
+      validateFile();
+    });
+  }
+
+  function scheduleRetryRetry(file, error) {
+    addToPendingRetries(file, error);
+
+    // Show a message about scheduled retry
+    showNotification(`Will retry "${file.name}" when network is restored`, 'info');
+
+    // If we're offline, schedule a retry check every 30 seconds
+    if (!isNetworkOnline && !networkRetryTimeout) {
+      networkRetryTimeout = setTimeout(() => {
+        console.log('[Network] Checking for network restoration...');
+        networkRetryTimeout = null;
+
+        // Check if network is back online
+        if (navigator.onLine) {
+          console.log('[Network] Network detected during retry check');
+          isNetworkOnline = true;
+          processPendingRetries();
+        } else {
+          // Schedule another check
+          scheduleRetryRetry(file, error);
+        }
+      }, 30000); // 30 seconds
+    }
   }
 
   function confirmMove() {
