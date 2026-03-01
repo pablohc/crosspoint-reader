@@ -1236,20 +1236,19 @@
             </div>
           </div>
           -->
-          <!-- Light Novel Mode -->
+          <!-- Rotate and Crop Mode -->
           <div class="advanced-setting-row">
-            <div class="setting-toggle">
-              <div>
-                <div class="setting-title">📖 Light Novel Mode</div>
-                <div class="setting-desc">Rotate wide images 90° and split into pages for vertical reading</div>
-              </div>
-              <label class="toggle-switch">
-                <input type="checkbox" id="lightNovelToggle" onchange="toggleLightNovelMode()">
-                <span class="toggle-slider"></span>
-              </label>
+            <div>
+              <div class="setting-title">📖 Rotate and Crop</div>
+              <div class="setting-desc">Choose image processing mode</div>
             </div>
-            <!-- Handedness options (shown when Light Novel Mode is on) -->
-            <div class="handedness-buttons" id="handednessOptions" style="display:none; margin-top: 12px;">
+            <select id="rotateAndCropSelect" onchange="updateRotateAndCropMode()" style="margin-top: 8px; padding: 6px; border-radius: 4px; border: 1px solid var(--border-color); background: var(--card-bg); color: var(--font-color);">
+              <option value="off">OFF</option>
+              <option value="lightNovel">Light Novel</option>
+              <option value="manual">Manual Picker</option>
+            </select>
+            <!-- Handedness options (shown when Light Novel Mode is selected) -->
+            <div class="handedness-buttons" id="handednessOptions" style="display: none; margin-top: 12px;">
               <button class="handedness-btn" id="handednessLeft" data-value="left" onclick="setHandedness('left')">
                 <span style="float: right;">✋</span><span>Left-handed<br><small>(Counter-clockwise)</small></span>
               </button>
@@ -1288,6 +1287,46 @@
           <div class="log-title">📋 Conversion Log</div>
         </div>
         <div class="log-container" id="log-container"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Image Picker Modal -->
+<div class="modal-overlay" id="imagePickerModal">
+  <div class="modal">
+    <button class="modal-close" onclick="closeImagePickerModal()">&times;</button>
+    <h3>🖼️ Image Picker</h3>
+    <p class="file-info">Select image processing for each image:</p>
+
+    <div class="image-picker-section" id="imagePickerSection">
+      <div class="image-picker-header">
+        <div class="image-picker-title">Images in EPUB</div>
+        <div class="image-picker-count" id="imagePickerCount"></div>
+      </div>
+      <div class="image-grid" id="imageGrid"></div>
+      <div class="image-picker-actions">
+        <button class="image-picker-btn secondary" onclick="selectAllImages()">Select All</button>
+        <button class="image-picker-btn secondary" onclick="deselectAllImages()">Deselect All</button>
+        <button class="image-picker-btn secondary" onclick="resetAllImageStates()">Reset All</button>
+        <button class="image-picker-btn primary" onclick="startConversionWithImageStates()">Start Conversion</button>
+      </div>
+      <div class="selection-info" id="selectionInfo">
+        Selected: <span id="selectedCount">0</span> / <span id="totalCount">0</span> images
+      </div>
+      <div class="state-legend">
+        <div class="legend-item">
+          <div class="legend-color" style="background:var(--border-color)"></div>
+          <span>Normal (no processing)</span>
+        </div>
+        <div class="legend-item">
+          <div class="legend-color" style="background:#3498db"></div>
+          <span>H-Split (rotate after cut)</span>
+        </div>
+        <div class="legend-item">
+          <div class="legend-color" style="background:#e74c3c"></div>
+          <span>V-Split (no rotation)</span>
+        </div>
       </div>
     </div>
   </div>
@@ -1736,9 +1775,169 @@
   function validateFile() {
     const fileInput = document.getElementById('fileInput');
     const uploadBtn = document.getElementById('uploadBtn');
+    const rotateAndCropSelect = document.getElementById('rotateAndCropSelect');
     const files = fileInput.files;
+
     uploadBtn.disabled = !(files.length > 0);
+
+    if (files.length > 0) {
+      const convertEnabled = document.getElementById('convertBeforeUpload').checked;
+      const mode = rotateAndCropSelect ? rotateAndCropSelect.value : 'off';
+
+      // Check if single EPUB with conversion enabled and Manual Picker mode
+      if (files.length === 1 && convertEnabled && files[0].name.toLowerCase().endsWith('.epub')) {
+        if (mode === 'manual') {
+          // Show image picker for manual mode
+          showImagePicker(files[0]).catch(err => {
+            console.error('Image picker error:', err);
+            // Fallback to upload without picker
+            uploadBtn.disabled = false;
+          });
+          uploadBtn.disabled = true;
+          return;
+        } else if (mode === 'lightNovel') {
+          // Light Novel mode - automatic processing, no picker
+          console.log('Light Novel mode: Automatic image processing');
+          uploadBtn.disabled = false;
+          return;
+        }
+      }
+
+      // For OFF mode or non-EPUB files
+      uploadBtn.disabled = false;
+    }
   }
+
+// Image Picker functions
+let imageStates = {};
+let imagePickerVisible = false;
+
+/**
+ * Show image picker for manual image selection
+ */
+async function showImagePicker(file) {
+  // Check if JSZip is available
+  if (typeof JSZip === 'undefined') {
+    console.error('JSZip not loaded');
+    alert('JSZip library not available. Conversion will proceed without image picker.');
+    return;
+  }
+
+  const pickerSection = document.getElementById('imagePickerSection');
+  if (!pickerSection) {
+    console.error('Image picker section not found');
+    return;
+  }
+
+  // Reset state
+  imageStates = {};
+  imagePickerVisible = true;
+
+  try {
+    // Extract images from EPUB
+    const zip = await JSZip.loadAsync(file);
+    const imageFiles = [];
+
+    zip.forEach((relativePath, file) => {
+      const fileName = relativePath.toLowerCase();
+      if (fileName.match(/\.(png|gif|webp|bmp|jpg|jpeg)$/)) {
+        imageFiles.push({ path: relativePath, file: file });
+      }
+    });
+
+    if (imageFiles.length === 0) {
+      alert('No images found in EPUB file');
+      imagePickerVisible = false;
+      return;
+    }
+
+    // Initialize all states to 0 (Normal)
+    imageFiles.forEach(img => {
+      imageStates[img.path] = 0;
+    });
+
+    // Show image picker section
+    pickerSection.style.display = 'block';
+
+    // Update UI
+    document.querySelector('.upload-modal').style.display = 'none';
+
+  } catch (error) {
+    console.error('Failed to extract images:', error);
+    alert('Failed to preview images: ' + error.message);
+    imagePickerVisible = false;
+  }
+}
+
+/**
+ * Cycle image state (0=Normal, 1=H-Split, 2=V-Split)
+ */
+function cycleImageState(imagePath) {
+  imageStates[imagePath] = (imageStates[imagePath] + 1) % 3;
+  renderImageGrid();
+}
+
+/**
+ * Render image grid
+ */
+function renderImageGrid() {
+  const imageGrid = document.getElementById('imageGrid');
+  if (!imageGrid) return;
+
+  imageGrid.innerHTML = '';
+
+  const stateLabels = ['Normal', 'H-Split', 'V-Split'];
+  const stateClasses = ['state-0', 'state-1', 'state-2'];
+
+  Object.entries(imageStates).forEach(([path, state]) => {
+    const item = document.createElement('div');
+    item.className = `image-item ${stateClasses[state]}`;
+    item.onclick = () => cycleImageState(path);
+    item.title = `Click to cycle: ${stateLabels[state]}`;
+
+    const img = document.createElement('img');
+    img.src = `data:image/svg+xml;base64,${btoa('<svg xmlns="http://www.w3.org/2000/svg" width="100" height="80"><rect width="100" height="80" fill="%23f0f0f0"/><text x="50" y="40" text-anchor="middle" font-size="12">${path.split('/').pop()}</text></svg>')}`;
+    item.appendChild(img);
+
+    const badge = document.createElement('div');
+    badge.className = 'image-state-badge';
+    badge.textContent = stateLabels[state].substring(0, 1);
+    item.appendChild(badge);
+
+    const name = document.createElement('div');
+    name.className = 'image-name';
+    name.textContent = path.split('/').pop();
+    item.appendChild(name);
+
+    imageGrid.appendChild(item);
+  });
+}
+
+/**
+ * Reset all image states to Normal
+ */
+function resetAllImageStates() {
+  Object.keys(imageStates).forEach(key => {
+    imageStates[key] = 0;
+  });
+  renderImageGrid();
+}
+
+/**
+ * Start conversion with selected image states
+ */
+function startConversionWithImageStates() {
+  const pickerSection = document.getElementById('imagePickerSection');
+  const uploadBtn = document.getElementById('uploadBtn');
+
+  if (pickerSection) {
+    pickerSection.style.display = 'none';
+  }
+
+  imagePickerVisible = false;
+  uploadBtn.disabled = false;
+  uploadFile();
+}
 
 let failedUploadsGlobal = [];
 let wsConnection = null;
@@ -2806,6 +3005,28 @@ function uploadFileHTTP(file, onProgress, onComplete, onError) {
   });
 }
 
+function updateRotateAndCropMode() {
+  const select = document.getElementById('rotateAndCropSelect');
+  const handednessOptions = document.getElementById('handednessOptions');
+
+  if (!select) return;
+
+  const mode = select.value;
+
+  // Update global variables
+  ENABLE_LIGHT_NOVEL_MODE = mode === 'lightNovel';
+
+  // Show/hide handedness options (for both Light Novel and Manual Picker modes)
+  if (handednessOptions) {
+    handednessOptions.style.display = (mode === 'lightNovel' || mode === 'manual') ? 'block' : 'none';
+  }
+
+  // If mode is 'manual', trigger validateFile to show image picker
+  if (mode === 'manual' && document.getElementById('fileInput').files.length > 0) {
+    validateFile();
+  }
+}
+
 function uploadFile() {
   const fileInput = document.getElementById('fileInput');
   const files = Array.from(fileInput.files);
@@ -2929,6 +3150,27 @@ function uploadFile() {
       }
 
       failedFiles.push({ name: file.name, error: error, file: originalFile });
+
+      // If network error, mark all remaining files as failed and show retry banner
+      if (error.includes('connection failed') || error.includes('Network error') ||
+          error.includes('timeout') || error.includes('disconnected')) {
+        // Add all remaining files to failed list
+        const remainingFiles = files.slice(currentIndex + 1);
+        remainingFiles.forEach(remainingFile => {
+          failedFiles.push({
+            name: remainingFile.name,
+            error: 'Network error - upload interrupted',
+            file: remainingFile
+          });
+        });
+
+        // Show retry banner immediately with all failed files
+        failedUploadsGlobal = failedUploadsGlobal.concat(failedFiles);
+        closeUploadModal();
+        showFailedUploadsBanner();
+        return;
+      }
+
       currentIndex++;
       uploadNextFile();
     };
@@ -3256,6 +3498,14 @@ function retryAllFailedUploads() {
 
   function closeMoveModal() {
     document.getElementById('moveModal').classList.remove('open');
+  }
+
+  function closeImagePickerModal() {
+    const pickerSection = document.getElementById('imagePickerSection');
+    if (pickerSection) {
+      pickerSection.style.display = 'none';
+    }
+    imagePickerVisible = false;
   }
 
   function confirmMove() {
