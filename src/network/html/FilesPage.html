@@ -2712,25 +2712,8 @@ function applyGrayscale(ctx, width, height) {
 function calculateSmartSplitPositions(totalDimension, maxDim) {
   const overlap = OVERLAP; // 0.15 (15%)
   const overlapPx = Math.round(maxDim * overlap); // 72px
-  const step = maxDim - overlapPx; // 408px
 
-  // Calculate how many parts with standard approach
-  const standardParts = Math.ceil((totalDimension - overlapPx) / step);
-
-  // For very long images (3+ parts), use standard approach with good overlap
-  if (standardParts >= 3) {
-    const parts = [];
-    for (let i = 0; i < standardParts; i++) {
-      let pos = i * step;
-      if (i === standardParts - 1) pos = totalDimension - maxDim;
-      pos = Math.max(0, Math.min(pos, totalDimension - maxDim));
-      parts.push({ start: pos, end: Math.min(pos + maxDim, totalDimension) });
-    }
-    return parts;
-  }
-
-  // For 1-2 parts, use smart positioning
-  // First part: from start
+  // ALWAYS start with first and last parts
   const firstPart = { start: 0, end: Math.min(maxDim, totalDimension) };
 
   // Case: Single part covers everything
@@ -2744,16 +2727,18 @@ function calculateSmartSplitPositions(totalDimension, maxDim) {
     end: totalDimension
   };
 
-  // Check if first and last overlap
+  // Check the gap between first part end and last part start
   const gapBetween = lastPart.start - firstPart.end;
 
-  // If parts overlap or gap is very small, use 2 parts with adjusted sizes
-  if (gapBetween <= overlapPx) {
-    // Calculate balanced 2-part split
+  // If parts overlap or gap is small enough, use just 2 parts
+  // Small gap = less than maxDim (meaning we'd fit one middle part at most)
+  if (gapBetween <= maxDim) {
+    // Use balanced 2-part split - each part gets half
     const partSize = Math.ceil(totalDimension / 2);
 
-    // Only use 2 parts if each part is reasonable (not too large)
-    const maxAllowedPartSize = maxDim + overlapPx * 2; // Allow some flexibility: up to ~552px
+    // Only force 2 parts if each part isn't too large
+    // Max reasonable part size: maxDim + overlapPx (e.g., 480 + 72 = 552px)
+    const maxAllowedPartSize = maxDim + overlapPx;
 
     if (partSize <= maxAllowedPartSize) {
       return [
@@ -2761,13 +2746,41 @@ function calculateSmartSplitPositions(totalDimension, maxDim) {
         { start: totalDimension - partSize, end: totalDimension }
       ];
     }
+
+    // Parts would be too large, use first/last with overlap
+    return [
+      { start: 0, end: Math.min(maxDim + overlapPx, totalDimension) },
+      { start: Math.max(0, totalDimension - maxDim - overlapPx), end: totalDimension }
+    ];
   }
 
-  // Otherwise, use standard 2-part approach with overlap
-  return [
-    { start: 0, end: maxDim },
-    { start: totalDimension - maxDim, end: totalDimension }
-  ];
+  // Gap is significant - we need middle parts
+  // Calculate how many middle parts we need
+  const step = maxDim - overlapPx; // 408px
+  const middlePartsNeeded = Math.ceil(gapBetween / step);
+
+  if (middlePartsNeeded <= 1) {
+    // Just one middle part needed - center it in the gap
+    const middleStart = Math.floor((firstPart.end + lastPart.start) / 2) - Math.floor(maxDim / 2);
+    return [
+      firstPart,
+      { start: middleStart, end: middleStart + maxDim },
+      lastPart
+    ];
+  }
+
+  // Multiple middle parts needed - use even spacing
+  const parts = [firstPart];
+  const totalMiddleSpace = lastPart.start - firstPart.end;
+  const middleStep = totalMiddleSpace / (middlePartsNeeded + 1);
+
+  for (let i = 1; i <= middlePartsNeeded; i++) {
+    const pos = firstPart.end + (middleStep * i) - (maxDim / 2);
+    parts.push({ start: Math.round(pos), end: Math.round(pos + maxDim) });
+  }
+  parts.push(lastPart);
+
+  return parts;
 }
 
 /**
