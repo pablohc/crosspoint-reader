@@ -1633,8 +1633,24 @@
     const logContainer = document.getElementById('log-container');
     if (logContainer) logContainer.innerHTML = '';
 
+    // Reset progress bar and text
+    const progressFill = document.getElementById('progress-fill');
+    const progressText = document.getElementById('progress-text');
+    if (progressFill) {
+      progressFill.style.width = '0%';
+      progressFill.style.backgroundColor = '#27ae60';
+      progressFill.classList.add('no-transition');
+      setTimeout(() => progressFill.classList.remove('no-transition'), 50);
+    }
+    if (progressText) {
+      progressText.textContent = 'Ready to upload';
+    }
+
     document.getElementById('uploadPathDisplay').textContent = currentPath === '/' ? '/ 🏠' : currentPath;
     document.getElementById('uploadModal').classList.add('open');
+
+    // Reset upload button based on current file selection
+    resetUploadButton();
   }
 
   function closeUploadModal() {
@@ -1899,6 +1915,15 @@
       // For OFF mode or non-EPUB files
       uploadBtn.disabled = false;
     }
+  }
+
+  function cleanupAfterFailedUpload() {
+    // Reset any global state
+    imageStates = {};
+    imagePickerVisible = false;
+
+    // Close modal if open
+    closeUploadModal();
   }
 
   function resetUploadButton() {
@@ -3298,6 +3323,7 @@ function uploadFile() {
           failedUploadsGlobal = failedUploadsGlobal.concat(failedFiles);
           closeUploadModal();
           showFailedUploadsBanner();
+          cleanupAfterFailedUpload();
         } else {
           // Network is offline, schedule retries for all failed files
           console.log(`[Network] Network offline, scheduling retries for ${failedFiles.length + 1} files`);
