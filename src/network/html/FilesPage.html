@@ -2582,57 +2582,153 @@ function exportLogToFile(filename = null, isBatch = false) {
 
 // Fix SVG cover - converts SVG-wrapped covers to plain HTML img tags
 function fixSvgCover(content) {
-  if (!content.includes('<svg') || !content.includes('xlink:href')) {
-    return { c: content, fixed: false, count: 0 };
-  }
-  if (!content.includes('calibre:cover') && !content.includes('name="cover"') && !content.includes('<title>Cover</title>')) {
-    return { c: content, fixed: false, count: 0 };
-  }
-  const match = content.match(/xlink:href=["']([^"']+)["']/);
-  if (!match) return { c: content, fixed: false, count: 0 };
+  const hasSvg = content.includes('<svg') || content.includes('<svg:');
+  if (!hasSvg || !content.includes('xlink:href')) return { c: content, fixed: false, count: 0 };
+  if (!content.includes('calibre:cover') && !content.includes('name="cover"') && !content.includes('<title>Cover</title>')) return { c: content, fixed: false, count: 0 };
 
-  return {
-    c: `<?xml version="1.0" encoding="utf-8"?>
+  try {
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(content, 'application/xhtml+xml');
+
+    if (doc.querySelector('parsererror')) {
+      // Fallback to regex
+      const m = content.match(/xlink:href=["']([^"']+)["']/);
+      if (!m) return { c: content, fixed: false, count: 0 };
+      return { c: `<?xml version="1.0" encoding="utf-8"?>
 <!DOCTYPE html>
 <html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops" lang="en" xml:lang="en">
 <head><meta content="text/html; charset=UTF-8" http-equiv="default-style"/><title>Cover</title></head>
-<body><section epub:type="cover"><img alt="Cover" src="${match[1]}"/></section></body>
+<body><section epub:type="cover"><img alt="Cover" src="${m[1]}"/></section></body>
+</html>`, fixed: true, count: 1 };
+    }
+
+    // Search for SVG element with xlink:href
+    const svgs = doc.querySelectorAll('svg[*|href], svg[xlink\\:href]');
+    let imgHref = null;
+
+    for (const svg of svgs) {
+      const imageEl = svg.querySelector('image[*|href]') ||
+                      svg.getElementsByTagNameNS('http://www.w3.org/2000/svg', 'image')[0] ||
+                      svg.getElementsByTagNameNS('*', 'image')[0];
+
+      if (imageEl) {
+        imgHref = imageEl.getAttributeNS('http://www.w3.org/1999/xlink', 'href') ||
+                  imageEl.getAttribute('xlink:href') ||
+                  imageEl.getAttribute('href');
+        if (imgHref) break;
+      }
+    }
+
+    if (!imgHref) {
+      // Fallback to regex
+      const m = content.match(/xlink:href=["']([^"']+)["']/);
+      if (!m) return { c: content, fixed: false, count: 0 };
+      imgHref = m[1];
+    }
+
+    return {
+      c: `<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops" lang="en" xml:lang="en">
+<head><meta content="text/html; charset=UTF-8" http-equiv="default-style"/><title>Cover</title></head>
+<body><section epub:type="cover"><img alt="Cover" src="${imgHref}"/></section></body>
 </html>`,
-    fixed: true,
-    count: 1
-  };
+      fixed: true,
+      count: 1
+    };
+  } catch (e) {
+    // Fallback to regex
+    const m = content.match(/xlink:href=["']([^"']+)["']/);
+    if (!m) return { c: content, fixed: false, count: 0 };
+    return { c: `<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops" lang="en" xml:lang="en">
+<head><meta content="text/html; charset=UTF-8" http-equiv="default-style"/><title>Cover</title></head>
+<body><section epub:type="cover"><img alt="Cover" src="${m[1]}"/></section></body>
+</html>`, fixed: true, count: 1 };
+  }
 }
 
 // Fix SVG-wrapped images - unwrap SVG and replace with plain img
 function fixSvgWrappedImages(content) {
-  if (!content.includes('<svg') || !content.includes('xlink:href')) {
-    return { c: content, fixed: false, count: 0 };
+  const hasSvg = content.includes('<svg') || content.includes('<svg:');
+  if (!hasSvg || !content.includes('xlink:href')) return { c: content, fixed: false, count: 0 };
+
+  try {
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(content, 'application/xhtml+xml');
+
+    if (doc.querySelector('parsererror')) {
+      // Fallback to regex
+      let fixedCount = 0;
+      const svgImageRegex = /<(?:svg:)?svg\b[^>]*>[\s\S]*?<(?:svg:)?image\b[^>]*xlink:href=["']([^"']+)["'][^>]*\/?>\s*<\/(?:svg:)?svg>/gi;
+      const newContent = content.replace(svgImageRegex, (match, href) => {
+        fixedCount++;
+        return `<img src="${href}" alt="" />`;
+      });
+      return { c: newContent, fixed: fixedCount > 0, count: fixedCount };
+    }
+
+    // Find all SVGs with xlink:href
+    const svgs = doc.querySelectorAll('svg[*|href], svg[xlink\\:href]');
+    const uniqueSvgs = [];
+
+    // Filter to avoid processing nested SVGs
+    for (const svg of svgs) {
+      if (!uniqueSvgs.some(s => s.contains(svg))) {
+        uniqueSvgs.push(svg);
+      }
+    }
+
+    if (uniqueSvgs.length === 0) return { c: content, fixed: false, count: 0 };
+
+    let fixedCount = 0;
+
+    for (const svg of uniqueSvgs) {
+      // Find image element inside (with or without namespace)
+      const imageEl = svg.querySelector('image[*|href]') ||
+                      svg.getElementsByTagNameNS('http://www.w3.org/2000/svg', 'image')[0] ||
+                      svg.getElementsByTagNameNS('*', 'image')[0];
+
+      if (!imageEl) continue;
+
+      const href = imageEl.getAttributeNS('http://www.w3.org/1999/xlink', 'href') ||
+                  imageEl.getAttribute('xlink:href') ||
+                  imageEl.getAttribute('href');
+
+      if (!href) continue;
+
+      // Get dimensions from image or svg
+      const width = imageEl.getAttribute('width') || svg.getAttribute('width');
+      const height = imageEl.getAttribute('height') || svg.getAttribute('height');
+
+      // Create replacement img element
+      const img = doc.createElementNS('http://www.w3.org/1999/xhtml', 'img');
+      img.setAttribute('src', href);
+      img.setAttribute('alt', '');
+      if (width) img.setAttribute('width', width);
+      if (height) img.setAttribute('height', height);
+
+      // Replace SVG with img
+      svg.parentNode.replaceChild(img, svg);
+      fixedCount++;
+    }
+
+    if (fixedCount === 0) return { c: content, fixed: false, count: 0 };
+
+    const serializer = new XMLSerializer();
+    return { c: serializer.serializeToString(doc), fixed: true, count: fixedCount };
+
+  } catch (e) {
+    // Fallback to regex
+    let fixedCount = 0;
+    const svgImageRegex = /<(?:svg:)?svg\b[^>]*>[\s\S]*?<(?:svg:)?image\b[^>]*xlink:href=["']([^"']+)["'][^>]*\/?>\s*<\/(?:svg:)?svg>/gi;
+    const newContent = content.replace(svgImageRegex, (match, href) => {
+      fixedCount++;
+      return `<img src="${href}" alt="" />`;
+    });
+    return { c: newContent, fixed: fixedCount > 0, count: fixedCount };
   }
-  let fixedCount = 0;
-  const svgImageRegex = /<svg\b[^>]*>[\s\S]*?<image\b[^>]*xlink:href=["']([^"']+)["'][^>]*>[\s\S]*?<\/svg>/gi;
-
-  const newContent = content.replace(svgImageRegex, (match, href) => {
-    fixedCount++;
-    const imageTagMatch = match.match(/<image\b[^>]*>/i);
-    const svgTagMatch = match.match(/<svg\b[^>]*>/i);
-
-    const getDim = (tag, attr) => {
-      if (!tag) return null;
-      const m = tag.match(new RegExp(attr + '=["\']([^"\']+)["\']', 'i'));
-      return m ? m[1] : null;
-    };
-
-    let width = getDim(imageTagMatch && imageTagMatch[0], 'width') || getDim(svgTagMatch && svgTagMatch[0], 'width');
-    let height = getDim(imageTagMatch && imageTagMatch[0], 'height') || getDim(svgTagMatch && svgTagMatch[0], 'height');
-
-    let attrs = '';
-    if (width) attrs += ` width="${width}"`;
-    if (height) attrs += ` height="${height}"`;
-
-    return `<img src="${href}" alt=""${attrs} />`;
-  });
-
-  return { c: newContent, fixed: fixedCount > 0, count: fixedCount };
 }
 
 // Ensure cover meta tag exists in OPF
@@ -3409,7 +3505,39 @@ async function convertEpubFile(file, progressCallback) {
     if (low.match(/\.(png|gif|webp|bmp|jpg|jpeg)$/)) {
       const data = await fileObj.async('arraybuffer');
       const imageState = getImageState(path);
-      const result = await processImage(data, imageState, path);
+
+      let result;
+      try {
+        result = await processImage(data, imageState, path);
+      } catch (imageError) {
+        // Log error but continue with original image
+        console.error(`Failed to process image ${path}:`, imageError);
+        log(`Warning: Failed to process ${path.split('/').pop()}, using original`, 'warning', 'IMG-ERR');
+
+        // Use original image data as fallback
+        result = {
+          parts: [{
+            data: data,
+            suffix: '',
+            width: 0,
+            height: 0,
+            size: data.byteLength
+          }],
+          meta: {
+            origW: 0,
+            origH: 0,
+            origSize: data.byteLength,
+            wasSplit: false,
+            rotated: false,
+            finalW: 0,
+            finalH: 0,
+            finalSize: data.byteLength,
+            imageState: imageState,
+            processingError: true
+          }
+        };
+      }
+
       const parts = result.parts;
       const meta = result.meta;
 
