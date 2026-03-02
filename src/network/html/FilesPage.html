@@ -2224,7 +2224,7 @@ const DEFAULT_MAX_WIDTH = 480;
 const DEFAULT_MAX_HEIGHT = 800;
 const DEFAULT_JPEG_QUALITY = 85;
 const DEFAULT_ENABLE_GRAYSCALE = true;
-const OVERLAP = 0.15; // 15% overlap for split images (fixed - reducing overlap creates MORE parts)
+const OVERLAP = 0.05; // 5% overlap for split images
 
 // Dynamic conversion settings (updated by UI)
 let MAX_WIDTH = DEFAULT_MAX_WIDTH;
@@ -2709,78 +2709,191 @@ function applyGrayscale(ctx, width, height) {
  * @param {number} maxDim - Maximum dimension per part (480px)
  * @returns {Array} - Array of {start, end} positions for each part
  */
-function calculateSmartSplitPositions(totalDimension, maxDim) {
-  const overlap = OVERLAP; // 0.15 (15%)
-  const overlapPx = Math.round(maxDim * overlap); // 72px
+function calculateSmartSplitPositions(totalDimension, maxDim, maxPartSizeOverride) {
+  const overlap = OVERLAP; // 0.05 (5%)
+  const overlapPx = Math.round(maxDim * overlap); // 24px
 
-  // ALWAYS start with first and last parts
-  const firstPart = { start: 0, end: Math.min(maxDim, totalDimension) };
-
-  // Case: Single part covers everything
-  if (firstPart.end >= totalDimension) {
-    return [firstPart];
+  // Single part case
+  if (totalDimension <= maxDim) {
+    return [{ start: 0, end: totalDimension }];
   }
 
-  // Last part: from end backwards
-  const lastPart = {
-    start: Math.max(0, totalDimension - maxDim),
-    end: totalDimension
-  };
-
-  // Check the gap between first part end and last part start
-  const gapBetween = lastPart.start - firstPart.end;
-
-  // If parts overlap or gap is small enough, use just 2 parts
-  // Small gap = less than maxDim (meaning we'd fit one middle part at most)
-  if (gapBetween <= maxDim) {
-    // Use balanced 2-part split - each part gets half
-    const partSize = Math.ceil(totalDimension / 2);
-
-    // Only force 2 parts if each part isn't too large
-    // Max reasonable part size: maxDim + overlapPx (e.g., 480 + 72 = 552px)
-    const maxAllowedPartSize = maxDim + overlapPx;
-
-    if (partSize <= maxAllowedPartSize) {
+  // Check if we should use larger parts (for V-SPLIT with 2 cuts)
+  if (maxPartSizeOverride) {
+    const canFitIn2Parts = (totalDimension + overlapPx) <= (maxPartSizeOverride * 2);
+    if (canFitIn2Parts) {
+      // Use 2 parts with calculated size
+      const partSize = Math.ceil((totalDimension + overlapPx) / 2);
       return [
         { start: 0, end: partSize },
-        { start: totalDimension - partSize, end: totalDimension }
+        { start: partSize - overlapPx, end: totalDimension }
       ];
     }
-
-    // Parts would be too large, use first/last with overlap
-    return [
-      { start: 0, end: Math.min(maxDim + overlapPx, totalDimension) },
-      { start: Math.max(0, totalDimension - maxDim - overlapPx), end: totalDimension }
-    ];
   }
 
-  // Gap is significant - we need middle parts
-  // Calculate how many middle parts we need
-  const step = maxDim - overlapPx; // 408px
-  const middlePartsNeeded = Math.ceil(gapBetween / step);
+  // STANDARD: Use parts of exactly maxDim (480px) to fill screen
+  // Calculate minimum number of parts needed
+  // Start with base overlap (5%), increase if needed
+  const baseStep = maxDim - overlapPx; // 456px
+  let numParts = Math.ceil((totalDimension - maxDim) / baseStep) + 1;
 
-  if (middlePartsNeeded <= 1) {
-    // Just one middle part needed - center it in the gap
-    const middleStart = Math.floor((firstPart.end + lastPart.start) / 2) - Math.floor(maxDim / 2);
-    return [
-      firstPart,
-      { start: middleStart, end: middleStart + maxDim },
-      lastPart
-    ];
+  // Calculate dynamic overlap needed for all parts to be maxDim
+  // Formula: overlapPx = (numParts * maxDim - totalDimension) / (numParts - 1)
+  let dynamicOverlapPx = Math.round((numParts * maxDim - totalDimension) / (numParts - 1));
+  const dynamicOverlapPct = (dynamicOverlapPx / maxDim * 100).toFixed(1);
+
+  console.log(`[Split] totalDim: ${totalDimension}, parts: ${numParts}, overlap: ${dynamicOverlapPx}px (${dynamicOverlapPct}%)`);
+
+  // Generate positions: each part is maxDim (480px) with dynamic overlap
+  const step = maxDim - dynamicOverlapPx;
+  const positions = [];
+  for (let i = 0; i < numParts; i++) {
+    const start = i * step;
+    const end = Math.min(start + maxDim, totalDimension);
+
+    if (start < totalDimension) {
+      positions.push({ start, end });
+    }
   }
 
-  // Multiple middle parts needed - use even spacing
-  const parts = [firstPart];
-  const totalMiddleSpace = lastPart.start - firstPart.end;
-  const middleStep = totalMiddleSpace / (middlePartsNeeded + 1);
-
-  for (let i = 1; i <= middlePartsNeeded; i++) {
-    const pos = firstPart.end + (middleStep * i) - (maxDim / 2);
-    parts.push({ start: Math.round(pos), end: Math.round(pos + maxDim) });
+  // Ensure last part ends exactly at totalDimension
+  if (positions.length > 0 && positions[positions.length - 1].end !== totalDimension) {
+    positions[positions.length - 1].end = totalDimension;
   }
-  parts.push(lastPart);
 
-  return parts;
+  return positions;
+}
+
+/**
+ * Analyze overlap vs unique content to determine if we should reduce parts
+ * @param {Array} positions - Array of {start, end} split positions
+ * @param {number} totalDimension - Total dimension being split
+ * @returns {object} - { overlapTotal, uniqueContent, shouldReduceParts, optimalPartCount }
+ */
+function calculateOverlapAnalysis(positions, totalDimension) {
+  if (positions.length <= 1) {
+    return { overlapTotal: 0, uniqueContent: totalDimension, shouldReduceParts: false, optimalPartCount: 1 };
+  }
+
+  // Calculate overlap between adjacent parts
+  let overlapTotal = 0;
+  for (let i = 0; i < positions.length - 1; i++) {
+    const currentEnd = positions[i].end;
+    const nextStart = positions[i + 1].start;
+    const overlap = Math.max(0, currentEnd - nextStart);
+    overlapTotal += overlap;
+  }
+
+  const uniqueContent = totalDimension - overlapTotal;
+
+  // DEBUG: Log overlap analysis
+  console.log(`[Overlap Analysis] totalDim: ${totalDimension}, parts: ${positions.length}, overlap: ${overlapTotal}, unique: ${uniqueContent}, ratio: ${(overlapTotal / uniqueContent).toFixed(2)}`);
+
+  // Only reduce parts if overlap is significantly larger than unique content
+  // This prevents reducing when overlap is only slightly larger (which causes loss of information)
+  const shouldReduceParts = overlapTotal > (uniqueContent * 1.5);
+
+  if (shouldReduceParts) {
+    console.log(`[Overlap Analysis] REDUCING from ${positions.length} to ${positions.length === 3 ? 2 : positions.length - 1} parts`);
+  }
+
+  // Calculate optimal part count when reducing
+  // For 3 parts: reduce to 2
+  // For 4+ parts: reduce to (N-1)
+  let optimalPartCount;
+  if (positions.length === 3) {
+    optimalPartCount = 2;
+  } else if (positions.length >= 4) {
+    optimalPartCount = positions.length - 1; // Reduce by 1
+  } else {
+    optimalPartCount = positions.length;
+  }
+
+  return {
+    overlapTotal,
+    uniqueContent,
+    shouldReduceParts,
+    optimalPartCount
+  };
+}
+
+/**
+ * Calculate split positions with overlap analysis
+ * Returns either the original positions or reduced positions based on overlap
+ * @param {number} totalDimension - Total dimension to split
+ * @param {number} maxDim - Maximum dimension per part (480px)
+ * @param {number} maxPartSizeOverride - Optional override for max part size
+ * @returns {Array} - Array of {start, end} positions
+ */
+function calculateOptimalSplitWithOverlapAnalysis(totalDimension, maxDim, maxPartSizeOverride) {
+  // Get initial split positions
+  const positions = calculateSmartSplitPositions(totalDimension, maxDim, maxPartSizeOverride);
+
+  // Analyze overlap vs unique content
+  const analysis = calculateOverlapAnalysis(positions, totalDimension);
+
+  // Case 1: If we have 2 parts but there's a GAP (parts don't touch), add a third part
+  // Check if there's a gap between parts (part2.start > part1.end)
+  const hasGap = positions.length === 2 && (positions[1].start > positions[0].end);
+
+  if (hasGap) {
+    const gapSize = positions[1].start - positions[0].end;
+    console.log(`[Overlap Analysis] DETECTED GAP: ${gapSize}px gap between parts. Adding 3rd part.`);
+
+    const overlap = OVERLAP; // 0.05 (5%)
+    const overlapPx = Math.round(maxDim * overlap);
+    const newPartCount = 3;
+
+    // Calculate part size WITH overlap included
+    // We want: partSize * newPartCount - overlapPx * (newPartCount - 1) = totalDimension
+    // Therefore: partSize = (totalDimension + overlapPx * (newPartCount - 1)) / newPartCount
+    const partSize = Math.ceil((totalDimension + overlapPx * (newPartCount - 1)) / newPartCount);
+
+    const newPositions = [];
+    for (let i = 0; i < newPartCount; i++) {
+      const start = i * (partSize - overlapPx);
+      const end = Math.min(start + partSize, totalDimension);
+
+      if (start < totalDimension) {
+        newPositions.push({ start, end });
+      }
+    }
+
+    return newPositions;
+  }
+
+  // Case 2: If overlap > unique content, reduce parts
+  if (analysis.shouldReduceParts && positions.length > 2) {
+    console.log(`[Overlap Analysis] REDUCING from ${positions.length} to ${analysis.optimalPartCount} parts`);
+
+    // Calculate new positions with fewer parts
+    // 3 parts → 2 parts, 4+ parts → (N-1) parts
+    // IMPORTANT: Maintain overlap to avoid losing information
+    const newPartCount = analysis.optimalPartCount;
+    const overlap = OVERLAP; // 0.05 (5%)
+    const overlapPx = Math.round(maxDim * overlap);
+
+    // Calculate part size considering overlap
+    // We want each part to be maxDim (480px) with overlap
+    // Formula: partSize + overlapPx for each additional part
+    const totalOverlap = overlapPx * (newPartCount - 1);
+    const partSize = Math.ceil((totalDimension - totalOverlap) / newPartCount);
+
+    const newPositions = [];
+    for (let i = 0; i < newPartCount; i++) {
+      const start = i * (partSize - overlapPx);
+      const end = Math.min(start + partSize, totalDimension);
+
+      // Ensure we don't have negative overlap (parts too small)
+      if (start < totalDimension) {
+        newPositions.push({ start, end });
+      }
+    }
+
+    return newPositions;
+  }
+
+  return positions;
 }
 
 /**
@@ -2790,9 +2903,9 @@ function calculateSmartSplitPositions(totalDimension, maxDim) {
  */
 function calculateOptimalScaleParams(estimatedScaledDimension) {
   const maxDim = MAX_WIDTH; // 480
-  const overlap = OVERLAP; // 0.15 (15%)
-  const overlapPx = Math.round(maxDim * overlap); // 72px
-  const step = maxDim - overlapPx; // 408px
+  const overlap = OVERLAP; // 0.05 (5%)
+  const overlapPx = Math.round(maxDim * overlap); // 24px
+  const step = maxDim - overlapPx; // 456px
 
   // Calculate how many parts with smart positioning
   const positions = calculateSmartSplitPositions(estimatedScaledDimension, maxDim);
@@ -2861,10 +2974,32 @@ async function processImage(data, imageState = 0, imagePath = '') {
         const estimatedScaledH = Math.round(origH * (MAX_HEIGHT / origW));
         const cropParams = calculateOptimalScaleParams(estimatedScaledH);
 
+        // Check overlap analysis to determine if we should reduce parts
+        const preliminaryPositions = calculateSmartSplitPositions(estimatedScaledH, MAX_WIDTH);
+        const overlapAnalysis = calculateOverlapAnalysis(preliminaryPositions, estimatedScaledH);
+
         // Step 1: Scale width using optimal scale size
-        const scale = cropParams.scaleSize / origW;
-        const scaledW = cropParams.scaleSize;
-        const scaledH = Math.round(origH * scale);
+        // If parts will be reduced, scale to make each part 480px wide after rotation
+        let scale;
+        let scaledW;
+        let scaledH;
+
+        if (overlapAnalysis.shouldReduceParts && preliminaryPositions.length > 2) {
+          // Reduce parts: scale so each part is 480px wide after rotation
+          // After rotation, width = part height. So we want part height = 480px.
+          // With fewer parts, each part is taller
+          const numReducedParts = overlapAnalysis.optimalPartCount;
+          const targetPartHeight = MAX_WIDTH; // 480px
+          const targetTotalHeight = numReducedParts * targetPartHeight;
+          scale = targetTotalHeight / origH;
+          scaledW = Math.round(origW * scale);
+          scaledH = targetTotalHeight;
+        } else {
+          // Use normal scale
+          scale = cropParams.scaleSize / origW;
+          scaledW = cropParams.scaleSize;
+          scaledH = Math.round(origH * scale);
+        }
 
         const scaledCanvas = document.createElement('canvas');
         scaledCanvas.width = scaledW;
@@ -2915,8 +3050,8 @@ async function processImage(data, imageState = 0, imagePath = '') {
           const overlapPx = cropParams.overlapPx;
           const isClockwise = HANDEDNESS === 'right';
 
-          // Calculate smart split positions
-          const splitPositions = calculateSmartSplitPositions(scaledH, maxH);
+          // Calculate smart split positions with overlap analysis
+          const splitPositions = calculateOptimalSplitWithOverlapAnalysis(scaledH, maxH);
           const numParts = splitPositions.length;
 
           for (let i = 0; i < numParts; i++) {
@@ -2975,10 +3110,32 @@ async function processImage(data, imageState = 0, imagePath = '') {
         const estimatedScaledW = Math.round(origW * (MAX_HEIGHT / origH));
         const cropParams = calculateOptimalScaleParams(estimatedScaledW);
 
+        // Check overlap analysis to determine if we should reduce parts
+        // V-SPLIT: Use larger max part size (560px) to allow 2 cuts for wider images
+        const preliminaryPositions = calculateSmartSplitPositions(estimatedScaledW, MAX_WIDTH, 560);
+        const overlapAnalysis = calculateOverlapAnalysis(preliminaryPositions, estimatedScaledW);
+
         // Step 1: Scale height using optimal scale size
-        const scale = cropParams.scaleSize / origH;
-        const scaledW = Math.round(origW * scale);
-        const scaledH = cropParams.scaleSize;
+        // If parts will be reduced, scale to make each part 480px wide
+        let scale;
+        let scaledW;
+        let scaledH;
+
+        if (overlapAnalysis.shouldReduceParts && preliminaryPositions.length > 2) {
+          // Reduce parts: scale so each part is 480px wide
+          // With fewer parts, each part is wider
+          const numReducedParts = overlapAnalysis.optimalPartCount;
+          const targetPartWidth = MAX_WIDTH; // 480px
+          const targetTotalWidth = numReducedParts * targetPartWidth;
+          scale = targetTotalWidth / origW;
+          scaledW = targetTotalWidth;
+          scaledH = Math.round(origH * scale);
+        } else {
+          // Use normal scale
+          scale = cropParams.scaleSize / origH;
+          scaledW = Math.round(origW * scale);
+          scaledH = cropParams.scaleSize;
+        }
 
         const scaledCanvas = document.createElement('canvas');
         scaledCanvas.width = scaledW;
@@ -3006,8 +3163,9 @@ async function processImage(data, imageState = 0, imagePath = '') {
           const maxW = MAX_WIDTH;  // 480
           const overlapPx = cropParams.overlapPx;
 
-          // Calculate smart split positions
-          const splitPositions = calculateSmartSplitPositions(scaledW, maxW);
+          // Calculate smart split positions with overlap analysis
+          // V-SPLIT: Use larger max part size (560px) to allow 2 cuts for wider images
+          const splitPositions = calculateOptimalSplitWithOverlapAnalysis(scaledW, maxW, 560);
           const numParts = splitPositions.length;
 
           for (let i = 0; i < numParts; i++) {
@@ -3041,12 +3199,36 @@ async function processImage(data, imageState = 0, imagePath = '') {
         // LIGHT NOVEL MODE: Rotate and split wide images
         // Better Crop: Calculate optimal scale parameters to minimize splits
         const estimatedScaledH = Math.round(origH * (MAX_HEIGHT / origW));
+
+        // Check overlap analysis to determine if we should reduce parts
+        // After rotation, width = scaledH, so we analyze based on that
+        const preliminaryPositions = calculateSmartSplitPositions(estimatedScaledH, MAX_WIDTH);
+        const overlapAnalysis = calculateOverlapAnalysis(preliminaryPositions, estimatedScaledH);
+
         const cropParams = calculateOptimalScaleParams(estimatedScaledH);
 
         // Step 1: Scale WIDTH using optimal scale size
-        const scale = cropParams.scaleSize / origW;
-        const scaledW = cropParams.scaleSize;
-        const scaledH = Math.round(origH * scale);
+        // If parts will be reduced, scale to make each part 480px wide after rotation
+        let scale;
+        let scaledW;
+        let scaledH;
+
+        if (overlapAnalysis.shouldReduceParts && preliminaryPositions.length > 2) {
+          // Reduce parts: scale so each part is 480px wide after rotation
+          // After rotation, width = scaledH. So we want scaledH to result in 480px parts.
+          const numReducedParts = overlapAnalysis.optimalPartCount;
+          const targetPartWidth = MAX_WIDTH; // 480px
+          const targetTotalWidth = numReducedParts * targetPartWidth;
+          // After rotation, rotW = scaledH, so we need scaledH = targetTotalWidth
+          scale = targetTotalWidth / origH;
+          scaledW = Math.round(origW * scale);
+          scaledH = targetTotalWidth;
+        } else {
+          // Use normal scale
+          scale = cropParams.scaleSize / origW;
+          scaledW = cropParams.scaleSize;
+          scaledH = Math.round(origH * scale);
+        }
 
         const scaledCanvas = document.createElement('canvas');
         scaledCanvas.width = scaledW;
@@ -3101,8 +3283,8 @@ async function processImage(data, imageState = 0, imagePath = '') {
           const maxW = MAX_WIDTH;
           const overlapPx = cropParams.overlapPx;
 
-          // Calculate smart split positions
-          const splitPositions = calculateSmartSplitPositions(rotW, maxW);
+          // Calculate smart split positions with overlap analysis
+          const splitPositions = calculateOptimalSplitWithOverlapAnalysis(rotW, maxW);
           const numParts = splitPositions.length;
 
           for (let i = 0; i < numParts; i++) {
