@@ -719,6 +719,14 @@
       border-top: 1px solid var(--border-color);
     }
 
+    /* Option Blocks - Groups related options */
+    .option-block {
+      padding: 12px;
+      background: var(--bg);
+      border-radius: 4px;
+      border: 1px solid var(--border-color);
+    }
+
     /* Quality Section (inline layout) */
     .quality-section-inline {
       display: flex;
@@ -1079,56 +1087,60 @@
         <!-- Advanced Options (accordion content, hidden by default) -->
         <div class="advanced-options" id="advancedOptions" style="display:none;">
 
-          <!-- Quality Section (inline layout) -->
-          <div class="quality-section-inline">
-            <label>🎨 JPEG Quality: <span id="qualityValue">85</span>%</label>
-            <input type="range" id="qualitySlider" min="1" max="95" value="85" class="quality-slider-inline">
+          <!-- JPEG Quality Block -->
+          <div class="option-block">
+            <div class="quality-section-inline">
+              <label>🎨 JPEG Quality: <span id="qualityValue">85</span>%</label>
+              <input type="range" id="qualitySlider" min="1" max="95" value="85" class="quality-slider-inline">
+            </div>
+            <div class="quality-presets">
+              <button class="quality-preset" data-value="60">Low (60%)</button>
+              <button class="quality-preset" data-value="75">Medium (75%)</button>
+              <button class="quality-preset active" data-value="85">High (85%)</button>
+              <button class="quality-preset" data-value="95">Max (95%)</button>
+            </div>
           </div>
 
-          <!-- Quality Presets -->
-          <div class="quality-presets">
-            <button class="quality-preset" data-value="60">Low (60%)</button>
-            <button class="quality-preset" data-value="75">Medium (75%)</button>
-            <button class="quality-preset active" data-value="85">High (85%)</button>
-            <button class="quality-preset" data-value="95">Max (95%)</button>
-          </div>
-
-          <!-- Rotate & Split Section (inline layout) -->
-          <div class="rotate-split-section-inline">
-            <label>🔄 Rotate & Split:</label>
-            <select id="rotateSplitMode">
-              <option value="off">OFF</option>
-              <option value="light-novel">Light Novel</option>
-              <option value="manual-picker">Manual Picker</option>
-            </select>
-          </div>
-
-          <!-- Direction buttons (only visible when Light Novel or Manual Picker) -->
-          <div class="direction-buttons" id="directionButtons" style="display:none;">
-            <button class="direction-btn" data-direction="ccw">↺ Left-handed (CCW)</button>
-            <button class="direction-btn active" data-direction="cw">↻ Right-handed (CW)</button>
+          <!-- Rotate & Split Block -->
+          <div class="option-block">
+            <div class="rotate-split-section-inline">
+              <label>🔄 Rotate & Split:</label>
+              <select id="rotateSplitMode">
+                <option value="off">OFF</option>
+                <option value="light-novel">Light Novel</option>
+                <option value="manual-picker">Manual Picker</option>
+              </select>
+            </div>
+            <div class="direction-buttons" id="directionButtons" style="display:none;">
+              <button class="direction-btn" data-direction="ccw">↺ Left-handed (CCW)</button>
+              <button class="direction-btn active" data-direction="cw">↻ Right-handed (CW)</button>
+            </div>
           </div>
 
           <!-- Image Picker (only visible with Manual Picker and 1 EPUB file) -->
-          <div class="image-picker" id="imagePicker" style="display:none;">
-            <div class="picker-header">
-              <span>🖼️ Select Images</span>
-              <span id="pickerCount">0 / 0 selected</span>
+          <div class="option-block" id="imagePickerBlock" style="display:none;">
+            <div class="image-picker" id="imagePicker">
+              <div class="picker-header">
+                <span>🖼️ Select Images</span>
+                <span id="pickerCount">0 / 0 selected</span>
+              </div>
+              <div class="picker-actions">
+                <button id="selectLandscapeBtn">Select Landscape</button>
+                <button id="selectAllBtn">Select All</button>
+                <button id="clearSelectionBtn">Clear Selection</button>
+              </div>
+              <div class="image-grid" id="imageGrid"></div>
             </div>
-            <div class="picker-actions">
-              <button id="selectLandscapeBtn">Select Landscape</button>
-              <button id="selectAllBtn">Select All</button>
-              <button id="clearSelectionBtn">Clear Selection</button>
-            </div>
-            <div class="image-grid" id="imageGrid"></div>
           </div>
 
-          <!-- Auto Export Log Toggle -->
-          <div class="auto-export-toggle">
-            <label class="checkbox-label">
-              <input type="checkbox" id="autoExportLogCheckbox">
-              <span>📥 Auto-export log on completion/error</span>
-            </label>
+          <!-- Auto Export Log Block -->
+          <div class="option-block">
+            <div class="auto-export-toggle">
+              <label class="checkbox-label">
+                <input type="checkbox" id="autoExportLogCheckbox">
+                <span>📥 Auto-export log on completion/error</span>
+              </label>
+            </div>
           </div>
 
         </div>
@@ -1410,7 +1422,7 @@
   function updateRotateSplitUI() {
     const mode = EPUBOptimizer.state.rotateSplitMode;
     const directionButtons = document.getElementById('directionButtons');
-    const imagePicker = document.getElementById('imagePicker');
+    const imagePickerBlock = document.getElementById('imagePickerBlock');
     const fileInput = document.getElementById('fileInput');
 
     // Show/hide direction buttons
@@ -1420,11 +1432,11 @@
       directionButtons.style.display = 'none';
     }
 
-    // Show/hide image picker (only for Manual Picker with single EPUB)
+    // Show/hide image picker block (only for Manual Picker with single EPUB)
     if (mode === EPUBOptimizer.MODES.MANUAL_PICKER && fileInput.files.length === 1) {
-      imagePicker.style.display = 'block';
+      imagePickerBlock.style.display = 'block';
     } else {
-      imagePicker.style.display = 'none';
+      imagePickerBlock.style.display = 'none';
     }
   }
 
