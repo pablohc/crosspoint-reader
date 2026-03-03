@@ -670,8 +670,8 @@
       cursor: pointer;
     }
 
-    /* Advanced Mode Toggle Button (inline accordion) */
-    .advanced-toggle-btn {
+    /* Advanced Mode Toggle (replicating backup esthetics) */
+    .advanced-options-toggle {
       display: flex;
       align-items: center;
       gap: 6px;
@@ -680,21 +680,26 @@
       border: 1px solid var(--border-color);
       border-radius: 4px;
       cursor: pointer;
-      font-size: 0.9em;
+      font-size: 0.85em;
+      font-weight: 500;
+      color: var(--label-color);
       transition: all 0.2s;
+      user-select: none;
     }
 
-    .advanced-toggle-btn:hover {
+    .advanced-options-toggle:hover {
       background: var(--accent-color-10);
       border-color: var(--accent-color);
+      color: var(--font-color);
     }
 
-    .advanced-toggle-btn .toggle-arrow {
+    .advanced-options-arrow {
       transition: transform 0.2s;
+      font-size: 0.8em;
     }
 
-    .advanced-toggle-btn.expanded .toggle-arrow {
-      transform: rotate(180deg);
+    .advanced-options-toggle.expanded .advanced-options-arrow {
+      transform: rotate(90deg);
     }
 
     /* Advanced Options (accordion content) */
@@ -934,6 +939,16 @@
     .log-warning { color: #f39c12; }
     .log-info { color: #3498db; }
 
+    /* Image Picker State Styles */
+    .image-thumb.state-normal {
+      border-color: var(--border-color);
+    }
+
+    .image-thumb.state-split {
+      border-color: #e74c3c;
+      box-shadow: 0 0 0 2px rgba(231, 76, 60, 0.2);
+    }
+
     /* Mobile Responsive for Optimizer */
     @media (max-width: 600px) {
       .optimizer-main-row {
@@ -942,7 +957,7 @@
         gap: 8px;
       }
 
-      .advanced-toggle-btn {
+      .advanced-options-toggle {
         width: 100%;
         justify-content: center;
       }
@@ -980,6 +995,7 @@
       }
     }
   </style>
+  <script src="/js/jszip.min.js"></script>
 </head>
 <body>
 <div class="nav-links">
@@ -1047,10 +1063,10 @@
             <span>⚡ Optimize EPUB</span>
           </label>
           <!-- Advanced Mode Toggle (inline accordion) -->
-          <button class="advanced-toggle-btn" id="advancedModeToggle" type="button" style="display:none;">
-            <span>⚙️</span>
-            <span class="toggle-arrow">▼</span>
-          </button>
+          <span class="advanced-options-toggle" id="advancedModeToggle" style="display:none;">
+            <span class="advanced-options-arrow">▶</span>
+            <span class="advanced-options-text">Advanced Mode</span>
+          </span>
         </div>
 
         <!-- Advanced Options (accordion content, hidden by default) -->
@@ -1413,24 +1429,458 @@
    * Select landscape images automatically (for Light Novel mode)
    */
   function selectLandscapeImages() {
-    // Placeholder for future implementation
-    console.log('[EPUBOptimizer] Select landscape images - to be implemented');
+    if (!EPUBOptimizer.state.thumbnails || EPUBOptimizer.state.thumbnails.length === 0) {
+      return;
+    }
+
+    // Select all landscape images (width > height)
+    EPUBOptimizer.state.thumbnails.forEach(img => {
+      if (img.width > img.height) {
+        // Set to split mode (1 = H-Split for landscape)
+        EPUBOptimizer.state.selectedImages.set(img.path, 1);
+      } else {
+        EPUBOptimizer.state.selectedImages.set(img.path, 0);
+      }
+    });
+
+    renderImageGrid();
+    addLogEntry('Selected all landscape images for splitting', 'info');
   }
 
   /**
    * Select all images (except cover)
    */
   function selectAllImages() {
-    // Placeholder for future implementation
-    console.log('[EPUBOptimizer] Select all images - to be implemented');
+    if (!EPUBOptimizer.state.thumbnails || EPUBOptimizer.state.thumbnails.length === 0) {
+      return;
+    }
+
+    // Set all images to split mode (1)
+    EPUBOptimizer.state.thumbnails.forEach(img => {
+      EPUBOptimizer.state.selectedImages.set(img.path, 1);
+    });
+
+    renderImageGrid();
+    addLogEntry('Selected all images for processing', 'info');
   }
 
   /**
    * Clear image selection
    */
   function clearImageSelection() {
-    // Placeholder for future implementation
-    console.log('[EPUBOptimizer] Clear selection - to be implemented');
+    // Reset all to normal mode (0)
+    EPUBOptimizer.state.selectedImages.clear();
+    if (EPUBOptimizer.state.thumbnails) {
+      EPUBOptimizer.state.thumbnails.forEach(img => {
+        EPUBOptimizer.state.selectedImages.set(img.path, 0);
+      });
+    }
+
+    renderImageGrid();
+    addLogEntry('Cleared all image selections', 'info');
+  }
+
+  // ===== EPUB IMAGE PICKER FUNCTIONS =====
+
+  /**
+   * Extract images from EPUB for preview
+   * Returns array of {path, name, dataUrl, width, height}
+   */
+  async function extractImagesForPreview(file) {
+    if (typeof JSZip === 'undefined') {
+      throw new Error('JSZip library not available');
+    }
+
+    const zip = await JSZip.loadAsync(file);
+    const images = [];
+    const imageExtensions = ['.png', '.gif', '.webp', '.bmp', '.jpg', '.jpeg'];
+
+    for (const [path, fileObj] of Object.entries(zip.files)) {
+      if (fileObj.dir) continue;
+
+      const ext = path.substring(path.lastIndexOf('.')).toLowerCase();
+      if (imageExtensions.includes(ext)) {
+        const data = await fileObj.async('arraybuffer');
+        const blob = new Blob([data]);
+        const dataUrl = URL.createObjectURL(blob);
+
+        // Get dimensions
+        const dims = await getImageDimensions(data);
+
+        images.push({
+          path: path,
+          name: path.split('/').pop(),
+          dataUrl: dataUrl,
+          width: dims.width,
+          height: dims.height
+        });
+      }
+    }
+
+    return images;
+  }
+
+  /**
+   * Get image dimensions from array buffer
+   */
+  function getImageDimensions(data) {
+    return new Promise((resolve, reject) => {
+      const url = URL.createObjectURL(new Blob([data]));
+      const img = new Image();
+      img.onload = () => {
+        URL.revokeObjectURL(url);
+        resolve({ width: img.width, height: img.height });
+      };
+      img.onerror = () => {
+        URL.revokeObjectURL(url);
+        resolve({ width: 0, height: 0 });
+      };
+      img.src = url;
+    });
+  }
+
+  /**
+   * Render image grid with current selections
+   */
+  function renderImageGrid() {
+    const imageGrid = document.getElementById('imageGrid');
+    const pickerCount = document.getElementById('pickerCount');
+    if (!imageGrid) return;
+
+    imageGrid.innerHTML = '';
+
+    const stateLabels = ['Normal', 'Split'];
+    const stateClasses = ['state-normal', 'state-split'];
+
+    let selectedCount = 0;
+
+    EPUBOptimizer.state.thumbnails.forEach(img => {
+      const state = EPUBOptimizer.state.selectedImages.get(img.path) || 0;
+      if (state > 0) selectedCount++;
+
+      const item = document.createElement('div');
+      item.className = `image-thumb ${stateClasses[state] || ''}`;
+      item.onclick = () => cycleImageState(img.path);
+      item.title = `Click to cycle: ${stateLabels[state] || 'Normal'}`;
+
+      item.innerHTML = `
+        <img src="${img.dataUrl}" alt="${img.name}" loading="lazy">
+        <div class="overlay">${stateLabels[state] || '•'}</div>
+      `;
+
+      imageGrid.appendChild(item);
+    });
+
+    // Update count display
+    if (pickerCount) {
+      pickerCount.textContent = `${selectedCount} / ${EPUBOptimizer.state.thumbnails.length} selected`;
+    }
+  }
+
+  /**
+   * Cycle state for a single image: 0 -> 1 -> 0
+   */
+  function cycleImageState(imagePath) {
+    const currentState = EPUBOptimizer.state.selectedImages.get(imagePath) || 0;
+    EPUBOptimizer.state.selectedImages.set(imagePath, (currentState + 1) % 2);
+    renderImageGrid();
+  }
+
+  /**
+   * Load and display image picker for Manual Picker mode
+   */
+  async function loadImagePicker() {
+    const fileInput = document.getElementById('fileInput');
+    if (fileInput.files.length !== 1) {
+      return;
+    }
+
+    const epubFile = Array.from(fileInput.files).find(f =>
+      f.name.toLowerCase().endsWith('.epub')
+    );
+
+    if (!epubFile) {
+      return;
+    }
+
+    try {
+      addLogEntry('Extracting images for preview...', 'info');
+      const images = await extractImagesForPreview(epubFile);
+      EPUBOptimizer.state.thumbnails = images;
+
+      // Initialize all states to 0 (Normal)
+      images.forEach(img => {
+        EPUBOptimizer.state.selectedImages.set(img.path, 0);
+      });
+
+      // Render the grid
+      renderImageGrid();
+      addLogEntry(`Loaded ${images.length} images for manual selection`, 'success');
+
+    } catch (error) {
+      console.error('Failed to load image picker:', error);
+      addLogEntry(`Failed to load images: ${error.message}`, 'error');
+    }
+  }
+
+  /**
+   * Get processing state for an image path
+   * Returns 0 (Normal) or 1 (Split)
+   */
+  function getImageState(imagePath) {
+    return EPUBOptimizer.state.selectedImages.get(imagePath) || 0;
+  }
+
+  // ===== EPUB CONVERSION FUNCTIONS =====
+
+  /**
+   * Process a single image - convert to baseline JPEG with optimizations
+   * Returns {data: Blob, suffix: string, width: number, height: number, size: number}
+   */
+  async function processImage(data, imageState = 0, imagePath = '') {
+    return new Promise((resolve, reject) => {
+      const url = URL.createObjectURL(new Blob([data]));
+      const img = new Image();
+      const origSize = data.byteLength;
+
+      img.onload = async () => {
+        URL.revokeObjectURL(url);
+        const origW = img.width;
+        const origH = img.height;
+
+        // Determine target dimensions
+        let targetW = origW;
+        let targetH = origH;
+
+        // Scale down if exceeds max dimensions
+        const scaleW = EPUBOptimizer.config.MAX_WIDTH / origW;
+        const scaleH = EPUBOptimizer.config.MAX_HEIGHT / origH;
+        const scale = Math.min(scaleW, scaleH, 1);
+
+        if (scale < 1) {
+          targetW = Math.round(origW * scale);
+          targetH = Math.round(origH * scale);
+        }
+
+        // Create canvas for processing
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+
+        // Handle rotation for Light Novel mode or manual split
+        let rotated = false;
+        if (imageState === 1 || (EPUBOptimizer.state.rotateSplitMode === EPUBOptimizer.MODES.LIGHT_NOVEL && origW > origH)) {
+          // Rotate 90 degrees based on direction
+          const direction = EPUBOptimizer.state.rotateDirection;
+          if (direction === EPUBOptimizer.DIRECTIONS.CW) {
+            // Clockwise (right-handed)
+            canvas.width = targetH;
+            canvas.height = targetW;
+            ctx.translate(targetH, 0);
+            ctx.rotate(90 * Math.PI / 180);
+          } else {
+            // Counter-clockwise (left-handed)
+            canvas.width = targetH;
+            canvas.height = targetW;
+            ctx.translate(0, targetW);
+            ctx.rotate(-90 * Math.PI / 180);
+          }
+          rotated = true;
+        } else {
+          canvas.width = targetW;
+          canvas.height = targetH;
+        }
+
+        // Draw scaled image
+        ctx.drawImage(img, 0, 0, targetW, targetH);
+
+        // Apply True-Grayscale if enabled
+        applyTrueGrayscale(ctx, canvas.width, canvas.height);
+
+        // Convert to baseline JPEG
+        canvas.toBlob((blob) => {
+          if (!blob) {
+            reject(new Error('Failed to create JPEG blob'));
+            return;
+          }
+
+          resolve({
+            data: blob,
+            suffix: '',
+            width: canvas.width,
+            height: canvas.height,
+            size: blob.size
+          });
+        }, 'image/jpeg', EPUBOptimizer.state.quality / 100);
+      };
+
+      img.onerror = () => {
+        URL.revokeObjectURL(url);
+        reject(new Error('Failed to load image'));
+      };
+
+      img.src = url;
+    });
+  }
+
+  /**
+   * Convert EPUB file with optimizations
+   * Returns optimized Blob
+   */
+  async function convertEpubFile(file) {
+    if (typeof JSZip === 'undefined') {
+      throw new Error('JSZip library not available');
+    }
+
+    const startTime = Date.now();
+    const originalSize = file.size;
+
+    addLogEntry(`Starting optimization for ${file.name} (${formatBytes(originalSize)})`, 'info');
+    addLogEntry(`Quality: ${EPUBOptimizer.state.quality}% | Grayscale: ${EPUBOptimizer.state.grayscale ? 'ON' : 'OFF'}`, 'info');
+
+    const zip = await JSZip.loadAsync(file);
+    const out = new JSZip();
+
+    // Track renamed files (extension changes)
+    const renamed = {};
+    zip.forEach(p => {
+      const l = p.toLowerCase();
+      if (l.match(/\.(png|gif|webp|bmp|jpeg)$/)) {
+        renamed[p] = p.replace(/\.(png|gif|webp|bmp|jpeg)$/i, '.jpg');
+      }
+    });
+
+    let totalImageSize = 0;
+    let totalNewSize = 0;
+    let processedImages = 0;
+
+    // Process images first
+    for (const [path, fileObj] of Object.entries(zip.files)) {
+      if (fileObj.dir || path === 'mimetype') continue;
+
+      const low = path.toLowerCase();
+
+      if (low.match(/\.(png|gif|webp|bmp|jpg|jpeg)$/)) {
+        try {
+          const data = await fileObj.async('arraybuffer');
+          const imageState = getImageState(path);
+
+          const result = await processImage(data, imageState, path);
+          const newPath = renamed[path] || path.replace(/\.[^.]+$/, '.jpg');
+
+          totalImageSize += data.byteLength;
+          totalNewSize += result.size;
+          processedImages++;
+
+          // Add to output zip
+          out.file(newPath, result.data, { compression: 'DEFLATE' });
+
+          addLogEntry(`✓ ${path.split('/').pop()}: ${formatBytes(data.byteLength)} → ${formatBytes(result.size)}`, 'success');
+
+        } catch (error) {
+          console.error(`Failed to process image ${path}:`, error);
+          addLogEntry(`✗ Failed to process ${path.split('/').pop()}, using original`, 'error');
+
+          // Use original image as fallback
+          const data = await fileObj.async('arraybuffer');
+          const newPath = renamed[path] || path;
+          out.file(newPath, data, { compression: 'DEFLATE' });
+        }
+      }
+    }
+
+    // Copy all other files
+    for (const [path, fileObj] of Object.entries(zip.files)) {
+      if (fileObj.dir || path === 'mimetype') continue;
+      const low = path.toLowerCase();
+
+      // Skip already processed images
+      if (low.match(/\.(png|gif|webp|bmp|jpg|jpeg)$/)) continue;
+
+      // Copy other files as-is
+      const data = await fileObj.async('arraybuffer');
+      out.file(path, data, { compression: 'DEFLATE' });
+    }
+
+    // Write mimetype first (EPUB OCF spec requirement)
+    if (zip.files['mimetype']) {
+      const mimetypeData = await zip.files['mimetype'].async('arraybuffer');
+      out.file('mimetype', mimetypeData, { compression: 'STORE' });
+    }
+
+    // Generate final blob
+    const newBlob = await out.generateAsync({ type: 'blob', mimeType: 'application/epub+zip' });
+    const newSize = newBlob.size;
+    const timeElapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+
+    addLogEntry(`✓ Optimization complete!`, 'success');
+    addLogEntry(`Processed ${processedImages} images in ${timeElapsed}s`, 'info');
+
+    if (totalImageSize > 0) {
+      const savings = totalImageSize - totalNewSize;
+      const percentSavings = ((savings / totalImageSize) * 100).toFixed(1);
+      addLogEntry(`Size reduction: ${formatBytes(totalImageSize)} → ${formatBytes(totalNewSize)} (${percentSavings}% saved)`, 'success');
+    }
+
+    // Auto-export log if enabled
+    if (EPUBOptimizer.state.autoExportLog) {
+      exportConversionLog();
+    }
+
+    return newBlob;
+  }
+
+  /**
+   * Process all EPUB files before upload
+   */
+  async function processEpubFilesBeforeUpload() {
+    if (!EPUBOptimizer.state.enabled) {
+      return;
+    }
+
+    const fileInput = document.getElementById('fileInput');
+    const epubFiles = Array.from(fileInput.files).filter(f =>
+      f.name.toLowerCase().endsWith('.epub')
+    );
+
+    if (epubFiles.length === 0) {
+      return;
+    }
+
+    addLogEntry(`=== EPUB Optimization Started ===`, 'info');
+
+    // Clear previous optimized files
+    EPUBOptimizer.state.optimizedFiles.clear();
+    EPUBOptimizer.state.logs = [];
+
+    try {
+      // Process each EPUB file
+      for (const epubFile of epubFiles) {
+        try {
+          addLogEntry(`\n--- Processing: ${epubFile.name} ---`, 'info');
+          const optimizedBlob = await convertEpubFile(epubFile);
+          EPUBOptimizer.state.optimizedFiles.set(epubFile.name, optimizedBlob);
+          addLogEntry(`✓ ${epubFile.name} optimized successfully`, 'success');
+        } catch (error) {
+          console.error(`Failed to optimize ${epubFile.name}:`, error);
+          addLogEntry(`✗ Failed to optimize ${epubFile.name}: ${error.message}`, 'error');
+
+          // Auto-export log on error if enabled
+          if (EPUBOptimizer.state.autoExportLog) {
+            exportConversionLog();
+          }
+
+          // Re-throw to notify user
+          throw new Error(`Failed to optimize ${epubFile.name}: ${error.message}`);
+        }
+      }
+
+      addLogEntry(`=== All EPUB files optimized ===`, 'success');
+
+    } catch (error) {
+      // Clear optimized files on error
+      EPUBOptimizer.state.optimizedFiles.clear();
+      throw error;
+    }
   }
 
   /**
@@ -1439,26 +1889,26 @@
   function initializeOptimizerHandlers() {
     // Optimize EPUB checkbox toggle
     const optimizeCheckbox = document.getElementById('optimizeEpubCheckbox');
-    const advancedToggleBtn = document.getElementById('advancedModeToggle');
+    const advancedToggle = document.getElementById('advancedModeToggle');
     if (optimizeCheckbox) {
       optimizeCheckbox.addEventListener('change', function() {
         EPUBOptimizer.state.enabled = this.checked;
 
-        // Show/hide advanced toggle button
-        advancedToggleBtn.style.display = this.checked ? 'flex' : 'none';
+        // Show/hide advanced toggle
+        advancedToggle.style.display = this.checked ? 'flex' : 'none';
 
         // Reset advanced mode if optimizer is disabled
         if (!this.checked) {
           EPUBOptimizer.state.advancedMode = false;
           document.getElementById('advancedOptions').style.display = 'none';
-          advancedToggleBtn.classList.remove('expanded');
+          advancedToggle.classList.remove('expanded');
         }
       });
     }
 
-    // Advanced Mode toggle button (accordion behavior)
-    if (advancedToggleBtn) {
-      advancedToggleBtn.addEventListener('click', function() {
+    // Advanced Mode toggle (accordion behavior)
+    if (advancedToggle) {
+      advancedToggle.addEventListener('click', function() {
         EPUBOptimizer.state.advancedMode = !EPUBOptimizer.state.advancedMode;
         const advancedOptions = document.getElementById('advancedOptions');
         advancedOptions.style.display = EPUBOptimizer.state.advancedMode ? 'flex' : 'none';
@@ -1495,9 +1945,14 @@
     // Rotate & Split mode select
     const rotateSplitSelect = document.getElementById('rotateSplitMode');
     if (rotateSplitSelect) {
-      rotateSplitSelect.addEventListener('change', function() {
+      rotateSplitSelect.addEventListener('change', async function() {
         EPUBOptimizer.state.rotateSplitMode = this.value;
         updateRotateSplitUI();
+
+        // Load images when switching to Manual Picker
+        if (this.value === EPUBOptimizer.MODES.MANUAL_PICKER) {
+          await loadImagePicker();
+        }
       });
     }
 
@@ -1955,13 +2410,23 @@ function uploadFileHTTP(file, onProgress, onComplete, onError) {
   });
 }
 
-function uploadFile() {
+async function uploadFile() {
   const fileInput = document.getElementById('fileInput');
   let files = Array.from(fileInput.files);
 
   if (files.length === 0) {
     alert('Please select at least one file!');
     return;
+  }
+
+  // Process EPUB files if optimizer is enabled
+  if (EPUBOptimizer.state.enabled) {
+    try {
+      await processEpubFilesBeforeUpload();
+    } catch (error) {
+      alert(`EPUB optimization failed: ${error.message}\n\nPlease try again or upload without optimization.`);
+      return;
+    }
   }
 
   // Check if optimizer is enabled and has optimized files
