@@ -637,6 +637,348 @@
         font-size: 0.9em;
       }
     }
+
+    /* ===== EPUB OPTIMIZER STYLES ===== */
+
+    /* Optimizer Toggle in Upload Modal */
+    .optimizer-toggle {
+      margin: 15px 0;
+      padding: 12px;
+      background: var(--card-bg);
+      border-radius: 4px;
+      border: 1px solid var(--accent-color);
+    }
+
+    .optimizer-main-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .checkbox-label {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      cursor: pointer;
+      font-weight: 500;
+    }
+
+    .checkbox-label input[type="checkbox"] {
+      width: 18px;
+      height: 18px;
+      cursor: pointer;
+    }
+
+    /* Advanced Mode Toggle Button (inline accordion) */
+    .advanced-toggle-btn {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 12px;
+      background: var(--bg);
+      border: 1px solid var(--border-color);
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 0.9em;
+      transition: all 0.2s;
+    }
+
+    .advanced-toggle-btn:hover {
+      background: var(--accent-color-10);
+      border-color: var(--accent-color);
+    }
+
+    .advanced-toggle-btn .toggle-arrow {
+      transition: transform 0.2s;
+    }
+
+    .advanced-toggle-btn.expanded .toggle-arrow {
+      transform: rotate(180deg);
+    }
+
+    /* Advanced Options (accordion content) */
+    .advanced-options {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      margin-top: 12px;
+      padding-top: 12px;
+      border-top: 1px solid var(--border-color);
+    }
+
+    /* Quality Section (inline layout) */
+    .quality-section-inline {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .quality-section-inline label {
+      font-weight: 500;
+      white-space: nowrap;
+    }
+
+    .quality-slider-inline {
+      flex: 1;
+      cursor: pointer;
+    }
+
+    .quality-presets {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 6px;
+    }
+
+    .quality-preset {
+      padding: 8px 4px;
+      font-size: 0.85em;
+      background: var(--card-bg);
+      border: 1px solid var(--border-color);
+      border-radius: 4px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .quality-preset:hover {
+      background: var(--accent-color-10);
+    }
+
+    .quality-preset.active {
+      background: var(--accent-color);
+      color: white;
+      border-color: var(--accent-color);
+    }
+
+    /* Rotate & Split Section (inline layout) */
+    .rotate-split-section-inline {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .rotate-split-section-inline label {
+      font-weight: 500;
+      white-space: nowrap;
+    }
+
+    .rotate-split-section-inline select {
+      flex: 1;
+      padding: 6px 10px;
+      border-radius: 4px;
+      border: 1px solid var(--border-color);
+      background: var(--card-bg);
+      color: var(--font-color);
+      font-size: 0.9em;
+    }
+
+    /* Direction Buttons */
+    .direction-buttons {
+      display: flex;
+      gap: 8px;
+    }
+
+    .direction-btn {
+      flex: 1;
+      padding: 8px 12px;
+      font-size: 0.9em;
+      background: var(--card-bg);
+      border: 1px solid var(--border-color);
+      border-radius: 4px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .direction-btn:hover {
+      background: var(--accent-color-10);
+    }
+
+    .direction-btn.active {
+      background: var(--accent-color);
+      color: white;
+      border-color: var(--accent-color);
+    }
+
+    /* Image Picker */
+    .image-picker {
+      margin-top: 10px;
+      padding: 12px;
+      background: var(--card-bg);
+      border-radius: 4px;
+      border: 1px solid var(--border-color);
+    }
+
+    .picker-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 10px;
+      font-weight: 500;
+    }
+
+    .picker-actions {
+      display: flex;
+      gap: 6px;
+      margin-bottom: 10px;
+    }
+
+    .picker-actions button {
+      flex: 1;
+      padding: 6px 8px;
+      font-size: 0.85em;
+      background: var(--bg);
+      border: 1px solid var(--border-color);
+      border-radius: 4px;
+      cursor: pointer;
+    }
+
+    .picker-actions button:hover {
+      background: var(--accent-color-10);
+    }
+
+    .image-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+      gap: 8px;
+      max-height: 300px;
+      overflow-y: auto;
+      padding: 8px;
+      background: var(--bg);
+      border-radius: 4px;
+    }
+
+    .image-thumb {
+      position: relative;
+      aspect-ratio: 1;
+      border-radius: 6px;
+      overflow: hidden;
+      cursor: pointer;
+      border: 2px solid var(--border-color);
+      transition: all 0.2s;
+    }
+
+    .image-thumb:hover {
+      transform: scale(1.05);
+      border-color: var(--accent-color);
+    }
+
+    .image-thumb.selected {
+      border-color: var(--accent-color);
+      box-shadow: 0 0 0 2px var(--accent-color-10);
+    }
+
+    .image-thumb img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .image-thumb .overlay {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background: rgba(0, 0, 0, 0.7);
+      color: white;
+      padding: 4px;
+      font-size: 0.7em;
+      text-align: center;
+    }
+
+    /* Auto Export Log Toggle */
+    .auto-export-toggle {
+      padding: 10px;
+      background: var(--bg);
+      border-radius: 4px;
+      margin-top: 5px;
+    }
+
+    /* Log Section */
+    .log-section {
+      margin-top: 10px;
+      padding: 12px;
+      background: var(--card-bg);
+      border-radius: 4px;
+      border: 1px solid var(--border-color);
+    }
+
+    .log-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+      font-weight: 500;
+    }
+
+    .log-container {
+      max-height: 150px;
+      overflow-y: auto;
+      padding: 8px;
+      background: var(--bg);
+      border-radius: 4px;
+      font-family: 'Courier New', monospace;
+      font-size: 0.8em;
+    }
+
+    .log-entry {
+      padding: 2px 0;
+      border-bottom: 1px solid var(--border-color);
+    }
+
+    .log-entry:last-child {
+      border-bottom: none;
+    }
+
+    .log-success { color: #27ae60; }
+    .log-error { color: #e74c3c; }
+    .log-warning { color: #f39c12; }
+    .log-info { color: #3498db; }
+
+    /* Mobile Responsive for Optimizer */
+    @media (max-width: 600px) {
+      .optimizer-main-row {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+      }
+
+      .advanced-toggle-btn {
+        width: 100%;
+        justify-content: center;
+      }
+
+      .quality-section-inline {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+      }
+
+      .quality-slider-inline {
+        width: 100%;
+      }
+
+      .quality-presets {
+        grid-template-columns: repeat(2, 1fr);
+      }
+
+      .rotate-split-section-inline {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+      }
+
+      .rotate-split-section-inline select {
+        width: 100%;
+      }
+
+      .image-grid {
+        grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+      }
+
+      .direction-buttons {
+        flex-direction: column;
+      }
+    }
   </style>
 </head>
 <body>
@@ -696,6 +1038,88 @@
     <div class="upload-form">
       <p class="file-info">Select a file to upload to <strong id="uploadPathDisplay"></strong></p>
       <input type="file" id="fileInput" onchange="validateFile()" multiple>
+
+      <!-- EPUB Optimizer Toggle -->
+      <div class="optimizer-toggle" id="optimizerToggle" style="display:none;">
+        <div class="optimizer-main-row">
+          <label class="checkbox-label">
+            <input type="checkbox" id="optimizeEpubCheckbox">
+            <span>⚡ Optimize EPUB</span>
+          </label>
+          <!-- Advanced Mode Toggle (inline accordion) -->
+          <button class="advanced-toggle-btn" id="advancedModeToggle" type="button" style="display:none;">
+            <span>⚙️</span>
+            <span class="toggle-arrow">▼</span>
+          </button>
+        </div>
+
+        <!-- Advanced Options (accordion content, hidden by default) -->
+        <div class="advanced-options" id="advancedOptions" style="display:none;">
+
+          <!-- Quality Section (inline layout) -->
+          <div class="quality-section-inline">
+            <label>🎨 JPEG Quality: <span id="qualityValue">85</span>%</label>
+            <input type="range" id="qualitySlider" min="1" max="95" value="85" class="quality-slider-inline">
+          </div>
+
+          <!-- Quality Presets -->
+          <div class="quality-presets">
+            <button class="quality-preset" data-value="60">Low (60%)</button>
+            <button class="quality-preset" data-value="75">Medium (75%)</button>
+            <button class="quality-preset active" data-value="85">High (85%)</button>
+            <button class="quality-preset" data-value="95">Max (95%)</button>
+          </div>
+
+          <!-- Rotate & Split Section (inline layout) -->
+          <div class="rotate-split-section-inline">
+            <label>🔄 Rotate & Split:</label>
+            <select id="rotateSplitMode">
+              <option value="off">OFF</option>
+              <option value="light-novel">Light Novel</option>
+              <option value="manual-picker">Manual Picker</option>
+            </select>
+          </div>
+
+          <!-- Direction buttons (only visible when Light Novel or Manual Picker) -->
+          <div class="direction-buttons" id="directionButtons" style="display:none;">
+            <button class="direction-btn" data-direction="ccw">↺ Left-handed (CCW)</button>
+            <button class="direction-btn active" data-direction="cw">↻ Right-handed (CW)</button>
+          </div>
+
+          <!-- Image Picker (only visible with Manual Picker and 1 EPUB file) -->
+          <div class="image-picker" id="imagePicker" style="display:none;">
+            <div class="picker-header">
+              <span>🖼️ Select Images</span>
+              <span id="pickerCount">0 / 0 selected</span>
+            </div>
+            <div class="picker-actions">
+              <button id="selectLandscapeBtn">Select Landscape</button>
+              <button id="selectAllBtn">Select All</button>
+              <button id="clearSelectionBtn">Clear Selection</button>
+            </div>
+            <div class="image-grid" id="imageGrid"></div>
+          </div>
+
+          <!-- Auto Export Log Toggle -->
+          <div class="auto-export-toggle">
+            <label class="checkbox-label">
+              <input type="checkbox" id="autoExportLogCheckbox">
+              <span>📥 Auto-export log on completion/error</span>
+            </label>
+          </div>
+
+          <!-- Log Section -->
+          <div class="log-section" id="logSection">
+            <div class="log-header">
+              <span>📋 Conversion Log</span>
+              <button id="exportLogBtn">📥 Export</button>
+            </div>
+            <div class="log-container" id="logContainer"></div>
+          </div>
+
+        </div>
+      </div>
+
       <button id="uploadBtn" class="upload-btn" onclick="uploadFile()" disabled>Upload</button>
       <div id="progress-container">
         <div id="progress-bar"><div id="progress-fill"></div></div>
@@ -768,6 +1192,48 @@
   // get current path from query parameter
   const currentPath = decodeURIComponent(new URLSearchParams(window.location.search).get('path') || '/');
 
+  // ===== EPUB OPTIMIZER STATE =====
+  /**
+   * Global state for the EPUB optimizer
+   * All code in English, well documented
+   */
+  const EPUBOptimizer = {
+    // Configuration constants
+    config: {
+      MAX_WIDTH: 480,
+      MAX_HEIGHT: 800,
+      DEFAULT_QUALITY: 85,
+      DEFAULT_GRAYSCALE: true
+    },
+
+    // Current state
+    state: {
+      enabled: false,           // Optimizer enabled via checkbox
+      advancedMode: false,      // Advanced mode enabled
+      quality: 85,              // JPEG quality (1-95)
+      grayscale: true,          // True-Grayscale conversion enabled
+      rotateSplitMode: 'off',   // 'off', 'light-novel', 'manual-picker'
+      rotateDirection: 'cw',    // 'cw' (right-handed) or 'ccw' (left-handed)
+      selectedImages: new Map(), // imagePath -> mode (for manual picker)
+      thumbnails: [],           // Array of thumbnail objects
+      optimizedFiles: new Map(), // originalName -> optimizedBlob
+      logs: [],                  // Conversion log entries
+      autoExportLog: true       // Auto-export log on completion/error
+    },
+
+    // Constants
+    MODES: {
+      OFF: 'off',
+      LIGHT_NOVEL: 'light-novel',
+      MANUAL_PICKER: 'manual-picker'
+    },
+
+    DIRECTIONS: {
+      CW: 'cw',   // Clockwise (right-handed)
+      CCW: 'ccw'  // Counter-clockwise (left-handed)
+    }
+  };
+
   function escapeHtml(unsafe) {
     return unsafe
       .replaceAll("&", "&amp;")
@@ -783,6 +1249,309 @@
     const sizes = ['B', 'KB', 'MB', 'GB', 'TB', 'PB', 'EB', 'ZB', 'YB'];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)).toLocaleString() + ' ' + sizes[i];
+  }
+
+  // ===== EPUB OPTIMIZER FUNCTIONS =====
+
+  /**
+   * Parse XHTML content using DOMParser to preserve EPUB hash
+   * This is critical for KOSYNC synchronization to work correctly
+   *
+   * @param {string} content - The XHTML content to parse
+   * @returns {Document|null} - Parsed document or null if parsing fails
+   */
+  function parseXHTMLSafe(content) {
+    try {
+      const parser = new DOMParser();
+      // Use 'application/xhtml+xml' MIME type for proper XML parsing
+      const doc = parser.parseFromString(content, 'application/xhtml+xml');
+
+      // Check for parser errors
+      const parseError = doc.querySelector('parsererror');
+      if (parseError) {
+        console.warn('[EPUBOptimizer] DOMParser error:', parseError.textContent);
+        return null;
+      }
+
+      return doc;
+    } catch (e) {
+      console.error('[EPUBOptimizer] DOMParser failed:', e.message);
+      return null;
+    }
+  }
+
+  /**
+   * Serialize document back to XHTML string
+   * Uses XMLSerializer to preserve document structure and hash
+   *
+   * @param {Document} doc - The document to serialize
+   * @returns {string} - Serialized XHTML content
+   */
+  function serializeXHTML(doc) {
+    const serializer = new XMLSerializer();
+    return serializer.serializeToString(doc);
+  }
+
+  /**
+   * Apply True-Grayscale conversion using BT.709 luminance formula
+   * This ensures proper grayscale conversion for e-ink displays
+   *
+   * Formula: L = 0.2126*R + 0.7152*G + 0.0722*B
+   * Reference: ITU-R BT.709
+   *
+   * @param {CanvasRenderingContext2D} ctx - Canvas context
+   * @param {number} width - Image width
+   * @param {number} height - Image height
+   */
+  function applyTrueGrayscale(ctx, width, height) {
+    if (!EPUBOptimizer.state.grayscale) {
+      return; // Grayscale disabled
+    }
+
+    // Get pixel data from canvas
+    const imageData = ctx.getImageData(0, 0, width, height);
+    const data = imageData.data;
+
+    // Process each pixel (RGBA, 4 bytes per pixel)
+    for (let i = 0; i < data.length; i += 4) {
+      const r = data[i];     // Red channel
+      const g = data[i + 1]; // Green channel
+      const b = data[i + 2]; // Blue channel
+      // Alpha channel (data[i + 3]) is preserved
+
+      // Calculate luminance using BT.709 formula
+      const l = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+
+      // Set all RGB channels to luminance value
+      data[i] = l;       // R
+      data[i + 1] = l;   // G
+      data[i + 2] = l;   // B
+      // Alpha (data[i + 3]) remains unchanged
+    }
+
+    // Put modified pixel data back to canvas
+    ctx.putImageData(imageData, 0, 0);
+  }
+
+  /**
+   * Add log entry to conversion log
+   *
+   * @param {string} message - Log message
+   * @param {string} type - Log type: 'success', 'error', 'warning', 'info'
+   */
+  function addLogEntry(message, type = 'info') {
+    const timestamp = new Date().toLocaleTimeString();
+    EPUBOptimizer.state.logs.push({ timestamp, message, type });
+
+    const logContainer = document.getElementById('logContainer');
+    if (logContainer) {
+      const entry = document.createElement('div');
+      entry.className = `log-entry log-${type}`;
+      entry.textContent = `[${timestamp}] ${message}`;
+      logContainer.appendChild(entry);
+      logContainer.scrollTop = logContainer.scrollHeight;
+    }
+  }
+
+  /**
+   * Export conversion log as text file
+   * Automatically called on completion or error if auto-export is enabled
+   */
+  function exportConversionLog() {
+    if (EPUBOptimizer.state.logs.length === 0) {
+      return;
+    }
+
+    // Check if auto-export is enabled (for automatic calls)
+    if (EPUBOptimizer.state.autoExportLog === false && !window.manualExport) {
+      return;
+    }
+
+    // Reset manual export flag
+    window.manualExport = false;
+
+    const logText = EPUBOptimizer.state.logs
+      .map(entry => `[${entry.timestamp}] [${entry.type.toUpperCase()}] ${entry.message}`)
+      .join('\n');
+
+    const blob = new Blob([logText], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `epub-optimizer-log-${Date.now()}.txt`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
+  /**
+   * Update UI based on Rotate & Split mode selection
+   */
+  function updateRotateSplitUI() {
+    const mode = EPUBOptimizer.state.rotateSplitMode;
+    const directionButtons = document.getElementById('directionButtons');
+    const imagePicker = document.getElementById('imagePicker');
+    const fileInput = document.getElementById('fileInput');
+
+    // Show/hide direction buttons
+    if (mode === EPUBOptimizer.MODES.LIGHT_NOVEL || mode === EPUBOptimizer.MODES.MANUAL_PICKER) {
+      directionButtons.style.display = 'flex';
+    } else {
+      directionButtons.style.display = 'none';
+    }
+
+    // Show/hide image picker (only for Manual Picker with single EPUB)
+    if (mode === EPUBOptimizer.MODES.MANUAL_PICKER && fileInput.files.length === 1) {
+      imagePicker.style.display = 'block';
+    } else {
+      imagePicker.style.display = 'none';
+    }
+  }
+
+  /**
+   * Select landscape images automatically (for Light Novel mode)
+   */
+  function selectLandscapeImages() {
+    // Placeholder for future implementation
+    console.log('[EPUBOptimizer] Select landscape images - to be implemented');
+  }
+
+  /**
+   * Select all images (except cover)
+   */
+  function selectAllImages() {
+    // Placeholder for future implementation
+    console.log('[EPUBOptimizer] Select all images - to be implemented');
+  }
+
+  /**
+   * Clear image selection
+   */
+  function clearImageSelection() {
+    // Placeholder for future implementation
+    console.log('[EPUBOptimizer] Clear selection - to be implemented');
+  }
+
+  /**
+   * Initialize EPUB Optimizer event handlers
+   */
+  function initializeOptimizerHandlers() {
+    // Optimize EPUB checkbox toggle
+    const optimizeCheckbox = document.getElementById('optimizeEpubCheckbox');
+    const advancedToggleBtn = document.getElementById('advancedModeToggle');
+    if (optimizeCheckbox) {
+      optimizeCheckbox.addEventListener('change', function() {
+        EPUBOptimizer.state.enabled = this.checked;
+
+        // Show/hide advanced toggle button
+        advancedToggleBtn.style.display = this.checked ? 'flex' : 'none';
+
+        // Reset advanced mode if optimizer is disabled
+        if (!this.checked) {
+          EPUBOptimizer.state.advancedMode = false;
+          document.getElementById('advancedOptions').style.display = 'none';
+          advancedToggleBtn.classList.remove('expanded');
+        }
+      });
+    }
+
+    // Advanced Mode toggle button (accordion behavior)
+    if (advancedToggleBtn) {
+      advancedToggleBtn.addEventListener('click', function() {
+        EPUBOptimizer.state.advancedMode = !EPUBOptimizer.state.advancedMode;
+        const advancedOptions = document.getElementById('advancedOptions');
+        advancedOptions.style.display = EPUBOptimizer.state.advancedMode ? 'flex' : 'none';
+
+        // Toggle arrow rotation
+        this.classList.toggle('expanded', EPUBOptimizer.state.advancedMode);
+      });
+    }
+
+    // Quality slider
+    const qualitySlider = document.getElementById('qualitySlider');
+    const qualityValue = document.getElementById('qualityValue');
+    if (qualitySlider) {
+      qualitySlider.addEventListener('input', function() {
+        EPUBOptimizer.state.quality = parseInt(this.value);
+        qualityValue.textContent = this.value;
+      });
+    }
+
+    // Quality presets
+    document.querySelectorAll('.quality-preset').forEach(btn => {
+      btn.addEventListener('click', function() {
+        const value = parseInt(this.dataset.value);
+        EPUBOptimizer.state.quality = value;
+        qualitySlider.value = value;
+        qualityValue.textContent = value;
+
+        // Update active state
+        document.querySelectorAll('.quality-preset').forEach(b => b.classList.remove('active'));
+        this.classList.add('active');
+      });
+    });
+
+    // Rotate & Split mode select
+    const rotateSplitSelect = document.getElementById('rotateSplitMode');
+    if (rotateSplitSelect) {
+      rotateSplitSelect.addEventListener('change', function() {
+        EPUBOptimizer.state.rotateSplitMode = this.value;
+        updateRotateSplitUI();
+      });
+    }
+
+    // Direction buttons
+    document.querySelectorAll('.direction-btn').forEach(btn => {
+      btn.addEventListener('click', function() {
+        EPUBOptimizer.state.rotateDirection = this.dataset.direction;
+
+        // Update active state
+        document.querySelectorAll('.direction-btn').forEach(b => b.classList.remove('active'));
+        this.classList.add('active');
+      });
+    });
+
+    // Export log button
+    const exportLogBtn = document.getElementById('exportLogBtn');
+    if (exportLogBtn) {
+      exportLogBtn.addEventListener('click', function() {
+        window.manualExport = true;
+        exportConversionLog();
+      });
+    }
+
+    // Auto-export log checkbox (unchecked by default)
+    const autoExportCheckbox = document.getElementById('autoExportLogCheckbox');
+    if (autoExportCheckbox) {
+      // Initialize state (default: unchecked)
+      EPUBOptimizer.state.autoExportLog = autoExportCheckbox.checked;
+      autoExportCheckbox.addEventListener('change', function() {
+        EPUBOptimizer.state.autoExportLog = this.checked;
+      });
+    }
+
+    // Image picker buttons
+    const selectLandscapeBtn = document.getElementById('selectLandscapeBtn');
+    const selectAllBtn = document.getElementById('selectAllBtn');
+    const clearSelectionBtn = document.getElementById('clearSelectionBtn');
+
+    if (selectLandscapeBtn) {
+      selectLandscapeBtn.addEventListener('click', selectLandscapeImages);
+    }
+    if (selectAllBtn) {
+      selectAllBtn.addEventListener('click', selectAllImages);
+    }
+    if (clearSelectionBtn) {
+      clearSelectionBtn.addEventListener('click', clearImageSelection);
+    }
+  }
+
+  // Initialize optimizer handlers when DOM is ready
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initializeOptimizerHandlers);
+  } else {
+    initializeOptimizerHandlers();
   }
 
   async function hydrate() {
@@ -1010,6 +1779,33 @@
     const uploadBtn = document.getElementById('uploadBtn');
     const files = fileInput.files;
     uploadBtn.disabled = !(files.length > 0);
+
+    // Check if any file is an EPUB
+    const epubFiles = Array.from(files).filter(f =>
+      f.name.toLowerCase().endsWith('.epub')
+    );
+
+    // Show/hide optimizer toggle based on EPUB files
+    const optimizerToggle = document.getElementById('optimizerToggle');
+    const advancedToggleBtn = document.getElementById('advancedModeToggle');
+    if (epubFiles.length > 0) {
+      optimizerToggle.style.display = 'block';
+    } else {
+      optimizerToggle.style.display = 'none';
+      // If optimizer was shown, hide it and reset
+      if (EPUBOptimizer.state.enabled) {
+        document.getElementById('optimizeEpubCheckbox').checked = false;
+        EPUBOptimizer.state.enabled = false;
+        advancedToggleBtn.style.display = 'none';
+        document.getElementById('advancedOptions').style.display = 'none';
+        advancedToggleBtn.classList.remove('expanded');
+      }
+    }
+
+    // Update Rotate & Split UI if optimizer is enabled
+    if (EPUBOptimizer.state.enabled) {
+      updateRotateSplitUI();
+    }
   }
 
 let failedUploadsGlobal = [];
@@ -1161,11 +1957,34 @@ function uploadFileHTTP(file, onProgress, onComplete, onError) {
 
 function uploadFile() {
   const fileInput = document.getElementById('fileInput');
-  const files = Array.from(fileInput.files);
+  let files = Array.from(fileInput.files);
 
   if (files.length === 0) {
     alert('Please select at least one file!');
     return;
+  }
+
+  // Check if optimizer is enabled and has optimized files
+  if (EPUBOptimizer.state.enabled && EPUBOptimizer.state.optimizedFiles.size > 0) {
+    // Use optimized files for upload
+    const optimizedFiles = [];
+    for (const file of files) {
+      if (file.name.toLowerCase().endsWith('.epub') && EPUBOptimizer.state.optimizedFiles.has(file.name)) {
+        // Replace with optimized blob
+        const optimizedBlob = EPUBOptimizer.state.optimizedFiles.get(file.name);
+        optimizedFiles.push(new File([optimizedBlob], file.name, { type: 'application/epub+zip' }));
+        addLogEntry(`Using optimized version of ${file.name}`, 'success');
+      } else {
+        // Use original file
+        optimizedFiles.push(file);
+      }
+    }
+    files = optimizedFiles;
+
+    // Create new FileList with optimized files
+    const dt = new DataTransfer();
+    files.forEach(f => dt.items.add(f));
+    fileInput.files = dt.files;
   }
 
   const progressContainer = document.getElementById('progress-container');
