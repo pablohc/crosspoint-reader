@@ -239,6 +239,7 @@
       cursor: pointer;
       font-size: 1em;
       width: 100%;
+      transition: background-color 0.2s;
     }
     .upload-btn:hover {
       background-color: #219a52;
@@ -246,6 +247,12 @@
     .upload-btn:disabled {
       background-color: #95a5a6;
       cursor: not-allowed;
+    }
+    .upload-btn.optimize {
+      background-color: #9b59b6;
+    }
+    .upload-btn.optimize:hover {
+      background-color: #8e44ad;
     }
     .file-info {
       color: var(--label-color);
@@ -1124,19 +1131,20 @@
             </label>
           </div>
 
-          <!-- Log Section -->
-          <div class="log-section" id="logSection">
-            <div class="log-header">
-              <span>📋 Conversion Log</span>
-              <button id="exportLogBtn">📥 Export</button>
-            </div>
-            <div class="log-container" id="logContainer"></div>
-          </div>
-
         </div>
       </div>
 
       <button id="uploadBtn" class="upload-btn" onclick="uploadFile()" disabled>Upload</button>
+
+      <!-- Log Section (hidden by default, shown during optimization) -->
+      <div class="log-section" id="logSection" style="display:none;">
+        <div class="log-header">
+          <span>📋 Conversion Log</span>
+          <button id="exportLogBtn">📥 Export</button>
+        </div>
+        <div class="log-container" id="logContainer"></div>
+      </div>
+
       <div id="progress-container">
         <div id="progress-bar"><div id="progress-fill"></div></div>
         <div id="progress-text"></div>
@@ -1368,11 +1376,6 @@
       logContainer.scrollTop = logContainer.scrollHeight;
     }
   }
-
-  /**
-   * Export conversion log as text file
-   * Automatically called on completion or error if auto-export is enabled
-   */
   function exportConversionLog() {
     if (EPUBOptimizer.state.logs.length === 0) {
       return;
@@ -1846,6 +1849,9 @@
       return;
     }
 
+    // Show log section when optimization starts
+    document.getElementById('logSection').style.display = 'block';
+
     addLogEntry(`=== EPUB Optimization Started ===`, 'info');
 
     // Clear previous optimized files
@@ -1890,12 +1896,24 @@
     // Optimize EPUB checkbox toggle
     const optimizeCheckbox = document.getElementById('optimizeEpubCheckbox');
     const advancedToggle = document.getElementById('advancedModeToggle');
+    const uploadBtn = document.getElementById('uploadBtn');
     if (optimizeCheckbox) {
       optimizeCheckbox.addEventListener('change', function() {
         EPUBOptimizer.state.enabled = this.checked;
 
         // Show/hide advanced toggle
         advancedToggle.style.display = this.checked ? 'flex' : 'none';
+
+        // Update upload button appearance and text
+        if (this.checked) {
+          uploadBtn.classList.add('optimize');
+          uploadBtn.textContent = 'Optimize & Upload';
+        } else {
+          uploadBtn.classList.remove('optimize');
+          uploadBtn.textContent = 'Upload';
+          // Hide log section when optimizer is disabled
+          document.getElementById('logSection').style.display = 'none';
+        }
 
         // Reset advanced mode if optimizer is disabled
         if (!this.checked) {
@@ -2254,6 +2272,13 @@
         advancedToggleBtn.style.display = 'none';
         document.getElementById('advancedOptions').style.display = 'none';
         advancedToggleBtn.classList.remove('expanded');
+
+        // Reset upload button
+        uploadBtn.classList.remove('optimize');
+        uploadBtn.textContent = 'Upload';
+
+        // Hide log section
+        document.getElementById('logSection').style.display = 'none';
       }
     }
 
