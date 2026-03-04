@@ -751,13 +751,14 @@
     }
 
     .quality-preset {
-      padding: 8px 4px;
+      padding: 10px 12px;
       font-size: 0.85em;
       background: var(--card-bg);
       border: 1px solid var(--border-color);
       border-radius: 4px;
       cursor: pointer;
       transition: all 0.2s;
+      white-space: nowrap;
     }
 
     .quality-preset:hover {
@@ -800,7 +801,7 @@
 
     .direction-btn {
       flex: 1;
-      padding: 8px 12px;
+      padding: 12px 16px;
       font-size: 0.9em;
       background: var(--card-bg);
       border: 1px solid var(--border-color);
@@ -907,7 +908,7 @@
 
     /* Auto Export Log Toggle */
     .auto-export-toggle {
-      padding: 10px;
+      padding: 8px 10px;
       background: var(--bg);
       border-radius: 4px;
       margin-top: 5px;
@@ -1953,8 +1954,19 @@
     const qualityValue = document.getElementById('qualityValue');
     if (qualitySlider) {
       qualitySlider.addEventListener('input', function() {
-        EPUBOptimizer.state.quality = parseInt(this.value);
+        const newValue = parseInt(this.value);
+        EPUBOptimizer.state.quality = newValue;
         qualityValue.textContent = this.value;
+
+        // Auto-select matching preset
+        document.querySelectorAll('.quality-preset').forEach(btn => {
+          const presetValue = parseInt(btn.dataset.value);
+          if (presetValue === newValue) {
+            btn.classList.add('active');
+          } else {
+            btn.classList.remove('active');
+          }
+        });
       });
     }
 
