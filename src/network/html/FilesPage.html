@@ -4008,6 +4008,7 @@ function uploadFileWebSocket(file, onProgress, onComplete, onError) {
     const ws = new WebSocket(getWsUrl());
     let uploadStarted = false;
     let sendingChunks = false;
+    const startTime = Date.now();
 
     ws.binaryType = 'arraybuffer';
 
@@ -4049,12 +4050,6 @@ function uploadFileWebSocket(file, onProgress, onComplete, onError) {
 
             ws.send(buffer);
             offset += chunkSize;
-
-            // Update local progress with real transfer progress
-            // Server will confirm 100% with DONE message
-            if (onProgress) {
-              onProgress(offset, totalSize);
-            }
           }
 
           sendingChunks = false;
@@ -4066,12 +4061,32 @@ function uploadFileWebSocket(file, onProgress, onComplete, onError) {
           reject(err);
         }
       } else if (msg.startsWith('PROGRESS:')) {
-        // Server confirmed progress - log for debugging but don't update UI
-        // (local progress is smoother, server progress causes jumping)
-        console.log('[WS] Server progress:', msg);
+        // Parse server progress: "PROGRESS:<received>:<total>"
+        const parts = msg.substring(9).split(':');
+        if (parts.length === 2) {
+          const received = parseInt(parts[0], 10);
+          const total = parseInt(parts[1], 10);
+          const elapsed = (Date.now() - startTime) / 1000; // seconds
+          const speed = elapsed > 0 ? (received / elapsed) : 0; // bytes/sec
+
+          // Calculate ETA
+          const remaining = total - received;
+          const eta = speed > 0 ? (remaining / speed) : 0;
+
+          // Call onProgress with extended info
+          if (onProgress) {
+            onProgress(received, total, {
+              serverReceived: received,
+              serverTotal: total,
+              speed: speed,
+              eta: eta,
+              elapsed: elapsed
+            });
+          }
+        }
       } else if (msg === 'DONE') {
         // Show 100% when server confirms completion
-        if (onProgress) onProgress(file.size, file.size);
+        if (onProgress) onProgress(file.size, file.size, { serverReceived: file.size, serverTotal: file.size });
         ws.close();
         if (onComplete) onComplete();
         resolve();
@@ -4235,13 +4250,37 @@ function uploadFile() {
     const stageText = needsConversion ? 'Converting & uploading' : 'Uploading';
     progressText.textContent = `${stageText} ${file.name} (${currentIndex + 1}/${files.length})${methodText}`;
 
-    const onProgress = (loaded, total) => {
+    const onProgress = (loaded, total, extendedInfo) => {
       const uploadPercent = Math.round((loaded / total) * 100);
       // If conversion succeeded, display goes from 50-100%, otherwise 0-100%
       const displayPercent = conversionSucceeded ? 50 + Math.round(uploadPercent / 2) : uploadPercent;
       progressFill.style.width = displayPercent + '%';
       const prefix = conversionSucceeded ? 'Converting & uploading' : 'Uploading';
-      progressText.textContent = `${prefix} ${file.name} (${currentIndex + 1}/${files.length})${methodText} — ${uploadPercent}%`;
+
+      // Format progress text with extended info if available
+      let progressTextContent = `${prefix} ${file.name} (${currentIndex + 1}/${files.length})${methodText} — ${uploadPercent}%`;
+
+      if (extendedInfo && extendedInfo.serverReceived !== undefined) {
+        // Show detailed server progress info
+        const speedMbps = (extendedInfo.speed / 1024 / 1024).toFixed(2);
+        const etaSeconds = Math.round(extendedInfo.eta);
+        const serverPercent = Math.round((extendedInfo.serverReceived / extendedInfo.serverTotal) * 100);
+
+        progressTextContent += ` [Server: ${serverPercent}% | ${(extendedInfo.speed / 1024).toFixed(1)} KB/s`;
+
+        if (etaSeconds > 0) {
+          if (etaSeconds < 60) {
+            progressTextContent += ` | ${etaSeconds}s left`;
+          } else {
+            const minutes = Math.floor(etaSeconds / 60);
+            const seconds = etaSeconds % 60;
+            progressTextContent += ` | ${minutes}m ${seconds}s left`;
+          }
+        }
+        progressTextContent += ']';
+      }
+
+      progressText.textContent = progressTextContent;
     };
 
     const onComplete = () => {
