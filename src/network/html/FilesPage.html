@@ -1373,7 +1373,7 @@
     <div class="upload-form">
       <p class="file-info">Select a file to upload to <strong id="uploadPathDisplay"></strong></p>
       <input type="file" id="fileInput" onchange="validateFile()" multiple>
-      <div class="convert-options">
+      <div class="convert-options" id="convertOptions" style="display:none;">
         <div class="convert-row">
           <label class="convert-checkbox">
             <input type="checkbox" id="convertBeforeUpload" onchange="toggleConvertOptions()">
@@ -1797,12 +1797,17 @@
     JPEG_QUALITY = 85;
     HANDEDNESS = 'right';
 
+    // Hide convert options when opening modal (no files selected initially)
+    const convertOptions = document.getElementById('convertOptions');
+    if (convertOptions) {
+      convertOptions.style.display = 'none';
+    }
+
     // Reset Rotate & Crop selector
     document.getElementById('rotateCropOff').checked = true;
     document.getElementById('handednessOptions').style.display = 'none';
     setHandedness('right');
     updateRotateCropOptions();
-
     // Hide log section from previous session
     const logSection = document.getElementById('log-section');
     if (logSection) logSection.classList.remove('visible');
@@ -1824,7 +1829,6 @@
     document.getElementById('convertInfo').style.display = 'none';
     document.getElementById('convertWarning').style.display = 'none';
     // Hide log section
-    const logSection = document.getElementById('log-section');
     if (logSection) logSection.classList.remove('visible');
     // Reset advanced options
     const advancedSettingsContent = document.getElementById('advancedSettingsContent');
@@ -2287,9 +2291,31 @@
     const fileInput = document.getElementById('fileInput');
     const uploadBtn = document.getElementById('uploadBtn');
     const files = fileInput.files;
+    const convertOptions = document.getElementById('convertOptions');
+
+    // Show/hide convert options based on file selection
+    if (files.length > 0) {
+      convertOptions.style.display = 'block';
+    } else {
+      convertOptions.style.display = 'none';
+    }
 
     // Update Rotate & Crop options based on file count
     updateRotateCropOptions();
+
+    // Add click listener to detect when user clicks on file input (to deselect files)
+    fileInput.addEventListener('click', function() {
+      // Small delay to allow browser to process click before checking files
+      setTimeout(() => {
+        const currentFiles = fileInput.files;
+        const convertOptions = document.getElementById('convertOptions');
+
+        // Hide convert options if no files are selected (user clicked to deselect)
+        if (currentFiles.length === 0 && convertOptions) {
+          convertOptions.style.display = 'none';
+        }
+      }, 10);
+    });
 
     if (files.length > 0) {
       const convertEnabled = document.getElementById('convertBeforeUpload').checked;
