@@ -289,6 +289,7 @@
       padding: 8px 12px;
       margin-top: 8px;
       line-height: 1.4;
+      text-align: center;
     }
     .convert-info {
       font-size: 0.85em;
@@ -1455,10 +1456,10 @@
             <!-- Handedness options (shown when mode is Light Novel or Manual Picker) -->
             <div class="handedness-buttons" id="handednessOptions" style="display:none; margin-top: 12px;">
               <button class="handedness-btn" id="handednessLeft" data-value="left" onclick="setHandedness('left')">
-                <span style="float: right;">✋</span><span>Left-handed<br><small>(Counter-clockwise)</small></span>
+                <span style="float: right; transform: scaleX(-1);">🤚</span><span>Left-handed<br><small>(CCW)</small></span>
               </button>
               <button class="handedness-btn active" id="handednessRight" data-value="right" onclick="setHandedness('right')">
-                <span style="float: right;">✋</span><span>Right-handed<br><small>(Clockwise)</small></span>
+                <span style="float: left;">🤚</span><span>Right-handed<br><small>(CW)</small></span>
               </button>
             </div>
           </div>
@@ -1479,7 +1480,8 @@
         </div>
       <!-- Sync compatibility warning -->
       <div class="convert-warning" id="convertWarning" style="display:none;" role="alert" aria-live="polite">
-        ⚠️ Conversion mutates files and may break hash-based sync — back up or disable sync before proceeding
+        ⚠️ Converting will modify files and can break hash‑based sync. ⚠️<br>
+        Please back up or disable sync before proceeding.
       </div>
       </div>
       <button id="uploadBtn" class="upload-btn" onclick="uploadFile()" disabled>Upload</button>
