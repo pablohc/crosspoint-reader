@@ -1603,6 +1603,42 @@
     return el;
   }
 
+  // Download file function - forces proper download instead of opening in browser
+  async function downloadFile(filePath) {
+    try {
+      const response = await fetch(`/download?path=${encodeURIComponent(filePath)}`);
+      if (!response.ok) {
+        throw new Error(`Download failed: ${response.status} ${response.statusText}`);
+      }
+
+      // Get filename from Content-Disposition header or from path
+      let filename = filePath.split('/').pop();
+      const contentDisposition = response.headers.get('Content-Disposition');
+      if (contentDisposition) {
+        const filenameMatch = contentDisposition.match(/filename="?(.+)"?/);
+        if (filenameMatch) {
+          filename = filenameMatch[1];
+        }
+      }
+
+      // Create blob and download link
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+
+      // Cleanup
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+    } catch (error) {
+      console.error('Download error:', error);
+      showNotification(`Download failed: ${error.message}`, 'error');
+    }
+  }
+
   // Network status monitoring
   let isNetworkOnline = navigator.onLine;
 
@@ -1786,7 +1822,7 @@
           fileTableContent += `<tr class="${file.isEpub ? 'epub-file' : ''}">`;
           fileTableContent += `<td><input type="checkbox" class="select-item" data-path="${encodeURIComponent(filePath)}" data-name="${escapeHtml(file.name)}" data-type="file"></td>`;
           fileTableContent += `<td><span class="file-icon">${file.isEpub ? '📗' : '📄'}</span>`;
-          fileTableContent += `<a href="/download?path=${encodeURIComponent(filePath)}" class="file-link" download>${escapeHtml(file.name)}</a>`;
+          fileTableContent += `<a href="#" onclick="downloadFile('${escapeHtml(filePath)}'); return false;" class="file-link">${escapeHtml(file.name)}</a>`;
           if (file.isEpub) fileTableContent += '<span class="epub-badge">EPUB</span>';
           fileTableContent += '</td>';
           fileTableContent += `<td>${file.name.split('.').pop().toUpperCase()}</td>`;
