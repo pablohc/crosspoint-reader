@@ -682,6 +682,19 @@
       border-color: #e74c3c;
       background: rgba(231, 76, 60, 0.1);
     }
+    .image-item.locked {
+      border-color: #27ae60;
+      background: rgba(39, 174, 96, 0.1);
+      cursor: default;
+      opacity: 0.8;
+    }
+    .image-item.locked:hover {
+      transform: none;
+      border-color: #27ae60;
+    }
+    .image-item.locked .image-state-badge {
+      background: #27ae60;
+    }
     .image-item img {
       width: 100%;
       height: 80px;
@@ -1416,7 +1429,6 @@
               <button class="quality-preset active" data-value="85" onclick="setQualityPreset(85)">High<br><small>85%</small></button>
               <button class="quality-preset" data-value="95" onclick="setQualityPreset(95)">Max<br><small>95%</small></button>
             </div>
-            <div class="quality-display" id="qualityDisplaySimple">📦 85% JPEG</div>
           </div>
           <!-- Grayscale Toggle (commented for e-ink optimization, kept for compatibility with other devices/web apps)
           <div class="advanced-setting-row" style="display:none;">
@@ -1443,10 +1455,6 @@
                 <div class="rotate-crop-option">
                   <input type="radio" name="rotateCropMode" id="rotateCropOff" value="off" onchange="setRotateCropMode('off')" checked>
                   <label for="rotateCropOff">OFF</label>
-                </div>
-                <div class="rotate-crop-option">
-                  <input type="radio" name="rotateCropMode" id="rotateCropBaseline" value="baseline" onchange="setRotateCropMode('baseline')">
-                  <label for="rotateCropBaseline">Baseline</label>
                 </div>
                 <div class="rotate-crop-option">
                   <input type="radio" name="rotateCropMode" id="rotateCropLightNovel" value="light_novel" onchange="setRotateCropMode('light_novel')">
@@ -1508,16 +1516,20 @@
         </div>
         <div class="state-legend">
           <div class="legend-item">
+            <div class="legend-color" style="background:#27ae60"></div>
+            <span>✓ Fits 480×800</span>
+          </div>
+          <div class="legend-item">
             <div class="legend-color" style="background:var(--label-color)"></div>
-            <span>Normal (click to cycle)</span>
+            <span>Normal (scale only)</span>
           </div>
           <div class="legend-item">
             <div class="legend-color" style="background:#3498db"></div>
-            <span>H-Split (rotate after cut)</span>
+            <span>H-Split (rotate+cut)</span>
           </div>
           <div class="legend-item">
             <div class="legend-color" style="background:#e74c3c"></div>
-            <span>V-Split (no rotation)</span>
+            <span>V-Split (cut only)</span>
           </div>
         </div>
         <div class="image-grid" id="imageGrid"></div>
@@ -1592,56 +1604,6 @@
 <script>
   // get current path from query parameter
   const currentPath = decodeURIComponent(new URLSearchParams(window.location.search).get('path') || '/');
-
-  // Safe element getter - returns null if element doesn't exist
-  function getEl(id) {
-    return document.getElementById(id);
-  }
-
-  // Safe element getter with check - returns element or throws if not found
-  function getElOrThrow(id) {
-    const el = document.getElementById(id);
-    if (!el) {
-      throw new Error(`Required element with id "${id}" not found`);
-    }
-    return el;
-  }
-
-  // Download file function - forces proper download instead of opening in browser
-  async function downloadFile(filePath) {
-    try {
-      const response = await fetch(`/download?path=${encodeURIComponent(filePath)}`);
-      if (!response.ok) {
-        throw new Error(`Download failed: ${response.status} ${response.statusText}`);
-      }
-
-      // Get filename from Content-Disposition header or from path
-      let filename = filePath.split('/').pop();
-      const contentDisposition = response.headers.get('Content-Disposition');
-      if (contentDisposition) {
-        const filenameMatch = contentDisposition.match(/filename="?(.+)"?/);
-        if (filenameMatch) {
-          filename = filenameMatch[1];
-        }
-      }
-
-      // Create blob and download link
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = filename;
-      document.body.appendChild(a);
-      a.click();
-
-      // Cleanup
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
-    } catch (error) {
-      console.error('Download error:', error);
-      showNotification(`Download failed: ${error.message}`, 'error');
-    }
-  }
 
   // Network status monitoring
   let isNetworkOnline = navigator.onLine;
@@ -1826,7 +1788,7 @@
           fileTableContent += `<tr class="${file.isEpub ? 'epub-file' : ''}">`;
           fileTableContent += `<td><input type="checkbox" class="select-item" data-path="${encodeURIComponent(filePath)}" data-name="${escapeHtml(file.name)}" data-type="file"></td>`;
           fileTableContent += `<td><span class="file-icon">${file.isEpub ? '📗' : '📄'}</span>`;
-          fileTableContent += `<a href="#" onclick="downloadFile('${escapeHtml(filePath)}'); return false;" class="file-link">${escapeHtml(file.name)}</a>`;
+          fileTableContent += `<a rel="noopener noreferrer" target="_blank" href="/download?path=${encodeURIComponent(filePath)}" class="file-link">${escapeHtml(file.name)}</a>`;
           if (file.isEpub) fileTableContent += '<span class="epub-badge">EPUB</span>';
           fileTableContent += '</td>';
           fileTableContent += `<td>${file.name.split('.').pop().toUpperCase()}</td>`;
@@ -1902,6 +1864,7 @@
     document.getElementById('handednessOptions').style.display = 'none';
     setHandedness('right');
     // Update converter variables
+    console.log('[CALL] updateQualitySettings triggered from event handler');
     updateQualitySettings();
   }
 
@@ -1955,21 +1918,58 @@
         btn.classList.add('active');
       }
     });
+    console.log('[CALL] updateQualitySettings triggered from event handler');
     updateQualitySettings();
   }
 
+  // DEBUG: Temporal logging function - REMOVE AFTER DEBUG
+  function debugLog(message, data) {
+    console.log(`[DEBUG ${new Date().toISOString()}] ${message}`, data || '');
+  }
+
+  // DEBUG: Check for missing elements
+  function checkRequiredElements() {
+    const requiredElements = [
+      'qualitySlider',
+      'qualityDisplaySimple',
+      'grayscaleToggle'
+    ];
+
+    requiredElements.forEach(id => {
+      const element = document.getElementById(id);
+      if (!element) {
+        console.warn(`[MISSING ELEMENT] Element with ID '${id}' not found`);
+      } else {
+        console.log(`[FOUND ELEMENT] ${id}:`, element);
+      }
+    });
+  }
+
   function updateQualitySettings() {
+    console.log('[DEBUG] updateQualitySettings called');
     const quality = document.getElementById('qualitySlider').value;
+    console.log('[DEBUG] quality slider value:', quality);
+    console.log('[DEBUG] qualitySlider element:', document.getElementById('qualitySlider'));
+
     // Check if grayscaleToggle exists (may be hidden for compatibility with other devices)
     const grayscaleToggle = document.getElementById('grayscaleToggle');
+    console.log('[DEBUG] grayscaleToggle element:', grayscaleToggle);
     const grayscale = grayscaleToggle ? grayscaleToggle.checked : true; // Default to true for e-ink
+    console.log('[DEBUG] grayscale value:', grayscale);
 
     // Update displays (grayscale is always enabled for e-ink)
-    document.getElementById('qualityDisplaySimple').textContent = '📦 ' + quality + '% JPEG';
+    const qualityDisplaySimple = document.getElementById('qualityDisplaySimple');
+    console.log('[DEBUG] qualityDisplaySimple element:', qualityDisplaySimple);
+    if (qualityDisplaySimple) {
+      qualityDisplaySimple.textContent = '📦 ' + quality + '% JPEG';
+    } else {
+      console.warn('[WARNING] qualityDisplaySimple element not found');
+    }
 
     // Update converter variables (used by processImage and applyGrayscale)
     JPEG_QUALITY = parseInt(quality, 10);
     ENABLE_GRAYSCALE = true; // Always grayscale for e-ink
+    console.log('[DEBUG] JPEG_QUALITY set to:', JPEG_QUALITY);
   }
 
   function setHandedness(value) {
@@ -1984,8 +1984,8 @@
     ROTATE_CROP_MODE = mode;
     ENABLE_LIGHT_NOVEL_MODE = (mode === 'light_novel');
 
-    // Show/hide handedness options (hidden when OFF and Baseline, visible for Light Novel and Manual Picker)
-    document.getElementById('handednessOptions').style.display = (mode === 'off' || mode === 'baseline') ? 'none' : 'block';
+    // Show/hide handedness options (hidden when OFF, visible for Light Novel and Manual Picker)
+    document.getElementById('handednessOptions').style.display = (mode === 'off') ? 'none' : 'block';
 
     // If switching to/from Manual Picker, handle image picker visibility
     const fileInput = document.getElementById('fileInput');
@@ -2032,29 +2032,131 @@
    */
   async function extractImagesForPreview(file) {
     const zip = await JSZip.loadAsync(file);
-    const images = [];
     const imageExtensions = ['.png', '.gif', '.webp', '.bmp', '.jpg', '.jpeg'];
-
+    
+    // Collect all image paths first
+    const allImages = [];
     for (const [path, fileObj] of Object.entries(zip.files)) {
       if (fileObj.dir) continue;
-
       const ext = path.substring(path.lastIndexOf('.')).toLowerCase();
       if (imageExtensions.includes(ext)) {
-        const data = await fileObj.async('arraybuffer');
-        const blob = new Blob([data]);
-        const dataUrl = URL.createObjectURL(blob);
-
-        // Get dimensions
-        const dims = await getImageDimensions(data);
-
-        images.push({
-          path: path,
-          name: path.split('/').pop(),
-          dataUrl: dataUrl,
-          width: dims.width,
-          height: dims.height
-        });
+        allImages.push(path);
       }
+    }
+    
+    // Try to get images in reading order from OPF spine
+    let orderedImages = [];
+    try {
+      // Find OPF file
+      let opfPath = null;
+      zip.forEach(p => { if (p.toLowerCase().endsWith('.opf')) opfPath = p; });
+      
+      if (opfPath) {
+        const opfContent = await zip.files[opfPath].async('string');
+        const opfDir = opfPath.includes('/') ? opfPath.substring(0, opfPath.lastIndexOf('/')) : '';
+        
+        // Parse manifest to get id -> href mapping
+        const manifest = {};
+        const manifestRegex = /<item[^>]+id=["']([^"']+)["'][^>]+href=["']([^"']+)["'][^>]*>/gi;
+        let match;
+        while ((match = manifestRegex.exec(opfContent)) !== null) {
+          const id = match[1];
+          const href = match[2];
+          const fullPath = opfDir ? opfDir + '/' + href : href;
+          manifest[id] = fullPath;
+        }
+        // Also check reversed attribute order
+        const manifestRegex2 = /<item[^>]+href=["']([^"']+)["'][^>]+id=["']([^"']+)["'][^>]*>/gi;
+        while ((match = manifestRegex2.exec(opfContent)) !== null) {
+          const href = match[1];
+          const id = match[2];
+          const fullPath = opfDir ? opfDir + '/' + href : href;
+          manifest[id] = fullPath;
+        }
+        
+        // Parse spine to get reading order
+        const spineOrder = [];
+        const spineRegex = /<itemref[^>]+idref=["']([^"']+)["'][^>]*>/gi;
+        while ((match = spineRegex.exec(opfContent)) !== null) {
+          const idref = match[1];
+          if (manifest[idref]) spineOrder.push(manifest[idref]);
+        }
+        
+        // For each spine item (XHTML), extract images in order
+        const seenImages = new Set();
+        for (const xhtmlPath of spineOrder) {
+          if (!zip.files[xhtmlPath]) continue;
+          const xhtmlContent = await zip.files[xhtmlPath].async('string');
+          const xhtmlDir = xhtmlPath.includes('/') ? xhtmlPath.substring(0, xhtmlPath.lastIndexOf('/')) : '';
+          
+          // Find all image references
+          const imgRegex = /(?:src|xlink:href)=["']([^"']+)["']/gi;
+          while ((match = imgRegex.exec(xhtmlContent)) !== null) {
+            let imgHref = match[1];
+            // Skip non-image references
+            if (!imageExtensions.some(ext => imgHref.toLowerCase().endsWith(ext))) continue;
+            
+            // Resolve relative path
+            let imgPath;
+            if (imgHref.startsWith('../')) {
+              // Go up from xhtmlDir
+              const parts = xhtmlDir.split('/');
+              parts.pop();
+              imgPath = parts.join('/') + '/' + imgHref.substring(3);
+            } else if (imgHref.startsWith('/')) {
+              imgPath = imgHref.substring(1);
+            } else {
+              imgPath = xhtmlDir ? xhtmlDir + '/' + imgHref : imgHref;
+            }
+            // Normalize path
+            imgPath = imgPath.replace(/\/+/g, '/');
+            
+            // Check if this is actually an image in our list
+            for (const realPath of allImages) {
+              if (realPath === imgPath || realPath.endsWith('/' + imgHref) || realPath.endsWith(imgHref)) {
+                if (!seenImages.has(realPath)) {
+                  seenImages.add(realPath);
+                  orderedImages.push(realPath);
+                }
+                break;
+              }
+            }
+          }
+        }
+        
+        // Add any remaining images that weren't in XHTML files (e.g., unused images)
+        for (const imgPath of allImages) {
+          if (!seenImages.has(imgPath)) {
+            orderedImages.push(imgPath);
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('Failed to parse reading order, using default:', e);
+    }
+    
+    // Fallback to alphabetical if parsing failed
+    if (orderedImages.length === 0) {
+      orderedImages = [...allImages].sort();
+    }
+    
+    // Load image data in order
+    const images = [];
+    for (const path of orderedImages) {
+      const data = await zip.files[path].async('arraybuffer');
+      const blob = new Blob([data]);
+      const dataUrl = URL.createObjectURL(blob);
+      
+      // Get dimensions
+      const dims = await getImageDimensions(data);
+      
+      images.push({
+        path: path,
+        name: path.split('/').pop(),
+        dataUrl: dataUrl,
+        width: dims.width,
+        height: dims.height
+      });
     }
 
     return images;
@@ -2112,7 +2214,15 @@
 
       // Build UI
       renderImageGrid();
-      countDisplay.textContent = `${images.length} image${images.length !== 1 ? 's' : ''}`;
+      
+      // Count selectable vs locked images
+      const selectableCount = images.filter(img => img.width > 480 || img.height > 800).length;
+      const lockedCount = images.length - selectableCount;
+      if (lockedCount > 0) {
+        countDisplay.textContent = `${images.length} images (${selectableCount} selectable, ${lockedCount} fit screen)`;
+      } else {
+        countDisplay.textContent = `${images.length} image${images.length !== 1 ? 's' : ''}`;
+      }
 
       // Show picker, hide upload button temporarily
       pickerSection.style.display = 'block';
@@ -2137,18 +2247,30 @@
     const stateClasses = ['state-0', 'state-1', 'state-2'];
 
     epubImagesCache.forEach(img => {
+      // Check if image already fits in 480x800 - no processing needed
+      const fitsInScreen = img.width <= 480 && img.height <= 800;
       const state = imageStates[img.path] || 0;
 
       const item = document.createElement('div');
-      item.className = `image-item ${stateClasses[state]}`;
-      item.onclick = () => cycleImageState(img.path);
-      item.title = `Click to cycle: ${stateLabels[state] || 'Normal'}`;
-
-      item.innerHTML = `
-        <span class="image-state-badge">${stateLabels[state] || '•'}</span>
-        <img src="${img.dataUrl}" alt="${img.name}" loading="lazy">
-        <div class="image-name">${img.name}</div>
-      `;
+      
+      if (fitsInScreen) {
+        item.className = 'image-item locked';
+        item.title = `${img.width}×${img.height} - Fits in 480×800, no processing needed`;
+        item.innerHTML = `
+          <span class="image-state-badge">✓</span>
+          <img src="${img.dataUrl}" alt="${img.name}" loading="lazy">
+          <div class="image-name">${img.name}</div>
+        `;
+      } else {
+        item.className = `image-item ${stateClasses[state]}`;
+        item.onclick = () => cycleImageState(img.path);
+        item.title = `${img.width}×${img.height} - Click to cycle: ${stateLabels[state] || 'Normal'}`;
+        item.innerHTML = `
+          <span class="image-state-badge">${stateLabels[state] || '•'}</span>
+          <img src="${img.dataUrl}" alt="${img.name}" loading="lazy">
+          <div class="image-name">${img.name}</div>
+        `;
+      }
 
       imageGrid.appendChild(item);
     });
@@ -2207,6 +2329,8 @@
 
   // Initialize quality settings handlers
   document.addEventListener('DOMContentLoaded', function() {
+    debugLog('DOM fully loaded');
+    checkRequiredElements();
     const qualitySlider = document.getElementById('qualitySlider');
     const qualityInput = document.getElementById('qualityInput');
 
@@ -2221,7 +2345,8 @@
 
     if (qualitySlider && qualityInput) {
       // Initialize converter variables with UI default values
-      updateQualitySettings();
+      console.log('[CALL] updateQualitySettings triggered from event handler');
+    updateQualitySettings();
 
       // Deselect all presets when slider is manually changed
       const deselectPresets = function() {
@@ -2233,14 +2358,16 @@
       qualitySlider.oninput = function() {
         qualityInput.value = this.value;
         deselectPresets();
-        updateQualitySettings();
+        console.log('[CALL] updateQualitySettings triggered from event handler');
+    updateQualitySettings();
       };
       qualityInput.onchange = function() {
         let v = Math.max(1, Math.min(95, parseInt(this.value, 10) || 85));
         this.value = v;
         qualitySlider.value = v;
         deselectPresets();
-        updateQualitySettings();
+        console.log('[CALL] updateQualitySettings triggered from event handler');
+    updateQualitySettings();
       };
       qualityInput.onblur = function() {
         this.value = qualitySlider.value;
@@ -2347,11 +2474,8 @@
   function validateFile() {
     const fileInput = document.getElementById('fileInput');
     const uploadBtn = document.getElementById('uploadBtn');
-    const convertOptions = document.getElementById('convertOptions');
-
-    if (!fileInput || !uploadBtn || !convertOptions) return;
-
     const files = fileInput.files;
+    const convertOptions = document.getElementById('convertOptions');
 
     // Show/hide convert options based on file selection
     if (files.length > 0) {
@@ -2535,8 +2659,9 @@ function logImage(name, origW, origH, origFormat, origSize, newW, newH, newSize,
     // Build parts detail string
     let partsDetail = '';
     if (partsInfo && partsInfo.length > 0) {
+      const baseName = name.replace(/\.[^.]+$/, '');
       partsDetail = partsInfo.map(p =>
-        `${p.name} (${p.width}×${p.height}, ${formatBytes(p.size)})`
+        `${baseName}${p.suffix}.jpg (${p.width}×${p.height}, ${formatBytes(p.size)})`
       ).join(', ');
     }
     const savedInfo = saved > 0 ? `, <span style="color:#27ae60">-${savedPct}%</span>` : '';
@@ -2796,17 +2921,26 @@ function fixSvgCover(content) {
 </html>`, fixed: true, count: 1 };
     }
 
-    // Search for SVG element with xlink:href
-    const svgs = doc.querySelectorAll('svg[*|href], svg[xlink\\:href]');
+    // Find SVG elements - check both standard and namespaced variants
     let imgHref = null;
-
+    const svgNS = 'http://www.w3.org/2000/svg';
+    const xlinkNS = 'http://www.w3.org/1999/xlink';
+    
+    // Try to find all SVG elements
+    const svgs = [
+      ...doc.getElementsByTagName('svg'),
+      ...doc.getElementsByTagNameNS(svgNS, 'svg'),
+      ...doc.getElementsByTagName('svg:svg')
+    ];
+    
     for (const svg of svgs) {
-      const imageEl = svg.querySelector('image[*|href]') ||
-                      svg.getElementsByTagNameNS('http://www.w3.org/2000/svg', 'image')[0] ||
-                      svg.getElementsByTagNameNS('*', 'image')[0];
-
+      // Find image element inside - try all variants
+      const imageEl = svg.getElementsByTagName('image')[0] ||
+                      svg.getElementsByTagNameNS(svgNS, 'image')[0] ||
+                      svg.getElementsByTagName('svg:image')[0];
+      
       if (imageEl) {
-        imgHref = imageEl.getAttributeNS('http://www.w3.org/1999/xlink', 'href') ||
+        imgHref = imageEl.getAttributeNS(xlinkNS, 'href') ||
                   imageEl.getAttribute('xlink:href') ||
                   imageEl.getAttribute('href');
         if (imgHref) break;
@@ -2863,13 +2997,28 @@ function fixSvgWrappedImages(content) {
       return { c: newContent, fixed: fixedCount > 0, count: fixedCount };
     }
 
-    // Find all SVGs with xlink:href
-    const svgs = doc.querySelectorAll('svg[*|href], svg[xlink\\:href]');
+    const svgNS = 'http://www.w3.org/2000/svg';
+    const xlinkNS = 'http://www.w3.org/1999/xlink';
+    
+    // Find all SVG elements - check both standard and namespaced variants
+    const allSvgs = [
+      ...doc.getElementsByTagName('svg'),
+      ...doc.getElementsByTagNameNS(svgNS, 'svg'),
+      ...doc.getElementsByTagName('svg:svg')
+    ];
+    
+    // Filter to unique, non-nested SVGs
     const uniqueSvgs = [];
-
-    // Filter to avoid processing nested SVGs
-    for (const svg of svgs) {
-      if (!uniqueSvgs.some(s => s.contains(svg))) {
+    for (const svg of allSvgs) {
+      let dominated = false;
+      for (const other of uniqueSvgs) {
+        if (other.contains(svg)) { dominated = true; break; }
+      }
+      if (!dominated) {
+        // Remove any existing that this one dominates
+        for (let i = uniqueSvgs.length - 1; i >= 0; i--) {
+          if (svg.contains(uniqueSvgs[i])) uniqueSvgs.splice(i, 1);
+        }
         uniqueSvgs.push(svg);
       }
     }
@@ -2879,14 +3028,14 @@ function fixSvgWrappedImages(content) {
     let fixedCount = 0;
 
     for (const svg of uniqueSvgs) {
-      // Find image element inside (with or without namespace)
-      const imageEl = svg.querySelector('image[*|href]') ||
-                      svg.getElementsByTagNameNS('http://www.w3.org/2000/svg', 'image')[0] ||
-                      svg.getElementsByTagNameNS('*', 'image')[0];
+      // Find image element inside - try all variants
+      const imageEl = svg.getElementsByTagName('image')[0] ||
+                      svg.getElementsByTagNameNS(svgNS, 'image')[0] ||
+                      svg.getElementsByTagName('svg:image')[0];
 
       if (!imageEl) continue;
 
-      const href = imageEl.getAttributeNS('http://www.w3.org/1999/xlink', 'href') ||
+      const href = imageEl.getAttributeNS(xlinkNS, 'href') ||
                   imageEl.getAttribute('xlink:href') ||
                   imageEl.getAttribute('href');
 
@@ -2904,14 +3053,29 @@ function fixSvgWrappedImages(content) {
       if (height) img.setAttribute('height', height);
 
       // Replace SVG with img
-      svg.parentNode.replaceChild(img, svg);
-      fixedCount++;
+      if (svg.parentNode) {
+        svg.parentNode.replaceChild(img, svg);
+        fixedCount++;
+      }
     }
 
     if (fixedCount === 0) return { c: content, fixed: false, count: 0 };
 
+    // Serialize and restore DOCTYPE/XML declaration
     const serializer = new XMLSerializer();
-    return { c: serializer.serializeToString(doc), fixed: true, count: fixedCount };
+    let result = serializer.serializeToString(doc);
+    
+    // Restore DOCTYPE if missing
+    const dtdMatch = content.match(/<!DOCTYPE[^>]*>/i);
+    const xmlMatch = content.match(/<\?xml[^?]*\?>/i);
+    if (dtdMatch && !result.includes('<!DOCTYPE')) {
+      result = result.replace(/(<html)/, dtdMatch[0] + '\n$1');
+    }
+    if (xmlMatch && !result.startsWith('<?xml')) {
+      result = xmlMatch[0] + '\n' + result;
+    }
+    
+    return { c: result, fixed: true, count: fixedCount };
 
   } catch (e) {
     // Fallback to regex
@@ -2984,250 +3148,6 @@ function applyGrayscale(ctx, width, height) {
   ctx.putImageData(imageData, 0, 0);
 }
 
-// ============================================================================
-// Better Crop: Calculate optimal scale size to minimize image splits
-// ============================================================================
-
-/**
- * Smart split calculation: balance between minimizing parts and maintaining reasonable part sizes
- * Strategy:
- * 1. First part: from start to maxDim+overlap
- * 2. Last part: from end backwards by maxDim+overlap
- * 3. If gap is small AND part sizes are reasonable, use 2 parts
- * 4. Otherwise, add middle parts as needed
- * @param {number} totalDimension - Total dimension to split (height or width)
- * @param {number} maxDim - Maximum dimension per part (480px)
- * @returns {Array} - Array of {start, end} positions for each part
- */
-function calculateSmartSplitPositions(totalDimension, maxDim, maxPartSizeOverride) {
-  const overlap = OVERLAP; // 0.05 (5%)
-  const overlapPx = Math.round(maxDim * overlap); // 24px
-
-  // Single part case
-  if (totalDimension <= maxDim) {
-    return [{ start: 0, end: totalDimension }];
-  }
-
-  // Check if we should use larger parts (for V-SPLIT with 2 cuts)
-  if (maxPartSizeOverride) {
-    const canFitIn2Parts = (totalDimension + overlapPx) <= (maxPartSizeOverride * 2);
-    if (canFitIn2Parts) {
-      // Use 2 parts with calculated size
-      const partSize = Math.ceil((totalDimension + overlapPx) / 2);
-      return [
-        { start: 0, end: partSize },
-        { start: partSize - overlapPx, end: totalDimension }
-      ];
-    }
-  }
-
-  // STANDARD: Use parts of exactly maxDim (480px) to fill screen
-  // Calculate minimum number of parts needed
-  // Start with base overlap (5%), increase if needed
-  const baseStep = maxDim - overlapPx; // 456px
-  let numParts = Math.ceil((totalDimension - maxDim) / baseStep) + 1;
-
-  // Calculate dynamic overlap needed for all parts to be maxDim
-  // Formula: overlapPx = (numParts * maxDim - totalDimension) / (numParts - 1)
-  let dynamicOverlapPx = Math.round((numParts * maxDim - totalDimension) / (numParts - 1));
-  const dynamicOverlapPct = (dynamicOverlapPx / maxDim * 100).toFixed(1);
-
-  console.log(`[Split] totalDim: ${totalDimension}, parts: ${numParts}, overlap: ${dynamicOverlapPx}px (${dynamicOverlapPct}%)`);
-
-  // Generate positions: each part is maxDim (480px) with dynamic overlap
-  const step = maxDim - dynamicOverlapPx;
-  const positions = [];
-  for (let i = 0; i < numParts; i++) {
-    const start = i * step;
-    const end = Math.min(start + maxDim, totalDimension);
-
-    if (start < totalDimension) {
-      positions.push({ start, end });
-    }
-  }
-
-  // Ensure last part ends exactly at totalDimension
-  if (positions.length > 0 && positions[positions.length - 1].end !== totalDimension) {
-    positions[positions.length - 1].end = totalDimension;
-  }
-
-  return positions;
-}
-
-/**
- * Analyze overlap vs unique content to determine if we should reduce parts
- * @param {Array} positions - Array of {start, end} split positions
- * @param {number} totalDimension - Total dimension being split
- * @returns {object} - { overlapTotal, uniqueContent, shouldReduceParts, optimalPartCount }
- */
-function calculateOverlapAnalysis(positions, totalDimension) {
-  if (positions.length <= 1) {
-    return { overlapTotal: 0, uniqueContent: totalDimension, shouldReduceParts: false, optimalPartCount: 1 };
-  }
-
-  // Calculate overlap between adjacent parts
-  let overlapTotal = 0;
-  for (let i = 0; i < positions.length - 1; i++) {
-    const currentEnd = positions[i].end;
-    const nextStart = positions[i + 1].start;
-    const overlap = Math.max(0, currentEnd - nextStart);
-    overlapTotal += overlap;
-  }
-
-  const uniqueContent = totalDimension - overlapTotal;
-
-  // DEBUG: Log overlap analysis
-  console.log(`[Overlap Analysis] totalDim: ${totalDimension}, parts: ${positions.length}, overlap: ${overlapTotal}, unique: ${uniqueContent}, ratio: ${(overlapTotal / uniqueContent).toFixed(2)}`);
-
-  // Only reduce parts if overlap is significantly larger than unique content
-  // This prevents reducing when overlap is only slightly larger (which causes loss of information)
-  const shouldReduceParts = overlapTotal > (uniqueContent * 1.5);
-
-  if (shouldReduceParts) {
-    console.log(`[Overlap Analysis] REDUCING from ${positions.length} to ${positions.length === 3 ? 2 : positions.length - 1} parts`);
-  }
-
-  // Calculate optimal part count when reducing
-  // For 3 parts: reduce to 2
-  // For 4+ parts: reduce to (N-1)
-  let optimalPartCount;
-  if (positions.length === 3) {
-    optimalPartCount = 2;
-  } else if (positions.length >= 4) {
-    optimalPartCount = positions.length - 1; // Reduce by 1
-  } else {
-    optimalPartCount = positions.length;
-  }
-
-  return {
-    overlapTotal,
-    uniqueContent,
-    shouldReduceParts,
-    optimalPartCount
-  };
-}
-
-/**
- * Calculate split positions with overlap analysis
- * Returns either the original positions or reduced positions based on overlap
- * @param {number} totalDimension - Total dimension to split
- * @param {number} maxDim - Maximum dimension per part (480px)
- * @param {number} maxPartSizeOverride - Optional override for max part size
- * @returns {Array} - Array of {start, end} positions
- */
-function calculateOptimalSplitWithOverlapAnalysis(totalDimension, maxDim, maxPartSizeOverride) {
-  // Get initial split positions
-  const positions = calculateSmartSplitPositions(totalDimension, maxDim, maxPartSizeOverride);
-
-  // Analyze overlap vs unique content
-  const analysis = calculateOverlapAnalysis(positions, totalDimension);
-
-  // Case 1: If we have 2 parts but there's a GAP (parts don't touch), add a third part
-  // Check if there's a gap between parts (part2.start > part1.end)
-  const hasGap = positions.length === 2 && (positions[1].start > positions[0].end);
-
-  if (hasGap) {
-    const gapSize = positions[1].start - positions[0].end;
-    console.log(`[Overlap Analysis] DETECTED GAP: ${gapSize}px gap between parts. Adding 3rd part.`);
-
-    const overlap = OVERLAP; // 0.05 (5%)
-    const overlapPx = Math.round(maxDim * overlap);
-    const newPartCount = 3;
-
-    // Calculate part size WITH overlap included
-    // We want: partSize * newPartCount - overlapPx * (newPartCount - 1) = totalDimension
-    // Therefore: partSize = (totalDimension + overlapPx * (newPartCount - 1)) / newPartCount
-    const partSize = Math.ceil((totalDimension + overlapPx * (newPartCount - 1)) / newPartCount);
-
-    const newPositions = [];
-    for (let i = 0; i < newPartCount; i++) {
-      const start = i * (partSize - overlapPx);
-      const end = Math.min(start + partSize, totalDimension);
-
-      if (start < totalDimension) {
-        newPositions.push({ start, end });
-      }
-    }
-
-    return newPositions;
-  }
-
-  // Case 2: If overlap > unique content, reduce parts
-  if (analysis.shouldReduceParts && positions.length > 2) {
-    console.log(`[Overlap Analysis] REDUCING from ${positions.length} to ${analysis.optimalPartCount} parts`);
-
-    // Calculate new positions with fewer parts
-    // 3 parts → 2 parts, 4+ parts → (N-1) parts
-    // IMPORTANT: Maintain overlap to avoid losing information
-    const newPartCount = analysis.optimalPartCount;
-    const overlap = OVERLAP; // 0.05 (5%)
-    const overlapPx = Math.round(maxDim * overlap);
-
-    // Calculate part size considering overlap
-    // We want each part to be maxDim (480px) with overlap
-    // Formula: partSize + overlapPx for each additional part
-    const totalOverlap = overlapPx * (newPartCount - 1);
-    const partSize = Math.ceil((totalDimension - totalOverlap) / newPartCount);
-
-    const newPositions = [];
-    for (let i = 0; i < newPartCount; i++) {
-      const start = i * (partSize - overlapPx);
-      const end = Math.min(start + partSize, totalDimension);
-
-      // Ensure we don't have negative overlap (parts too small)
-      if (start < totalDimension) {
-        newPositions.push({ start, end });
-      }
-    }
-
-    return newPositions;
-  }
-
-  return positions;
-}
-
-/**
- * Calculate optimal scale size - accept 3 parts for very long images rather than reduce too much
- * @param {number} estimatedScaledDimension - The estimated dimension after scaling
- * @returns {object} - { scaleSize, overlapPx, estimatedParts }
- */
-function calculateOptimalScaleParams(estimatedScaledDimension) {
-  const maxDim = MAX_WIDTH; // 480
-  const overlap = OVERLAP; // 0.05 (5%)
-  const overlapPx = Math.round(maxDim * overlap); // 24px
-  const step = maxDim - overlapPx; // 456px
-
-  // Calculate how many parts with smart positioning
-  const positions = calculateSmartSplitPositions(estimatedScaledDimension, maxDim);
-  const estimatedParts = positions.length;
-
-  // Keep scale at MAX_HEIGHT (800px) - let smart split handle the number of parts
-  // Only reduce scale if we would generate 4+ parts
-  let targetScaleSize = MAX_HEIGHT; // 800 by default
-
-  if (estimatedParts >= 4) {
-    // For very long images, reduce scale moderately
-    // Target: 3 parts max
-    const targetParts = 3;
-    const idealPartSize = estimatedScaledDimension / targetParts;
-    const maxPartSize = maxDim + overlapPx; // Maximum reasonable part size
-
-    if (idealPartSize > maxPartSize) {
-      targetScaleSize = Math.round(MAX_HEIGHT * (maxPartSize / idealPartSize));
-      // Ensure we don't go too small (minimum 70% of MAX_HEIGHT)
-      targetScaleSize = Math.max(Math.round(MAX_HEIGHT * 0.70), targetScaleSize);
-    }
-  }
-
-  return {
-    scaleSize: targetScaleSize,
-    overlap: overlap,
-    overlapPx: overlapPx,
-    step: step,
-    estimatedParts: estimatedParts
-  };
-}
-
 // Process single image - returns array of {data, suffix} objects
 const IMAGE_LOAD_TIMEOUT_MS = 30000; // 30 second timeout for image loading
 async function processImage(data, imageState = 0, imagePath = '') {
@@ -3246,62 +3166,21 @@ async function processImage(data, imageState = 0, imagePath = '') {
       URL.revokeObjectURL(url);
       const origW = img.width, origH = img.height;
 
-      // imageState: 0=Normal, 1=H-Split, 2=V-Split
-      // Use manual state if set, otherwise fall back to auto mode
-      let effectiveImageState = imageState;
-
-      // In baseline mode, force V-Split for images that exceed screen dimensions
-      if (ROTATE_CROP_MODE === 'baseline' && (img.width > MAX_WIDTH || img.height > MAX_HEIGHT)) {
-        effectiveImageState = 2; // Force V-Split
-      }
-
-      const useManualState = effectiveImageState !== 0;
-
-      // Check if Light Novel Mode should apply (only for auto mode)
-      const isHorizontal = origW > origH;
-      const exceedsScreen = origW > MAX_WIDTH || origH > MAX_HEIGHT;
-      const needsRotation = !useManualState && isHorizontal && exceedsScreen && ENABLE_LIGHT_NOVEL_MODE && ROTATE_CROP_MODE !== 'manual_picker';
-
-      // Baseline mode: Always use V-Split for images that exceed screen dimensions
-      const baselineMode = !useManualState && ROTATE_CROP_MODE === 'baseline';
-      const needsVerticalSplit = baselineMode && exceedsScreen;
-
+      // imageState: 0=Normal, 1=H-Split (CW/CCW), 2=V-Split
       // ========================================================================
-      // STATE 1: H-Split (Horizontal Split)
-      // Scale width to 800px, cut horizontally if height > 480px, rotate 90° CW
+      // STATE 1: H-Split (Rotate + Split) - EXACT COPY FROM index.html
+      // Step 1: Scale WIDTH to 800px (keep aspect ratio)
+      // Step 2: Rotate 90° CW or CCW based on HANDEDNESS
+      // Step 3: If WIDTH > 480, split vertically with overlap
       // ========================================================================
-      if (effectiveImageState === 1) {
-        // Better Crop: Calculate optimal scale parameters to minimize splits
-        const estimatedScaledH = Math.round(origH * (MAX_HEIGHT / origW));
-        const cropParams = calculateOptimalScaleParams(estimatedScaledH);
-
-        // Check overlap analysis to determine if we should reduce parts
-        const preliminaryPositions = calculateSmartSplitPositions(estimatedScaledH, MAX_WIDTH);
-        const overlapAnalysis = calculateOverlapAnalysis(preliminaryPositions, estimatedScaledH);
-
-        // Step 1: Scale width using optimal scale size
-        // If parts will be reduced, scale to make each part 480px wide after rotation
-        let scale;
-        let scaledW;
-        let scaledH;
-
-        if (overlapAnalysis.shouldReduceParts && preliminaryPositions.length > 2) {
-          // Reduce parts: scale so each part is 480px wide after rotation
-          // After rotation, width = part height. So we want part height = 480px.
-          // With fewer parts, each part is taller
-          const numReducedParts = overlapAnalysis.optimalPartCount;
-          const targetPartHeight = MAX_WIDTH; // 480px
-          const targetTotalHeight = numReducedParts * targetPartHeight;
-          scale = targetTotalHeight / origH;
-          scaledW = Math.round(origW * scale);
-          scaledH = targetTotalHeight;
-        } else {
-          // Use normal scale
-          scale = cropParams.scaleSize / origW;
-          scaledW = cropParams.scaleSize;
-          scaledH = Math.round(origH * scale);
-        }
-
+      if (imageState === 1) {
+        const overlap = OVERLAP;
+        
+        // Step 1: Scale WIDTH to 800 (this is the key difference!)
+        const scale = MAX_HEIGHT / origW;  // 800 / origW
+        const scaledW = MAX_HEIGHT;  // 800
+        const scaledH = Math.round(origH * scale);
+        
         const scaledCanvas = document.createElement('canvas');
         scaledCanvas.width = scaledW;
         scaledCanvas.height = scaledH;
@@ -3311,33 +3190,34 @@ async function processImage(data, imageState = 0, imagePath = '') {
         scaledCtx.fillStyle = '#FFF';
         scaledCtx.fillRect(0, 0, scaledW, scaledH);
         scaledCtx.drawImage(img, 0, 0, origW, origH, 0, 0, scaledW, scaledH);
-
-        // Step 2: Check if we need to cut horizontally (if height > MAX_WIDTH)
-        if (scaledH <= MAX_WIDTH) {
-          // No horizontal cut needed - just rotate the whole image based on handedness
-          const isClockwise = HANDEDNESS === 'right';
-          const rotW = scaledH;
-          const rotH = scaledW;
-
-          const rotCanvas = document.createElement('canvas');
-          rotCanvas.width = rotW;
-          rotCanvas.height = rotH;
-          const rotCtx = rotCanvas.getContext('2d');
-          rotCtx.fillStyle = '#FFF';
-          rotCtx.fillRect(0, 0, rotW, rotH);
-
-          if (isClockwise) {
-            // Rotate 90° clockwise (right-handed)
-            rotCtx.translate(rotW, 0);
-            rotCtx.rotate(Math.PI / 2);
-          } else {
-            // Rotate 90° counter-clockwise (left-handed)
-            rotCtx.translate(0, rotH);
-            rotCtx.rotate(-Math.PI / 2);
-          }
-          rotCtx.drawImage(scaledCanvas, 0, 0);
-          applyGrayscale(rotCtx, rotW, rotH);
-
+        
+        // Step 2: Rotate 90° CW or CCW
+        const rotW = scaledH;
+        const rotH = scaledW;  // 800
+        
+        const rotCanvas = document.createElement('canvas');
+        rotCanvas.width = rotW;
+        rotCanvas.height = rotH;
+        const rotCtx = rotCanvas.getContext('2d');
+        rotCtx.fillStyle = '#FFF';
+        rotCtx.fillRect(0, 0, rotW, rotH);
+        
+        const isClockwise = HANDEDNESS === 'right';
+        if (isClockwise) {
+          // Rotate 90° CW
+          rotCtx.translate(rotW, 0);
+          rotCtx.rotate(Math.PI / 2);
+        } else {
+          // Rotate 90° CCW
+          rotCtx.translate(0, rotH);
+          rotCtx.rotate(-Math.PI / 2);
+        }
+        rotCtx.drawImage(scaledCanvas, 0, 0);
+        rotCtx.setTransform(1, 0, 0, 1, 0, 0); // Reset transform
+        applyGrayscale(rotCtx, rotW, rotH);
+        
+        // Step 3: If WIDTH > 480, split vertically
+        if (rotW <= MAX_WIDTH) {
           const blob = await new Promise(res => rotCanvas.toBlob(res, 'image/jpeg', JPEG_QUALITY / 100));
           const arrBuf = await blob.arrayBuffer();
           resolve({
@@ -3345,373 +3225,300 @@ async function processImage(data, imageState = 0, imagePath = '') {
             meta: { origW, origH, origSize, wasSplit: false, rotated: true, finalW: rotW, finalH: rotH, finalSize: arrBuf.byteLength, imageState: 1 }
           });
         } else {
-          // Smart split: prioritize first and last parts, minimize middle parts
-          const parts = [];
-          const maxH = MAX_WIDTH;  // 480
-          const overlapPx = cropParams.overlapPx;
-          const isClockwise = HANDEDNESS === 'right';
-
-          // Calculate smart split positions with overlap analysis
-          const splitPositions = calculateOptimalSplitWithOverlapAnalysis(scaledH, maxH);
-          const numParts = splitPositions.length;
-
-          for (let i = 0; i < numParts; i++) {
-            const pos = splitPositions[i];
-            const y = pos.start;
-            const partH = pos.end - pos.start;
-
-            // Extract horizontal strip
-            const partCanvas = document.createElement('canvas');
-            partCanvas.width = scaledW;
-            partCanvas.height = partH;
-            const partCtx = partCanvas.getContext('2d');
-            partCtx.drawImage(scaledCanvas, 0, y, scaledW, partH, 0, 0, scaledW, partH);
-
-            // Rotate this strip based on handedness
-            const rotW = partH;
-            const rotH = scaledW;
-
-            const rotCanvas = document.createElement('canvas');
-            rotCanvas.width = rotW;
-            rotCanvas.height = rotH;
-            const rotCtx = rotCanvas.getContext('2d');
-            rotCtx.fillStyle = '#FFF';
-            rotCtx.fillRect(0, 0, rotW, rotH);
-
-            if (isClockwise) {
-              // Rotate 90° clockwise (right-handed)
-              rotCtx.translate(rotW, 0);
-              rotCtx.rotate(Math.PI / 2);
-            } else {
-              // Rotate 90° counter-clockwise (left-handed)
-              rotCtx.translate(0, rotH);
-              rotCtx.rotate(-Math.PI / 2);
-            }
-            rotCtx.drawImage(partCanvas, 0, 0);
-            applyGrayscale(rotCtx, rotW, rotH);
-
-            const blob = await new Promise(res => rotCanvas.toBlob(res, 'image/jpeg', JPEG_QUALITY / 100));
-            const arrBuf = await blob.arrayBuffer();
-            parts.push({ data: arrBuf, suffix: `_part${i + 1}`, width: rotW, height: rotH, size: arrBuf.byteLength });
-          }
-
-          const totalSize = parts.reduce((sum, p) => sum + p.size, 0);
-          resolve({
-            parts: parts,
-            meta: { origW, origH, origSize, wasSplit: true, rotated: true, splitCount: numParts, splitDirection: 'horizontal', finalW: parts[0].width, finalH: parts[0].height, finalSize: totalSize, imageState: 1 }
-          });
-        }
-      }
-      // ========================================================================
-      // STATE 2: V-Split (Vertical Split)
-      // Scale height to 800px, cut vertically if width > 480px, NO rotation
-      // ========================================================================
-      else if (effectiveImageState === 2) {
-        // Better Crop: Calculate optimal scale parameters to minimize splits
-        const estimatedScaledW = Math.round(origW * (MAX_HEIGHT / origH));
-        const cropParams = calculateOptimalScaleParams(estimatedScaledW);
-
-        // Check overlap analysis to determine if we should reduce parts
-        // V-SPLIT: Use larger max part size (560px) to allow 2 cuts for wider images
-        const preliminaryPositions = calculateSmartSplitPositions(estimatedScaledW, MAX_WIDTH, 560);
-        const overlapAnalysis = calculateOverlapAnalysis(preliminaryPositions, estimatedScaledW);
-
-        // Step 1: Scale height using optimal scale size
-        // If parts will be reduced, scale to make each part 480px wide
-        let scale;
-        let scaledW;
-        let scaledH;
-
-        if (overlapAnalysis.shouldReduceParts && preliminaryPositions.length > 2) {
-          // Reduce parts: scale so each part is 480px wide
-          // With fewer parts, each part is wider
-          const numReducedParts = overlapAnalysis.optimalPartCount;
-          const targetPartWidth = MAX_WIDTH; // 480px
-          const targetTotalWidth = numReducedParts * targetPartWidth;
-          scale = targetTotalWidth / origW;
-          scaledW = targetTotalWidth;
-          scaledH = Math.round(origH * scale);
-        } else {
-          // Use normal scale
-          scale = cropParams.scaleSize / origH;
-          scaledW = Math.round(origW * scale);
-          scaledH = cropParams.scaleSize;
-        }
-
-        const scaledCanvas = document.createElement('canvas');
-        scaledCanvas.width = scaledW;
-        scaledCanvas.height = scaledH;
-        const scaledCtx = scaledCanvas.getContext('2d');
-        scaledCtx.imageSmoothingEnabled = true;
-        scaledCtx.imageSmoothingQuality = 'high';
-        scaledCtx.fillStyle = '#FFF';
-        scaledCtx.fillRect(0, 0, scaledW, scaledH);
-        scaledCtx.drawImage(img, 0, 0, origW, origH, 0, 0, scaledW, scaledH);
-        applyGrayscale(scaledCtx, scaledW, scaledH);
-
-        // Step 2: Check if we need to cut vertically (if width > MAX_WIDTH)
-        if (scaledW <= MAX_WIDTH) {
-          // No vertical cut needed
-          const blob = await new Promise(res => scaledCanvas.toBlob(res, 'image/jpeg', JPEG_QUALITY / 100));
-          const arrBuf = await blob.arrayBuffer();
-          resolve({
-            parts: [{ data: arrBuf, suffix: '', width: scaledW, height: scaledH, size: arrBuf.byteLength }],
-            meta: { origW, origH, origSize, wasSplit: false, rotated: false, finalW: scaledW, finalH: scaledH, finalSize: arrBuf.byteLength, imageState: 2 }
-          });
-        } else {
-          // Smart split: prioritize first and last parts, minimize middle parts
+          // Split by WIDTH (vertical cuts) - from RIGHT to LEFT for CW, LEFT to RIGHT for CCW
           const parts = [];
           const maxW = MAX_WIDTH;  // 480
-          const overlapPx = cropParams.overlapPx;
-
-          // Calculate smart split positions with overlap analysis
-          // V-SPLIT: Use larger max part size (560px) to allow 2 cuts for wider images
-          const splitPositions = calculateOptimalSplitWithOverlapAnalysis(scaledW, maxW, 560);
-          const numParts = splitPositions.length;
-
+          const overlapPx = Math.round(maxW * overlap);
+          const step = maxW - overlapPx;
+          const numParts = Math.ceil((rotW - overlapPx) / step);
+          
+          // Calculate all x positions first to ensure consistency
+          const positions = [];
           for (let i = 0; i < numParts; i++) {
-            const pos = splitPositions[i];
-            const x = pos.start;
-            const partW = pos.end - pos.start;
-
-            const partCanvas = document.createElement('canvas');
-            partCanvas.width = partW;
-            partCanvas.height = scaledH;
-            const partCtx = partCanvas.getContext('2d');
-            partCtx.drawImage(scaledCanvas, x, 0, partW, scaledH, 0, 0, partW, scaledH);
-
-            const blob = await new Promise(res => partCanvas.toBlob(res, 'image/jpeg', JPEG_QUALITY / 100));
-            const arrBuf = await blob.arrayBuffer();
-            parts.push({ data: arrBuf, suffix: `_part${i + 1}`, width: partW, height: scaledH, size: arrBuf.byteLength });
+            let x;
+            if (isClockwise) {
+              // CW: right to left - start from right edge
+              x = rotW - maxW - (i * step);
+            } else {
+              // CCW: left to right - start from left edge
+              x = i * step;
+            }
+            // Clamp to valid range
+            x = Math.max(0, Math.min(x, rotW - maxW));
+            positions.push(x);
           }
-
-          const totalSize = parts.reduce((sum, p) => sum + p.size, 0);
-          resolve({
-            parts: parts,
-            meta: { origW, origH, origSize, wasSplit: true, rotated: false, splitCount: numParts, splitDirection: 'vertical', finalW: parts[0].width, finalH: parts[0].height, finalSize: totalSize, imageState: 2 }
-          });
-        }
-      }
-      // ========================================================================
-      // STATE 2: Baseline Mode - Vertical Split
-      // Scale height to 800px, cut vertically if width > 480px, NO rotation
-      // ========================================================================
-      else if (needsVerticalSplit) {
-        // Scale height to MAX_HEIGHT (800px)
-        const scale = MAX_HEIGHT / origH;
-        const scaledW = Math.round(origW * scale);
-        const scaledH = MAX_HEIGHT;
-
-        const scaledCanvas = document.createElement('canvas');
-        scaledCanvas.width = scaledW;
-        scaledCanvas.height = scaledH;
-        const scaledCtx = scaledCanvas.getContext('2d');
-        scaledCtx.imageSmoothingEnabled = true;
-        scaledCtx.imageSmoothingQuality = 'high';
-        scaledCtx.fillStyle = '#FFF';
-        scaledCtx.fillRect(0, 0, scaledW, scaledH);
-        scaledCtx.drawImage(img, 0, 0, origW, origH, 0, 0, scaledW, scaledH);
-        applyGrayscale(scaledCtx, scaledW, scaledH);
-
-        // Split vertically if needed
-        if (scaledW > MAX_WIDTH) {
-          // Use 3 parts for baseline mode
-          const partW = Math.ceil(scaledW / 3);
-          const parts = [];
-
-          for (let i = 0; i < 3; i++) {
-            const x = i * partW;
-            const actualPartW = Math.min(partW, scaledW - x);
-
-            const partCanvas = document.createElement('canvas');
-            partCanvas.width = actualPartW;
-            partCanvas.height = scaledH;
-            const partCtx = partCanvas.getContext('2d');
-            partCtx.drawImage(scaledCanvas, x, 0, actualPartW, scaledH, 0, 0, actualPartW, scaledH);
-
-            const blob = await new Promise(res => partCanvas.toBlob(res, 'image/jpeg', JPEG_QUALITY / 100));
-            const arrBuf = await blob.arrayBuffer();
-            parts.push({ data: arrBuf, suffix: `_part${i + 1}`, width: actualPartW, height: scaledH, size: arrBuf.byteLength });
+          
+          // Ensure first and last positions are at edges
+          if (isClockwise) {
+            positions[0] = rotW - maxW; // First part at right edge
+            positions[numParts - 1] = 0; // Last part at left edge
+          } else {
+            positions[0] = 0; // First part at left edge
+            positions[numParts - 1] = rotW - maxW; // Last part at right edge
           }
-
-          const totalSize = parts.reduce((sum, p) => sum + p.size, 0);
-          log(`[SPLIT] ${imagePath} [┃V] (${origW}×${origH} JPG, ${formatBytes(origSize)}) → ${parts.length} parts`, path, 'CONVERT');
-
-          resolve({
-            parts: parts,
-            meta: { origW, origH, origSize, wasSplit: true, rotated: false, splitCount: 3, splitDirection: 'vertical', finalW: parts[0].width, finalH: parts[0].height, finalSize: totalSize, imageState: 2 }
-          });
-        } else {
-          // No split needed
-          const blob = await new Promise(res => scaledCanvas.toBlob(res, 'image/jpeg', JPEG_QUALITY / 100));
-          const arrBuf = await blob.arrayBuffer();
-          resolve({
-            parts: [{ data: arrBuf, suffix: '', width: scaledW, height: scaledH, size: arrBuf.byteLength }],
-            meta: { origW, origH, origSize, wasSplit: false, rotated: false, finalW: scaledW, finalH: scaledH, finalSize: arrBuf.byteLength, imageState: 2 }
-          });
-        }
-      }
-      // ========================================================================
-      // STATE 0 (Normal) or Auto Mode
-      // Use existing logic: Auto Light Novel Mode or normal scaling
-      // ========================================================================
-      else if (needsRotation) {
-        // LIGHT NOVEL MODE: Rotate and split wide images
-        // Better Crop: Calculate optimal scale parameters to minimize splits
-        const estimatedScaledH = Math.round(origH * (MAX_HEIGHT / origW));
-
-        // Check overlap analysis to determine if we should reduce parts
-        // After rotation, width = scaledH, so we analyze based on that
-        const preliminaryPositions = calculateSmartSplitPositions(estimatedScaledH, MAX_WIDTH);
-        const overlapAnalysis = calculateOverlapAnalysis(preliminaryPositions, estimatedScaledH);
-
-        const cropParams = calculateOptimalScaleParams(estimatedScaledH);
-
-        // Step 1: Scale WIDTH using optimal scale size
-        // If parts will be reduced, scale to make each part 480px wide after rotation
-        let scale;
-        let scaledW;
-        let scaledH;
-
-        if (overlapAnalysis.shouldReduceParts && preliminaryPositions.length > 2) {
-          // Reduce parts: scale so each part is 480px wide after rotation
-          // After rotation, width = scaledH. So we want scaledH to result in 480px parts.
-          const numReducedParts = overlapAnalysis.optimalPartCount;
-          const targetPartWidth = MAX_WIDTH; // 480px
-          const targetTotalWidth = numReducedParts * targetPartWidth;
-          // After rotation, rotW = scaledH, so we need scaledH = targetTotalWidth
-          scale = targetTotalWidth / origH;
-          scaledW = Math.round(origW * scale);
-          scaledH = targetTotalWidth;
-        } else {
-          // Use normal scale
-          scale = cropParams.scaleSize / origW;
-          scaledW = cropParams.scaleSize;
-          scaledH = Math.round(origH * scale);
-        }
-
-        const scaledCanvas = document.createElement('canvas');
-        scaledCanvas.width = scaledW;
-        scaledCanvas.height = scaledH;
-        const scaledCtx = scaledCanvas.getContext('2d');
-        scaledCtx.imageSmoothingEnabled = true;
-        scaledCtx.imageSmoothingQuality = 'high';
-        scaledCtx.fillStyle = '#FFF';
-        scaledCtx.fillRect(0, 0, scaledW, scaledH);
-        scaledCtx.drawImage(img, 0, 0, origW, origH, 0, 0, scaledW, scaledH);
-
-        // Step 2: Rotate based on handedness
-        // Right-handed (clockwise): rotate 90° CW
-        // Left-handed (counter-clockwise): rotate 90° CCW
-        const isClockwise = HANDEDNESS === 'right';
-        const rotW = scaledH;  // After rotation, width becomes original height
-        const rotH = scaledW;  // After rotation, height becomes original width (800)
-
-        const rotCanvas = document.createElement('canvas');
-        rotCanvas.width = rotW;
-        rotCanvas.height = rotH;
-        const rotCtx = rotCanvas.getContext('2d');
-        rotCtx.fillStyle = '#FFF';
-        rotCtx.fillRect(0, 0, rotW, rotH);
-
-        if (isClockwise) {
-          // Rotate 90° clockwise (right-handed)
-          rotCtx.translate(rotW, 0);
-          rotCtx.rotate(Math.PI / 2);
-          rotCtx.drawImage(scaledCanvas, 0, 0);
-        } else {
-          // Rotate 90° counter-clockwise (left-handed)
-          rotCtx.translate(0, rotH);
-          rotCtx.rotate(-Math.PI / 2);
-          rotCtx.drawImage(scaledCanvas, 0, 0);
-        }
-
-        applyGrayscale(rotCtx, rotW, rotH);
-
-        // Step 3: Split if width exceeds MAX_WIDTH (480px)
-        if (rotW <= MAX_WIDTH) {
-          // No split needed
-          const blob = await new Promise(res => rotCanvas.toBlob(res, 'image/jpeg', JPEG_QUALITY / 100));
-          const arrBuf = await blob.arrayBuffer();
-          resolve({
-            parts: [{ data: arrBuf, suffix: '', width: rotW, height: rotH, size: arrBuf.byteLength }],
-            meta: { origW, origH, origSize, wasSplit: false, rotated: true, finalW: rotW, finalH: rotH, finalSize: arrBuf.byteLength, imageState: 0 }
-          });
-        } else {
-          // Smart split: prioritize first and last parts, minimize middle parts
-          const parts = [];
-          const maxW = MAX_WIDTH;
-          const overlapPx = cropParams.overlapPx;
-
-          // Calculate smart split positions with overlap analysis
-          const splitPositions = calculateOptimalSplitWithOverlapAnalysis(rotW, maxW);
-          const numParts = splitPositions.length;
-
+          
           for (let i = 0; i < numParts; i++) {
-            const pos = splitPositions[i];
-            const x = pos.start;
-            const partW = pos.end - pos.start;
-
+            const x = positions[i];
+            const partW = maxW; // Always full width for consistency
+            
             const partCanvas = document.createElement('canvas');
             partCanvas.width = partW;
             partCanvas.height = rotH;
             const partCtx = partCanvas.getContext('2d');
+            // Clear canvas first
+            partCtx.fillStyle = '#FFFFFF';
+            partCtx.fillRect(0, 0, partW, rotH);
+            // Draw the slice
             partCtx.drawImage(rotCanvas, x, 0, partW, rotH, 0, 0, partW, rotH);
-
+            
             const blob = await new Promise(res => partCanvas.toBlob(res, 'image/jpeg', JPEG_QUALITY / 100));
             const arrBuf = await blob.arrayBuffer();
             parts.push({ data: arrBuf, suffix: `_part${i + 1}`, width: partW, height: rotH, size: arrBuf.byteLength });
           }
+          
           const totalSize = parts.reduce((sum, p) => sum + p.size, 0);
           resolve({
-            parts: parts,
-            meta: { origW, origH, origSize, wasSplit: true, rotated: true, splitCount: numParts, finalW: rotW, finalH: rotH, finalSize: totalSize, imageState: 0 }
+            parts,
+            meta: { origW, origH, origSize, wasSplit: true, splitCount: numParts, rotated: true, finalW: parts[0].width, finalH: parts[0].height, finalSize: totalSize, imageState: 1 }
           });
         }
-      } else {
-        // Normal processing: check if scaling is needed
-        const fitsInScreen = origW <= MAX_WIDTH && origH <= MAX_HEIGHT;
-
-        if (fitsInScreen) {
-          // Image already fits - just convert to JPEG with grayscale
-          const c = document.createElement('canvas');
-          c.width = origW;
-          c.height = origH;
-          const ctx = c.getContext('2d');
-          ctx.fillStyle = '#FFF';
-          ctx.fillRect(0, 0, origW, origH);
-          ctx.drawImage(img, 0, 0);
-          applyGrayscale(ctx, origW, origH);
-
-          const blob = await new Promise(res => c.toBlob(res, 'image/jpeg', JPEG_QUALITY / 100));
+      }
+      // ========================================================================
+      // STATE 2: V-Split (Vertical Split, no rotation) - EXACT COPY FROM index.html
+      // Step 1: Scale HEIGHT to fit 800px
+      // Step 2: If WIDTH > 480, split vertically with overlap
+      // ========================================================================
+      else if (imageState === 2) {
+        const overlap = OVERLAP;
+        
+        // First scale to fit height
+        let scaledW = origW, scaledH = origH;
+        if (origH > MAX_HEIGHT) {
+          const scale = MAX_HEIGHT / origH;
+          scaledW = Math.round(origW * scale);
+          scaledH = MAX_HEIGHT;
+        }
+        
+        const scaledCanvas = document.createElement('canvas');
+        scaledCanvas.width = scaledW;
+        scaledCanvas.height = scaledH;
+        const scaledCtx = scaledCanvas.getContext('2d');
+        scaledCtx.imageSmoothingEnabled = true;
+        scaledCtx.imageSmoothingQuality = 'high';
+        scaledCtx.fillStyle = '#FFF';
+        scaledCtx.fillRect(0, 0, scaledW, scaledH);
+        scaledCtx.drawImage(img, 0, 0, origW, origH, 0, 0, scaledW, scaledH);
+        applyGrayscale(scaledCtx, scaledW, scaledH);
+        
+        // Check if split needed
+        if (scaledW <= MAX_WIDTH) {
+          const blob = await new Promise(res => scaledCanvas.toBlob(res, 'image/jpeg', JPEG_QUALITY / 100));
           const arrBuf = await blob.arrayBuffer();
           resolve({
-            parts: [{ data: arrBuf, suffix: '', width: origW, height: origH, size: arrBuf.byteLength }],
-            meta: { origW, origH, origSize, wasSplit: false, rotated: false, finalW: origW, finalH: origH, finalSize: arrBuf.byteLength, imageState: 0 }
+            parts: [{ data: arrBuf, suffix: '', width: scaledW, height: scaledH, size: arrBuf.byteLength }],
+            meta: { origW, origH, origSize, wasSplit: false, rotated: false, finalW: scaledW, finalH: scaledH, finalSize: arrBuf.byteLength, imageState: 2 }
           });
         } else {
-          // Scale to fit 480x800
-          const scale = Math.min(MAX_WIDTH / origW, MAX_HEIGHT / origH);
-          const newW = Math.round(origW * scale);
-          const newH = Math.round(origH * scale);
-
-          const c = document.createElement('canvas');
-          c.width = newW;
-          c.height = newH;
-          const ctx = c.getContext('2d');
-          ctx.imageSmoothingEnabled = true;
-          ctx.imageSmoothingQuality = 'high';
-          ctx.fillStyle = '#FFF';
-          ctx.fillRect(0, 0, newW, newH);
-          ctx.drawImage(img, 0, 0, newW, newH);
-          applyGrayscale(ctx, newW, newH);
-
-          const blob = await new Promise(res => c.toBlob(res, 'image/jpeg', JPEG_QUALITY / 100));
-          const arrBuf = await blob.arrayBuffer();
+          // Split by WIDTH (vertical cuts) - LEFT to RIGHT (natural reading order)
+          const parts = [];
+          const maxW = MAX_WIDTH;
+          const overlapPx = Math.round(maxW * overlap);
+          const step = maxW - overlapPx;
+          const numParts = Math.ceil((scaledW - overlapPx) / step);
+          
+          // Calculate all x positions first to ensure consistency
+          const positions = [];
+          for (let i = 0; i < numParts; i++) {
+            let x = i * step;
+            // Clamp to valid range
+            x = Math.max(0, Math.min(x, scaledW - maxW));
+            positions.push(x);
+          }
+          // Ensure last position is at right edge
+          positions[0] = 0;
+          positions[numParts - 1] = scaledW - maxW;
+          
+          for (let i = 0; i < numParts; i++) {
+            const x = positions[i];
+            const partW = maxW; // Always full width for consistency
+            
+            const partCanvas = document.createElement('canvas');
+            partCanvas.width = partW;
+            partCanvas.height = scaledH;
+            const partCtx = partCanvas.getContext('2d');
+            // Clear canvas first
+            partCtx.fillStyle = '#FFFFFF';
+            partCtx.fillRect(0, 0, partW, scaledH);
+            // Draw the slice
+            partCtx.drawImage(scaledCanvas, x, 0, partW, scaledH, 0, 0, partW, scaledH);
+            
+            const blob = await new Promise(res => partCanvas.toBlob(res, 'image/jpeg', JPEG_QUALITY / 100));
+            const arrBuf = await blob.arrayBuffer();
+            parts.push({ data: arrBuf, suffix: `_part${i + 1}`, width: partW, height: scaledH, size: arrBuf.byteLength });
+          }
+          
+          const totalSize = parts.reduce((sum, p) => sum + p.size, 0);
           resolve({
-            parts: [{ data: arrBuf, suffix: '', width: newW, height: newH, size: arrBuf.byteLength }],
-            meta: { origW, origH, origSize, wasSplit: false, rotated: false, finalW: newW, finalH: newH, finalSize: arrBuf.byteLength, imageState: 0 }
+            parts,
+            meta: { origW, origH, origSize, wasSplit: true, splitCount: numParts, rotated: false, finalW: parts[0].width, finalH: parts[0].height, finalSize: totalSize, imageState: 2 }
           });
+        }
+      }
+      // ========================================================================
+      // STATE 0: Normal processing (scale to fit, no split)
+      // Also handles Light Novel Mode auto-rotation
+      // ========================================================================
+      else {
+        // Check if Light Novel Mode should apply (only for auto mode)
+        const isHorizontal = origW > origH;
+        const exceedsScreen = origW > MAX_WIDTH || origH > MAX_HEIGHT;
+        const needsRotation = isHorizontal && exceedsScreen && ENABLE_LIGHT_NOVEL_MODE && ROTATE_CROP_MODE !== 'manual_picker';
+
+        if (needsRotation) {
+          // Light Novel Mode auto-rotation - use EXACT same logic as STATE 1
+          const overlap = OVERLAP;
+          
+          // Scale WIDTH to 800 (same as H-Split)
+          const scale = MAX_HEIGHT / origW;  // 800 / origW
+          const scaledW = MAX_HEIGHT;  // 800
+          const scaledH = Math.round(origH * scale);
+          
+          const scaledCanvas = document.createElement('canvas');
+          scaledCanvas.width = scaledW;
+          scaledCanvas.height = scaledH;
+          const scaledCtx = scaledCanvas.getContext('2d');
+          scaledCtx.imageSmoothingEnabled = true;
+          scaledCtx.imageSmoothingQuality = 'high';
+          scaledCtx.fillStyle = '#FFF';
+          scaledCtx.fillRect(0, 0, scaledW, scaledH);
+          scaledCtx.drawImage(img, 0, 0, origW, origH, 0, 0, scaledW, scaledH);
+          
+          // Rotate 90 based on handedness
+          const rotW = scaledH;
+          const rotH = scaledW;  // 800
+          
+          const rotCanvas = document.createElement('canvas');
+          rotCanvas.width = rotW;
+          rotCanvas.height = rotH;
+          const rotCtx = rotCanvas.getContext('2d');
+          rotCtx.fillStyle = '#FFF';
+          rotCtx.fillRect(0, 0, rotW, rotH);
+          
+          const isClockwise = HANDEDNESS === 'right';
+          if (isClockwise) {
+            rotCtx.translate(rotW, 0);
+            rotCtx.rotate(Math.PI / 2);
+          } else {
+            rotCtx.translate(0, rotH);
+            rotCtx.rotate(-Math.PI / 2);
+          }
+          rotCtx.drawImage(scaledCanvas, 0, 0);
+          rotCtx.setTransform(1, 0, 0, 1, 0, 0);
+          applyGrayscale(rotCtx, rotW, rotH);
+          
+          if (rotW <= MAX_WIDTH) {
+            const blob = await new Promise(res => rotCanvas.toBlob(res, 'image/jpeg', JPEG_QUALITY / 100));
+            const arrBuf = await blob.arrayBuffer();
+            resolve({
+              parts: [{ data: arrBuf, suffix: '', width: rotW, height: rotH, size: arrBuf.byteLength }],
+              meta: { origW, origH, origSize, wasSplit: false, rotated: true, finalW: rotW, finalH: rotH, finalSize: arrBuf.byteLength, imageState: 0 }
+            });
+          } else {
+            // Split by WIDTH (vertical cuts)
+            const parts = [];
+            const maxW = MAX_WIDTH;
+            const overlapPx = Math.round(maxW * overlap);
+            const step = maxW - overlapPx;
+            const numParts = Math.ceil((rotW - overlapPx) / step);
+            
+            const positions = [];
+            for (let i = 0; i < numParts; i++) {
+              let x;
+              if (isClockwise) {
+                x = rotW - maxW - (i * step);
+              } else {
+                x = i * step;
+              }
+              x = Math.max(0, Math.min(x, rotW - maxW));
+              positions.push(x);
+            }
+            
+            if (isClockwise) {
+              positions[0] = rotW - maxW;
+              positions[numParts - 1] = 0;
+            } else {
+              positions[0] = 0;
+              positions[numParts - 1] = rotW - maxW;
+            }
+            
+            for (let i = 0; i < numParts; i++) {
+              const x = positions[i];
+              const partW = maxW;
+              
+              const partCanvas = document.createElement('canvas');
+              partCanvas.width = partW;
+              partCanvas.height = rotH;
+              const partCtx = partCanvas.getContext('2d');
+              partCtx.fillStyle = '#FFFFFF';
+              partCtx.fillRect(0, 0, partW, rotH);
+              partCtx.drawImage(rotCanvas, x, 0, partW, rotH, 0, 0, partW, rotH);
+              
+              const blob = await new Promise(res => partCanvas.toBlob(res, 'image/jpeg', JPEG_QUALITY / 100));
+              const arrBuf = await blob.arrayBuffer();
+              parts.push({ data: arrBuf, suffix: `_part${i + 1}`, width: partW, height: rotH, size: arrBuf.byteLength });
+            }
+            
+            const totalSize = parts.reduce((sum, p) => sum + p.size, 0);
+            resolve({
+              parts,
+              meta: { origW, origH, origSize, wasSplit: true, splitCount: numParts, rotated: true, finalW: parts[0].width, finalH: parts[0].height, finalSize: totalSize, imageState: 0 }
+            });
+          }
+        } else {
+          // Normal processing: check if scaling is needed
+          const fitsInScreen = origW <= MAX_WIDTH && origH <= MAX_HEIGHT;
+
+          if (fitsInScreen) {
+            // Image already fits - just convert to JPEG with grayscale
+            const c = document.createElement('canvas');
+            c.width = origW;
+            c.height = origH;
+            const ctx = c.getContext('2d');
+            ctx.fillStyle = '#FFF';
+            ctx.fillRect(0, 0, origW, origH);
+            ctx.drawImage(img, 0, 0);
+            applyGrayscale(ctx, origW, origH);
+
+            const blob = await new Promise(res => c.toBlob(res, 'image/jpeg', JPEG_QUALITY / 100));
+            const arrBuf = await blob.arrayBuffer();
+            resolve({
+              parts: [{ data: arrBuf, suffix: '', width: origW, height: origH, size: arrBuf.byteLength }],
+              meta: { origW, origH, origSize, wasSplit: false, rotated: false, finalW: origW, finalH: origH, finalSize: arrBuf.byteLength, imageState: 0 }
+            });
+          } else {
+            // Scale to fit 480x800
+            const scale = Math.min(MAX_WIDTH / origW, MAX_HEIGHT / origH);
+            const newW = Math.round(origW * scale);
+            const newH = Math.round(origH * scale);
+
+            const c = document.createElement('canvas');
+            c.width = newW;
+            c.height = newH;
+            const ctx = c.getContext('2d');
+            ctx.imageSmoothingEnabled = true;
+            ctx.imageSmoothingQuality = 'high';
+            ctx.fillStyle = '#FFF';
+            ctx.fillRect(0, 0, newW, newH);
+            ctx.drawImage(img, 0, 0, newW, newH);
+            applyGrayscale(ctx, newW, newH);
+
+            const blob = await new Promise(res => c.toBlob(res, 'image/jpeg', JPEG_QUALITY / 100));
+            const arrBuf = await blob.arrayBuffer();
+            resolve({
+              parts: [{ data: arrBuf, suffix: '', width: newW, height: newH, size: arrBuf.byteLength }],
+              meta: { origW, origH, origSize, wasSplit: false, rotated: false, finalW: newW, finalH: newH, finalSize: arrBuf.byteLength, imageState: 0 }
+            });
+          }
         }
       }
     };
@@ -3820,14 +3627,23 @@ async function convertEpubFile(file, progressCallback) {
         const newPath = renamed[path] || path.replace(/\.[^.]+$/, newExt);
         out.file(newPath, parts[0].data, { compression: 'DEFLATE', createFolders: false });
       } else {
-        // Use full path as key to avoid collisions for identical filenames in different directories
-        splitImages[path] = [];
+        // Store with full path for collision prevention, but also keep original filename
+        const origName = path.split('/').pop();
+        const origDir = path.includes('/') ? path.substring(0, path.lastIndexOf('/')) : '';
+        
+        // Key by full path to avoid collisions
+        splitImages[path] = {
+          origName: origName,
+          origDir: origDir,
+          parts: []
+        };
+        
         for (const part of parts) {
           const partName = baseName.split('/').pop() + part.suffix + newExt;
           const partPath = (path.includes('/') ? path.substring(0, path.lastIndexOf('/') + 1) : '') + partName;
           out.file(partPath, part.data, { compression: 'DEFLATE', createFolders: false });
           // Store metadata for XHTML/OPF updates
-          splitImages[path].push({
+          splitImages[path].parts.push({
             path: partPath,
             imgName: partName,
             id: baseName.split('/').pop() + part.suffix,
@@ -3845,141 +3661,176 @@ async function convertEpubFile(file, progressCallback) {
     if (progressCallback) progressCallback((i / entries.length) * 60);
   }
 
-  // Second pass: update XHTML
-  for (const [path, content] of Object.entries(xhtmlFiles)) {
+  // Second pass: update XHTML using DOMParser
+  for (const [xhtmlPath, content] of Object.entries(xhtmlFiles)) {
     let t = content;
     const r = fixSvgCover(t);
-    if (r.fixed) { t = r.c; svgFix += r.count || 1; logFix('SVG cover', path.split('/').pop()); }
+    if (r.fixed) { t = r.c; svgFix += r.count || 1; logFix('SVG cover', xhtmlPath.split('/').pop()); }
 
     const r2 = fixSvgWrappedImages(t);
-    if (r2.fixed) { t = r2.c; svgFix += r2.count || 1; logFix(`SVG images (${r2.count})`, path.split('/').pop()); }
+    if (r2.fixed) { t = r2.c; svgFix += r2.count || 1; logFix(`SVG images (${r2.count})`, xhtmlPath.split('/').pop()); }
 
     for (const [o, n] of Object.entries(renamed)) {
       t = t.split(o.split('/').pop()).join(n.split('/').pop());
     }
 
-    // Handle split images - use DOMParser for safe manipulation (regex can't handle nested tags)
-    for (const [fullPath, parts] of Object.entries(splitImages)) {
-      const origName = fullPath.split('/').pop();
-      const newName = origName.replace(/\.(png|gif|webp|bmp|jpeg)$/i, '.jpg');
-      
-      // Path collision prevention: extract immediate parent directory
-      const splitDir = fullPath.includes('/') ? fullPath.substring(0, fullPath.lastIndexOf('/')) : '';
-      const splitDirParts = splitDir.split('/').filter(p => p);
-      const rootFolders = ['ops', 'oebps', 'epub', 'content'];
-      const lastDir = splitDirParts.length > 0 ? splitDirParts[splitDirParts.length - 1].toLowerCase() : null;
-      const immediateParent = (lastDir && !rootFolders.includes(lastDir)) ? splitDirParts[splitDirParts.length - 1] : null;
-      
-      const escapeRegex = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-      
-      // Match function to verify path includes correct parent directory
-      const pathMatches = (srcPath) => {
-        const srcParts = srcPath.split('/').filter(p => p && p !== '..' && p !== '.');
-        const srcName = srcParts.pop();
-        if (srcName !== origName && srcName !== newName) return false;
-        if (immediateParent) {
-          if (srcParts.length === 0) return false;
-          if (srcParts[srcParts.length - 1] !== immediateParent) return false;
-        }
-        return true;
-      };
-      
+    // Handle split images using DOMParser with path collision prevention
+    if (Object.keys(splitImages).length > 0) {
       try {
         const parser = new DOMParser();
         const doc = parser.parseFromString(t, 'application/xhtml+xml');
-        
         const parseError = doc.querySelector('parsererror');
-        if (parseError) {
-          // Fallback: just replace src without block duplication
-          const imgRegex = new RegExp(
-            `(<img[^>]*src=["'])([^"']*(?:${escapeRegex(origName)}|${escapeRegex(newName)}))(["'])`,
-            'gi'
-          );
-          t = t.replace(imgRegex, (match, before, srcPath, after) => {
-            if (!pathMatches(srcPath)) return match;
-            const newSrc = srcPath.replace(new RegExp(escapeRegex(origName) + '$'), parts[0].imgName)
-                                  .replace(new RegExp(escapeRegex(newName) + '$'), parts[0].imgName);
-            return before + newSrc + after;
-          });
-          continue;
-        }
         
-        // Find all img elements with matching src
-        const allImgs = doc.querySelectorAll('img');
-        const matchingImgs = [];
-        for (const img of allImgs) {
-          const src = img.getAttribute('src') || '';
-          if (pathMatches(src)) {
-            matchingImgs.push(img);
-          }
-        }
-        
-        // Process each matching img
-        for (const img of matchingImgs) {
-          // Find the closest safe container to duplicate
-          let container = img.parentElement;
-          const safeContainers = ['div', 'p', 'figure', 'aside', 'section'];
-          while (container && !safeContainers.includes(container.tagName.toLowerCase())) {
-            container = container.parentElement;
-          }
+        if (!parseError) {
+          let modified = false;
           
-          if (!container) {
-            // No safe container found, just update src to first part
-            const src = img.getAttribute('src') || '';
-            const newSrc = src.replace(new RegExp(escapeRegex(origName) + '$'), parts[0].imgName)
-                              .replace(new RegExp(escapeRegex(newName) + '$'), parts[0].imgName);
-            img.setAttribute('src', newSrc);
-            continue;
-          }
+          // Get XHTML directory for resolving relative paths
+          const xhtmlDir = xhtmlPath.includes('/') ? xhtmlPath.substring(0, xhtmlPath.lastIndexOf('/')) : '';
+          const rootFolders = ['ops', 'oebps', 'epub', 'content'];
           
-          const parent = container.parentElement;
-          const nextSibling = container.nextSibling;
-          
-          // Create duplicates for each part
-          const fragments = [];
-          for (let i = 0; i < parts.length; i++) {
-            const clone = container.cloneNode(true);
-            const cloneImg = clone.querySelector('img');
-            if (cloneImg) {
-              const src = cloneImg.getAttribute('src') || '';
-              const newSrc = src.replace(new RegExp(escapeRegex(origName) + '$'), parts[i].imgName)
-                                .replace(new RegExp(escapeRegex(newName) + '$'), parts[i].imgName);
-              cloneImg.setAttribute('src', newSrc);
+          for (const [fullPath, splitInfo] of Object.entries(splitImages)) {
+            const origName = splitInfo.origName;
+            const origDir = splitInfo.origDir;
+            const parts = splitInfo.parts;
+            const newName = origName.replace(/\.(png|gif|webp|bmp|jpeg)$/i, '.jpg');
+            
+            // Extract immediate parent directory for collision prevention
+            const splitDirParts = origDir.split('/').filter(p => p);
+            const lastDir = splitDirParts.length > 0 ? splitDirParts[splitDirParts.length - 1].toLowerCase() : null;
+            const immediateParent = (lastDir && !rootFolders.includes(lastDir)) ? splitDirParts[splitDirParts.length - 1] : null;
+            
+            // Get XHTML's parent directory parts for relative path resolution
+            const xhtmlDirParts = xhtmlDir.split('/').filter(p => p);
+            
+            // Find all img elements
+            const allImgs = doc.querySelectorAll('img');
+            const matchingImgs = [];
+            
+            for (const img of allImgs) {
+              const src = img.getAttribute('src') || '';
+              const srcParts = src.split('/').filter(p => p && p !== '..' && p !== '.');
+              const srcName = srcParts.pop() || '';
               
-              // Update IDs to be unique for each part
-              const suffix = parts[i].suffix || '_part' + (i+1);
-              const allWithId = clone.querySelectorAll('[id]');
-              for (const el of allWithId) {
-                el.setAttribute('id', el.getAttribute('id') + suffix);
+              // Check filename match
+              if (srcName !== origName && srcName !== newName) continue;
+              
+              // Path collision prevention with root folder handling
+              if (immediateParent) {
+                // Image is in a specific subfolder (not root like OPS/OEBPS)
+                if (srcParts.length === 0) {
+                  // src has no path - check if XHTML is in same folder as image
+                  // This handles case: XHTML in "OEBPS/images/", image in "OEBPS/images/"
+                  // where src is just "cover.jpg"
+                  const xhtmlLastDir = xhtmlDirParts.length > 0 ? xhtmlDirParts[xhtmlDirParts.length - 1] : null;
+                  if (xhtmlLastDir !== immediateParent) continue;
+                } else {
+                  // src has path - verify parent directory matches
+                  if (srcParts[srcParts.length - 1] !== immediateParent) continue;
+                }
+              } else {
+                // Image is in root folder (like OEBPS/cover.jpg)
+                // Only match if src has NO subfolder path OR points to root folder
+                if (srcParts.length > 0) {
+                  // src has a path like "images/cover.jpg" - this is a different image!
+                  // Only match if all parts are root folders (like "../cover.jpg" resolving to root)
+                  const srcLastDir = srcParts[srcParts.length - 1].toLowerCase();
+                  if (!rootFolders.includes(srcLastDir)) continue;
+                }
+                // If srcParts.length === 0, src is just filename - matches root folder image
               }
-              if (clone.hasAttribute && clone.hasAttribute('id')) {
-                clone.setAttribute('id', clone.getAttribute('id') + suffix);
+              
+              matchingImgs.push(img);
+            }
+            
+            // Process each matching img
+            for (const img of matchingImgs) {
+              // Find the closest safe container to duplicate
+              let container = img.parentElement;
+              const safeContainers = ['div', 'p', 'figure', 'aside', 'section'];
+              while (container && !safeContainers.includes(container.tagName.toLowerCase())) {
+                container = container.parentElement;
+              }
+              
+              if (container && container.parentElement) {
+                const parent = container.parentElement;
+                const nextSibling = container.nextSibling;
+                
+                // Create clones for each part
+                const clones = [];
+                for (let i = 0; i < parts.length; i++) {
+                  const clone = container.cloneNode(true);
+                  const cloneImg = clone.querySelector('img');
+                  if (cloneImg) {
+                    const src = cloneImg.getAttribute('src') || '';
+                    const newSrc = src.replace(origName, parts[i].imgName).replace(newName, parts[i].imgName);
+                    cloneImg.setAttribute('src', newSrc);
+                    
+                    // Update IDs to be unique
+                    const suffix = parts[i].suffix || '_part' + (i + 1);
+                    const allWithId = clone.querySelectorAll('[id]');
+                    for (const el of allWithId) {
+                      el.setAttribute('id', el.getAttribute('id') + suffix);
+                    }
+                    if (clone.hasAttribute && clone.hasAttribute('id')) {
+                      clone.setAttribute('id', clone.getAttribute('id') + suffix);
+                    }
+                  }
+                  clones.push(clone);
+                }
+                
+                // Remove original and insert all clones
+                parent.removeChild(container);
+                for (const clone of clones) {
+                  if (nextSibling) {
+                    parent.insertBefore(clone, nextSibling);
+                  } else {
+                    parent.appendChild(clone);
+                  }
+                }
+                modified = true;
+              } else {
+                // No safe container - just update src to first part
+                const src = img.getAttribute('src') || '';
+                const newSrc = src.replace(origName, parts[0].imgName).replace(newName, parts[0].imgName);
+                img.setAttribute('src', newSrc);
+                modified = true;
               }
             }
-            fragments.push(clone);
           }
           
-          // Remove original and insert all parts
-          parent.removeChild(container);
-          for (const frag of fragments) {
-            if (nextSibling) {
-              parent.insertBefore(frag, nextSibling);
-            } else {
-              parent.appendChild(frag);
+          // Only serialize if we made changes
+          if (modified) {
+            const serializer = new XMLSerializer();
+            let serialized = serializer.serializeToString(doc);
+            
+            // Restore DOCTYPE if original had one
+            const doctypeMatch = content.match(/<!DOCTYPE[^>]*>/i);
+            const xmlDeclMatch = content.match(/<\?xml[^?]*\?>/i);
+            
+            if (doctypeMatch && !serialized.includes('<!DOCTYPE')) {
+              if (serialized.startsWith('<?xml')) {
+                const xmlEnd = serialized.indexOf('?>');
+                if (xmlEnd !== -1) {
+                  serialized = serialized.slice(0, xmlEnd + 2) + '\n' + doctypeMatch[0] + serialized.slice(xmlEnd + 2);
+                }
+              } else {
+                serialized = doctypeMatch[0] + '\n' + serialized;
+              }
             }
+            
+            if (xmlDeclMatch && !serialized.startsWith('<?xml')) {
+              serialized = xmlDeclMatch[0] + '\n' + serialized;
+            }
+            
+            t = serialized;
           }
         }
-        
-        // Serialize back to string
-        const serializer = new XMLSerializer();
-        t = serializer.serializeToString(doc);
-        
       } catch (e) {
-        console.warn('DOMParser failed for split handling:', e.message);
+        console.warn('DOMParser error for', xhtmlPath, e.message);
       }
     }
 
-    out.file(path, t, { compression: 'DEFLATE', createFolders: false });
+    out.file(xhtmlPath, t, { compression: 'DEFLATE', createFolders: false });
   }
 
   // Extract main identifier from OPF before modifying it
@@ -4022,7 +3873,12 @@ async function convertEpubFile(file, progressCallback) {
     const opfDir = opfPath.includes('/') ? opfPath.substring(0, opfPath.lastIndexOf('/')) : '';
 
     // Add manifest entries for split image parts
-    for (const [fullPath, parts] of Object.entries(splitImages)) {
+    for (const [fullPath, splitInfo] of Object.entries(splitImages)) {
+      const origName = splitInfo.origName;
+      const parts = splitInfo.parts;
+      const origBaseName = origName.replace(/\.[^.]+$/, '');
+      const escapeRegex = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      
       // Calculate the href as it would appear in OPF (relative to OPF directory)
       let origHref;
       if (opfDir && fullPath.startsWith(opfDir + '/')) {
@@ -4030,19 +3886,11 @@ async function convertEpubFile(file, progressCallback) {
       } else {
         origHref = fullPath;
       }
+      const origHrefBaseName = origHref.replace(/\.[^.]+$/, '');
       
-      // Also need the .jpg version
-      const origHrefJpg = origHref.replace(/\.(png|gif|webp|bmp|jpeg)$/i, '.jpg');
-      
-      // Match the exact href path, not just basename (prevents path collisions)
-      const escapeRegex = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-      const origHrefPattern = escapeRegex(origHref);
-      const origHrefJpgPattern = escapeRegex(origHrefJpg);
-      
-      // Replace href with part1 version
-      const part1Href = origHrefJpg.replace(/\.jpg$/i, '_part1.jpg');
-      const origImgRegex = new RegExp(`(href=["'])(${origHrefPattern}|${origHrefJpgPattern})(["'])`, 'gi');
-      t = t.replace(origImgRegex, `$1${part1Href}$3`);
+      // Replace href with part1 version (match full path in OPF)
+      const origImgRegex = new RegExp(`(href=["'])(${escapeRegex(origHrefBaseName)})\\.(?:jpg|jpeg|png|gif|webp|bmp)(["'])`, 'gi');
+      t = t.replace(origImgRegex, `$1${origHrefBaseName}_part1.jpg$3`);
       
       // Add manifest entries for additional parts with correct relative paths
       let manifestAdditions = '';
@@ -4136,7 +3984,6 @@ function uploadFileWebSocket(file, onProgress, onComplete, onError) {
     const ws = new WebSocket(getWsUrl());
     let uploadStarted = false;
     let sendingChunks = false;
-    const startTime = Date.now();
 
     ws.binaryType = 'arraybuffer';
 
@@ -4178,6 +4025,12 @@ function uploadFileWebSocket(file, onProgress, onComplete, onError) {
 
             ws.send(buffer);
             offset += chunkSize;
+
+            // Update local progress with real transfer progress
+            // Server will confirm 100% with DONE message
+            if (onProgress) {
+              onProgress(offset, totalSize);
+            }
           }
 
           sendingChunks = false;
@@ -4189,32 +4042,12 @@ function uploadFileWebSocket(file, onProgress, onComplete, onError) {
           reject(err);
         }
       } else if (msg.startsWith('PROGRESS:')) {
-        // Parse server progress: "PROGRESS:<received>:<total>"
-        const parts = msg.substring(9).split(':');
-        if (parts.length === 2) {
-          const received = parseInt(parts[0], 10);
-          const total = parseInt(parts[1], 10);
-          const elapsed = (Date.now() - startTime) / 1000; // seconds
-          const speed = elapsed > 0 ? (received / elapsed) : 0; // bytes/sec
-
-          // Calculate ETA
-          const remaining = total - received;
-          const eta = speed > 0 ? (remaining / speed) : 0;
-
-          // Call onProgress with extended info
-          if (onProgress) {
-            onProgress(received, total, {
-              serverReceived: received,
-              serverTotal: total,
-              speed: speed,
-              eta: eta,
-              elapsed: elapsed
-            });
-          }
-        }
+        // Server confirmed progress - log for debugging but don't update UI
+        // (local progress is smoother, server progress causes jumping)
+        console.log('[WS] Server progress:', msg);
       } else if (msg === 'DONE') {
         // Show 100% when server confirms completion
-        if (onProgress) onProgress(file.size, file.size, { serverReceived: file.size, serverTotal: file.size });
+        if (onProgress) onProgress(file.size, file.size);
         ws.close();
         if (onComplete) onComplete();
         resolve();
@@ -4378,37 +4211,13 @@ function uploadFile() {
     const stageText = needsConversion ? 'Converting & uploading' : 'Uploading';
     progressText.textContent = `${stageText} ${file.name} (${currentIndex + 1}/${files.length})${methodText}`;
 
-    const onProgress = (loaded, total, extendedInfo) => {
+    const onProgress = (loaded, total) => {
       const uploadPercent = Math.round((loaded / total) * 100);
       // If conversion succeeded, display goes from 50-100%, otherwise 0-100%
       const displayPercent = conversionSucceeded ? 50 + Math.round(uploadPercent / 2) : uploadPercent;
       progressFill.style.width = displayPercent + '%';
       const prefix = conversionSucceeded ? 'Converting & uploading' : 'Uploading';
-
-      // Format progress text with extended info if available
-      let progressTextContent = `${prefix} ${file.name} (${currentIndex + 1}/${files.length})${methodText} — ${uploadPercent}%`;
-
-      if (extendedInfo && extendedInfo.serverReceived !== undefined) {
-        // Show detailed server progress info
-        const speedMbps = (extendedInfo.speed / 1024 / 1024).toFixed(2);
-        const etaSeconds = Math.round(extendedInfo.eta);
-        const serverPercent = Math.round((extendedInfo.serverReceived / extendedInfo.serverTotal) * 100);
-
-        progressTextContent += ` [Server: ${serverPercent}% | ${(extendedInfo.speed / 1024).toFixed(1)} KB/s`;
-
-        if (etaSeconds > 0) {
-          if (etaSeconds < 60) {
-            progressTextContent += ` | ${etaSeconds}s left`;
-          } else {
-            const minutes = Math.floor(etaSeconds / 60);
-            const seconds = etaSeconds % 60;
-            progressTextContent += ` | ${minutes}m ${seconds}s left`;
-          }
-        }
-        progressTextContent += ']';
-      }
-
-      progressText.textContent = progressTextContent;
+      progressText.textContent = `${prefix} ${file.name} (${currentIndex + 1}/${files.length})${methodText} — ${uploadPercent}%`;
     };
 
     const onComplete = () => {
