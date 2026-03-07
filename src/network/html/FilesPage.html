@@ -1445,6 +1445,10 @@
                   <label for="rotateCropOff">OFF</label>
                 </div>
                 <div class="rotate-crop-option">
+                  <input type="radio" name="rotateCropMode" id="rotateCropBaseline" value="baseline" onchange="setRotateCropMode('baseline')">
+                  <label for="rotateCropBaseline">Baseline</label>
+                </div>
+                <div class="rotate-crop-option">
                   <input type="radio" name="rotateCropMode" id="rotateCropLightNovel" value="light_novel" onchange="setRotateCropMode('light_novel')">
                   <label for="rotateCropLightNovel">Light Novel</label>
                 </div>
@@ -1980,8 +1984,8 @@
     ROTATE_CROP_MODE = mode;
     ENABLE_LIGHT_NOVEL_MODE = (mode === 'light_novel');
 
-    // Show/hide handedness options (hidden when OFF, visible for Light Novel and Manual Picker)
-    document.getElementById('handednessOptions').style.display = (mode === 'off') ? 'none' : 'block';
+    // Show/hide handedness options (hidden when OFF and Baseline, visible for Light Novel and Manual Picker)
+    document.getElementById('handednessOptions').style.display = (mode === 'off' || mode === 'baseline') ? 'none' : 'block';
 
     // If switching to/from Manual Picker, handle image picker visibility
     const fileInput = document.getElementById('fileInput');
@@ -3243,19 +3247,30 @@ async function processImage(data, imageState = 0, imagePath = '') {
       const origW = img.width, origH = img.height;
 
       // imageState: 0=Normal, 1=H-Split, 2=V-Split
-      // Use manual state if set, otherwise fall back to auto Light Novel Mode
-      const useManualState = imageState !== 0;
+      // Use manual state if set, otherwise fall back to auto mode
+      let effectiveImageState = imageState;
+
+      // In baseline mode, force V-Split for images that exceed screen dimensions
+      if (ROTATE_CROP_MODE === 'baseline' && (img.width > MAX_WIDTH || img.height > MAX_HEIGHT)) {
+        effectiveImageState = 2; // Force V-Split
+      }
+
+      const useManualState = effectiveImageState !== 0;
 
       // Check if Light Novel Mode should apply (only for auto mode)
       const isHorizontal = origW > origH;
       const exceedsScreen = origW > MAX_WIDTH || origH > MAX_HEIGHT;
       const needsRotation = !useManualState && isHorizontal && exceedsScreen && ENABLE_LIGHT_NOVEL_MODE && ROTATE_CROP_MODE !== 'manual_picker';
 
+      // Baseline mode: Always use V-Split for images that exceed screen dimensions
+      const baselineMode = !useManualState && ROTATE_CROP_MODE === 'baseline';
+      const needsVerticalSplit = baselineMode && exceedsScreen;
+
       // ========================================================================
       // STATE 1: H-Split (Horizontal Split)
       // Scale width to 800px, cut horizontally if height > 480px, rotate 90° CW
       // ========================================================================
-      if (imageState === 1) {
+      if (effectiveImageState === 1) {
         // Better Crop: Calculate optimal scale parameters to minimize splits
         const estimatedScaledH = Math.round(origH * (MAX_HEIGHT / origW));
         const cropParams = calculateOptimalScaleParams(estimatedScaledH);
@@ -3391,7 +3406,7 @@ async function processImage(data, imageState = 0, imagePath = '') {
       // STATE 2: V-Split (Vertical Split)
       // Scale height to 800px, cut vertically if width > 480px, NO rotation
       // ========================================================================
-      else if (imageState === 2) {
+      else if (effectiveImageState === 2) {
         // Better Crop: Calculate optimal scale parameters to minimize splits
         const estimatedScaledW = Math.round(origW * (MAX_HEIGHT / origH));
         const cropParams = calculateOptimalScaleParams(estimatedScaledW);
@@ -3474,6 +3489,65 @@ async function processImage(data, imageState = 0, imagePath = '') {
           resolve({
             parts: parts,
             meta: { origW, origH, origSize, wasSplit: true, rotated: false, splitCount: numParts, splitDirection: 'vertical', finalW: parts[0].width, finalH: parts[0].height, finalSize: totalSize, imageState: 2 }
+          });
+        }
+      }
+      // ========================================================================
+      // STATE 2: Baseline Mode - Vertical Split
+      // Scale height to 800px, cut vertically if width > 480px, NO rotation
+      // ========================================================================
+      else if (needsVerticalSplit) {
+        // Scale height to MAX_HEIGHT (800px)
+        const scale = MAX_HEIGHT / origH;
+        const scaledW = Math.round(origW * scale);
+        const scaledH = MAX_HEIGHT;
+
+        const scaledCanvas = document.createElement('canvas');
+        scaledCanvas.width = scaledW;
+        scaledCanvas.height = scaledH;
+        const scaledCtx = scaledCanvas.getContext('2d');
+        scaledCtx.imageSmoothingEnabled = true;
+        scaledCtx.imageSmoothingQuality = 'high';
+        scaledCtx.fillStyle = '#FFF';
+        scaledCtx.fillRect(0, 0, scaledW, scaledH);
+        scaledCtx.drawImage(img, 0, 0, origW, origH, 0, 0, scaledW, scaledH);
+        applyGrayscale(scaledCtx, scaledW, scaledH);
+
+        // Split vertically if needed
+        if (scaledW > MAX_WIDTH) {
+          // Use 3 parts for baseline mode
+          const partW = Math.ceil(scaledW / 3);
+          const parts = [];
+
+          for (let i = 0; i < 3; i++) {
+            const x = i * partW;
+            const actualPartW = Math.min(partW, scaledW - x);
+
+            const partCanvas = document.createElement('canvas');
+            partCanvas.width = actualPartW;
+            partCanvas.height = scaledH;
+            const partCtx = partCanvas.getContext('2d');
+            partCtx.drawImage(scaledCanvas, x, 0, actualPartW, scaledH, 0, 0, actualPartW, scaledH);
+
+            const blob = await new Promise(res => partCanvas.toBlob(res, 'image/jpeg', JPEG_QUALITY / 100));
+            const arrBuf = await blob.arrayBuffer();
+            parts.push({ data: arrBuf, suffix: `_part${i + 1}`, width: actualPartW, height: scaledH, size: arrBuf.byteLength });
+          }
+
+          const totalSize = parts.reduce((sum, p) => sum + p.size, 0);
+          log(`[SPLIT] ${imagePath} [┃V] (${origW}×${origH} JPG, ${formatBytes(origSize)}) → ${parts.length} parts`, path, 'CONVERT');
+
+          resolve({
+            parts: parts,
+            meta: { origW, origH, origSize, wasSplit: true, rotated: false, splitCount: 3, splitDirection: 'vertical', finalW: parts[0].width, finalH: parts[0].height, finalSize: totalSize, imageState: 2 }
+          });
+        } else {
+          // No split needed
+          const blob = await new Promise(res => scaledCanvas.toBlob(res, 'image/jpeg', JPEG_QUALITY / 100));
+          const arrBuf = await blob.arrayBuffer();
+          resolve({
+            parts: [{ data: arrBuf, suffix: '', width: scaledW, height: scaledH, size: arrBuf.byteLength }],
+            meta: { origW, origH, origSize, wasSplit: false, rotated: false, finalW: scaledW, finalH: scaledH, finalSize: arrBuf.byteLength, imageState: 2 }
           });
         }
       }
