@@ -513,7 +513,16 @@ void CrossPointWebServer::handleDownload() const {
   server->send(200, contentType.c_str(), "");
 
   NetworkClient client = server->client();
-  client.write(file);
+  const size_t chunkSize = 4096;
+  uint8_t buffer[chunkSize];
+
+  while (file.available()) {
+    size_t bytesRead = file.read(buffer, chunkSize);
+    if (bytesRead > 0) {
+      client.write(buffer, bytesRead);
+    }
+  }
+  client.flush();
   file.close();
 }
 
