@@ -89,5 +89,5 @@ for root, _, files in os.walk(SRC_DIR):
 
             print(f"Generated: {header_path}")
             print(f"  Original: {len(content)} bytes")
-            print(f"  Minified: {len(processed)} bytes ({100*len(processed)/len(content):.1f}%)")
-            print(f"  Compressed: {len(compressed)} bytes ({100*len(compressed)/len(content):.1f}%)")
+            print(f"  Minified: {len(processed)} bytes ({100*len(processed)/max(1, len(content)):.1f}%)")
+            print(f"  Compressed: {len(compressed)} bytes ({100*len(compressed)/max(1, len(content)):.1f}%)")

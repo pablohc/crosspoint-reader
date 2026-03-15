@@ -517,9 +517,24 @@ void CrossPointWebServer::handleDownload() const {
   uint8_t buffer[chunkSize];
 
   while (file.available()) {
-    size_t bytesRead = file.read(buffer, chunkSize);
-    if (bytesRead > 0) {
-      client.write(buffer, bytesRead);
+    const int bytesRead = file.read(buffer, chunkSize);
+    if (bytesRead <= 0) {
+      if (bytesRead < 0) {
+        LOG_DBG("WEB", "File read error during download: %d", bytesRead);
+      }
+      break;
+    }
+
+    size_t totalWritten = 0;
+    while (totalWritten < static_cast<size_t>(bytesRead)) {
+      const int written = client.write(buffer + totalWritten, bytesRead - totalWritten);
+      if (written <= 0) {
+        LOG_DBG("WEB", "Client write error during download: %d", written);
+        client.clear();
+        file.close();
+        return;
+      }
+      totalWritten += written;
     }
   }
   client.clear();
