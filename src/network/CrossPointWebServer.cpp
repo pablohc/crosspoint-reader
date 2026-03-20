@@ -1089,7 +1089,7 @@ void CrossPointWebServer::handleSettingsPage() const {
 }
 
 void CrossPointWebServer::handleGetSettings() const {
-  auto settings = getSettingsList();
+  const auto& settings = getSettingsList();
 
   server->setContentLength(CONTENT_LENGTH_UNKNOWN);
   server->send(200, "application/json", "");
@@ -1185,10 +1185,10 @@ void CrossPointWebServer::handlePostSettings() {
     return;
   }
 
-  auto settings = getSettingsList();
+  const auto& settings = getSettingsList();
   int applied = 0;
 
-  for (auto& s : settings) {
+  for (const auto& s : settings) {
     if (!s.key) continue;
     if (!doc[s.key].is<JsonVariant>()) continue;
 
