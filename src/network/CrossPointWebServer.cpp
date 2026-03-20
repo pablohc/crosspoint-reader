@@ -1237,8 +1237,8 @@ void CrossPointWebServer::onWebSocketEvent(uint8_t num, WStype_t type, uint8_t* 
         Storage.remove(filePath.c_str());
         LOG_DBG("WS", "Deleted incomplete upload: %s", filePath.c_str());
         wsUploadInProgress = false;
+        wsUploadClientNum = 255;
       }
-      wsUploadClientNum = 255;
       break;
 
     case WStype_CONNECTED: {
@@ -1252,6 +1252,12 @@ void CrossPointWebServer::onWebSocketEvent(uint8_t num, WStype_t type, uint8_t* 
       LOG_DBG("WS", "Text from client %u: %s", num, msg.c_str());
 
       if (msg.startsWith("START:")) {
+        // Reject if another client already owns an active upload
+        if (wsUploadInProgress && wsUploadClientNum != 255 && wsUploadClientNum != num) {
+          wsServer->sendTXT(num, "ERROR:Upload already in progress");
+          break;
+        }
+
         // Parse: START:<filename>:<size>:<path>
         int firstColon = msg.indexOf(':', 6);
         int secondColon = msg.indexOf(':', firstColon + 1);
@@ -1304,7 +1310,7 @@ void CrossPointWebServer::onWebSocketEvent(uint8_t num, WStype_t type, uint8_t* 
     }
 
     case WStype_BIN: {
-      if (!wsUploadInProgress || !wsUploadFile) {
+      if (!wsUploadInProgress || !wsUploadFile || num != wsUploadClientNum) {
         wsServer->sendTXT(num, "ERROR:No upload in progress");
         return;
       }
