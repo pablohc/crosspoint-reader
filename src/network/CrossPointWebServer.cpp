@@ -1127,7 +1127,7 @@ void CrossPointWebServer::handleSettingsPage() const {
 }
 
 void CrossPointWebServer::handleGetSettings() const {
-  auto settings = getSettingsList();
+  const auto& settings = getSettingsList();
 
   String result;
   result.reserve(4096);
@@ -1223,10 +1223,10 @@ void CrossPointWebServer::handlePostSettings() {
     return;
   }
 
-  auto settings = getSettingsList();
+  const auto& settings = getSettingsList();
   int applied = 0;
 
-  for (auto& s : settings) {
+  for (const auto& s : settings) {
     if (!s.key) continue;
     if (!doc[s.key].is<JsonVariant>()) continue;
 
