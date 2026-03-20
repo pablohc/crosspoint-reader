@@ -415,9 +415,7 @@ void CrossPointWebServer::scanFiles(const char* path, const std::function<void(F
 }
 
 bool CrossPointWebServer::isEpubFile(const String& filename) const {
-  String lower = filename;
-  lower.toLowerCase();
-  return lower.endsWith(".epub");
+  return FsHelpers::checkFileExtension(filename, ".epub");
 }
 
 void CrossPointWebServer::handleFileList() const {
