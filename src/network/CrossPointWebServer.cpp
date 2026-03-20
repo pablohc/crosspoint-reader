@@ -465,7 +465,9 @@ void CrossPointWebServer::scanFiles(const char* path, const std::function<void(F
   root.close();
 }
 
-bool CrossPointWebServer::isEpubFile(const String& filename) const { return FsHelpers::hasEpubExtension(filename); }
+bool CrossPointWebServer::isEpubFile(const String& filename) const {
+  return FsHelpers::checkFileExtension(filename, ".epub");
+}
 
 void CrossPointWebServer::handleFileList() const {
   sendHtmlContent(server.get(), FilesPageHtml, sizeof(FilesPageHtml));
@@ -1125,7 +1127,7 @@ void CrossPointWebServer::handleSettingsPage() const {
 }
 
 void CrossPointWebServer::handleGetSettings() const {
-  const auto& settings = getSettingsList();
+  auto settings = getSettingsList();
 
   String result;
   result.reserve(4096);
@@ -1221,10 +1223,10 @@ void CrossPointWebServer::handlePostSettings() {
     return;
   }
 
-  const auto& settings = getSettingsList();
+  auto settings = getSettingsList();
   int applied = 0;
 
-  for (const auto& s : settings) {
+  for (auto& s : settings) {
     if (!s.key) continue;
     if (!doc[s.key].is<JsonVariant>()) continue;
 
