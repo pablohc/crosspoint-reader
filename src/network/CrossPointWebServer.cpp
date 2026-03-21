@@ -203,9 +203,14 @@ void CrossPointWebServer::stop() {
 
   LOG_DBG("WEB", "[MEM] Free heap before stop: %d bytes", ESP.getFreeHeap());
 
-  // Close any in-progress WebSocket upload
+  // Close any in-progress WebSocket upload and remove partial file
   if (wsUploadInProgress && wsUploadFile) {
     wsUploadFile.close();
+    String filePath = wsUploadPath;
+    if (!filePath.endsWith("/")) filePath += "/";
+    filePath += wsUploadFileName;
+    Storage.remove(filePath.c_str());
+    LOG_DBG("WEB", "Deleted incomplete upload on stop: %s", filePath.c_str());
     wsUploadInProgress = false;
     wsUploadClientNum = 255;
   }
@@ -1311,6 +1316,19 @@ void CrossPointWebServer::onWebSocketEvent(uint8_t num, WStype_t type, uint8_t* 
           }
           esp_task_wdt_reset();
 
+          // Zero-byte upload: complete immediately without waiting for BIN frames
+          if (wsUploadSize == 0) {
+            wsUploadFile.close();
+            wsLastCompleteName = wsUploadFileName;
+            wsLastCompleteSize = 0;
+            wsLastCompleteAt = millis();
+            LOG_DBG("WS", "Zero-byte upload complete: %s", filePath.c_str());
+            clearEpubCacheIfNeeded(filePath);
+            wsServer->sendTXT(num, "DONE");
+            wsLastProgressSent = 0;
+            break;
+          }
+
           wsUploadClientNum = num;
           wsUploadInProgress = true;
           wsServer->sendTXT(num, "READY");
@@ -1334,6 +1352,11 @@ void CrossPointWebServer::onWebSocketEvent(uint8_t num, WStype_t type, uint8_t* 
 
       if (written != length) {
         wsUploadFile.close();
+        String filePath = wsUploadPath;
+        if (!filePath.endsWith("/")) filePath += "/";
+        filePath += wsUploadFileName;
+        Storage.remove(filePath.c_str());
+        LOG_DBG("WS", "Deleted incomplete upload after short write: %s", filePath.c_str());
         wsUploadInProgress = false;
         wsUploadClientNum = 255;
         wsServer->sendTXT(num, "ERROR:Write failed - disk full?");
