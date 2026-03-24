@@ -304,7 +304,7 @@ bool Xtc::generateCoverBmp() const {
 std::string Xtc::getThumbBmpPath() const { return cachePath + "/thumb_[HEIGHT].bmp"; }
 std::string Xtc::getThumbBmpPath(int height) const { return cachePath + "/thumb_" + std::to_string(height) + ".bmp"; }
 
-bool Xtc::generateThumbBmp(int height) const {
+bool Xtc::generateThumbBmp(int height, uint32_t /*deadline*/) const {
   // Already generated
   if (Storage.exists(getThumbBmpPath(height).c_str())) {
     return true;

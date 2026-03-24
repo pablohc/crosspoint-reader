@@ -25,12 +25,17 @@ void RecentBooksStore::addBook(const std::string& path, const std::string& title
   // Remove existing entry if present
   auto it =
       std::find_if(recentBooks.begin(), recentBooks.end(), [&](const RecentBook& book) { return book.path == path; });
+
+  // If the existing entry has an empty coverBmpPath, it was deliberately cleared (e.g. after a
+  // timeout failure) to prevent retrying. Preserve that empty state so HOME does not retry.
+  const std::string resolvedCover = (it != recentBooks.end() && it->coverBmpPath.empty()) ? "" : coverBmpPath;
+
   if (it != recentBooks.end()) {
     recentBooks.erase(it);
   }
 
   // Add to front
-  recentBooks.insert(recentBooks.begin(), {path, title, author, coverBmpPath});
+  recentBooks.insert(recentBooks.begin(), {path, title, author, resolvedCover});
 
   // Trim to max size
   if (recentBooks.size() > MAX_RECENT_BOOKS) {
@@ -49,6 +54,15 @@ void RecentBooksStore::updateBook(const std::string& path, const std::string& ti
     book.title = title;
     book.author = author;
     book.coverBmpPath = coverBmpPath;
+    saveToFile();
+  }
+}
+
+void RecentBooksStore::setCoverDisabled(const std::string& path, bool disabled) {
+  auto it =
+      std::find_if(recentBooks.begin(), recentBooks.end(), [&](const RecentBook& book) { return book.path == path; });
+  if (it != recentBooks.end()) {
+    it->coverDisabled = disabled;
     saveToFile();
   }
 }
