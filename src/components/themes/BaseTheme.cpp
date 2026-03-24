@@ -424,8 +424,8 @@ void BaseTheme::drawRecentBookCover(GfxRenderer& renderer, Rect rect, const std:
   // Bookmark dimensions (used in multiple places)
   const int bookmarkWidth = bookWidth / 8;
   const int bookmarkHeight = bookHeight / 5;
-  const int bookmarkX = bookX + bookWidth - bookmarkWidth - 10;
-  const int bookmarkY = bookY + 5;
+  const int bookmarkX = bookX + 20;  // top-left, 20px from the spine edge
+  const int bookmarkY = bookY;       // flush with the top of the card
 
   // Draw book card regardless, fill with message based on `hasContinueReading`
   {
@@ -510,71 +510,40 @@ void BaseTheme::drawRecentBookCover(GfxRenderer& renderer, Rect rect, const std:
   }
 
   if (hasContinueReading) {
-    const std::string& lastBookTitle = recentBooks[0].title;
-    const std::string& lastBookAuthor = recentBooks[0].author;
+    // Only show title + author when there is no cover image (alt-text placeholder).
+    // When the cover is available, it speaks for itself — the overlay would obscure the art.
+    if (!hasCoverImage) {
+      const std::string& lastBookTitle = recentBooks[0].title;
+      const std::string& lastBookAuthor = recentBooks[0].author;
 
-    // Invert text colors based on selection state:
-    // - With cover: selected = white text on black box, unselected = black text on white box
-    // - Without cover: selected = white text on black card, unselected = black text on white card
+      auto lines = renderer.wrappedText(UI_12_FONT_ID, lastBookTitle.c_str(), bookWidth - 40, 3);
 
-    auto lines = renderer.wrappedText(UI_12_FONT_ID, lastBookTitle.c_str(), bookWidth - 40, 3);
+      int totalTextHeight = renderer.getLineHeight(UI_12_FONT_ID) * static_cast<int>(lines.size());
+      if (!lastBookAuthor.empty()) {
+        totalTextHeight += renderer.getLineHeight(UI_10_FONT_ID) * 3 / 2;
+      }
 
-    // Book title text
-    int totalTextHeight = renderer.getLineHeight(UI_12_FONT_ID) * static_cast<int>(lines.size());
-    if (!lastBookAuthor.empty()) {
-      totalTextHeight += renderer.getLineHeight(UI_10_FONT_ID) * 3 / 2;
-    }
+      int titleYStart = bookY + (bookHeight - totalTextHeight) / 2;
 
-    // Vertically center the title block within the card
-    int titleYStart = bookY + (bookHeight - totalTextHeight) / 2;
+      const auto truncatedAuthor = lastBookAuthor.empty()
+                                       ? std::string{}
+                                       : renderer.truncatedText(UI_10_FONT_ID, lastBookAuthor.c_str(), bookWidth - 40);
 
-    const auto truncatedAuthor = lastBookAuthor.empty()
-                                     ? std::string{}
-                                     : renderer.truncatedText(UI_10_FONT_ID, lastBookAuthor.c_str(), bookWidth - 40);
-
-    // If cover image was rendered, draw box behind title and author
-    if (coverRendered) {
-      constexpr int boxPadding = 8;
-      // Calculate the max text width for the box
-      int maxTextWidth = 0;
       for (const auto& line : lines) {
-        const int lineWidth = renderer.getTextWidth(UI_12_FONT_ID, line.c_str());
-        if (lineWidth > maxTextWidth) {
-          maxTextWidth = lineWidth;
-        }
+        renderer.drawCenteredText(UI_12_FONT_ID, titleYStart, line.c_str(), !bookSelected);
+        titleYStart += renderer.getLineHeight(UI_12_FONT_ID);
       }
+
       if (!truncatedAuthor.empty()) {
-        const int authorWidth = renderer.getTextWidth(UI_10_FONT_ID, truncatedAuthor.c_str());
-        if (authorWidth > maxTextWidth) {
-          maxTextWidth = authorWidth;
-        }
+        titleYStart += renderer.getLineHeight(UI_10_FONT_ID) / 2;
+        renderer.drawCenteredText(UI_10_FONT_ID, titleYStart, truncatedAuthor.c_str(), !bookSelected);
       }
-
-      const int boxWidth = maxTextWidth + boxPadding * 2;
-      const int boxHeight = totalTextHeight + boxPadding * 2;
-      const int boxX = rect.x + (rect.width - boxWidth) / 2;
-      const int boxY = titleYStart - boxPadding;
-
-      // Draw box (inverted when selected: black box instead of white)
-      renderer.fillRect(boxX, boxY, boxWidth, boxHeight, bookSelected);
-      // Draw border around the box (inverted when selected: white border instead of black)
-      renderer.drawRect(boxX, boxY, boxWidth, boxHeight, !bookSelected);
     }
 
-    for (const auto& line : lines) {
-      renderer.drawCenteredText(UI_12_FONT_ID, titleYStart, line.c_str(), !bookSelected);
-      titleYStart += renderer.getLineHeight(UI_12_FONT_ID);
-    }
-
-    if (!truncatedAuthor.empty()) {
-      titleYStart += renderer.getLineHeight(UI_10_FONT_ID) / 2;
-      renderer.drawCenteredText(UI_10_FONT_ID, titleYStart, truncatedAuthor.c_str(), !bookSelected);
-    }
-
-    // "Continue Reading" label at the bottom
+    // "Continue Reading" label at the bottom — always visible.
+    // When a cover is present, draw it inside a box so it stands out over the image.
     const int continueY = bookY + bookHeight - renderer.getLineHeight(UI_10_FONT_ID) * 3 / 2;
-    if (coverRendered) {
-      // Draw box behind "Continue Reading" text (inverted when selected: black box instead of white)
+    if (hasCoverImage) {
       const char* continueText = tr(STR_CONTINUE_READING);
       const int continueTextWidth = renderer.getTextWidth(UI_10_FONT_ID, continueText);
       constexpr int continuePadding = 6;

@@ -118,7 +118,7 @@ void HomeActivity::loadRecentCovers(int coverHeight) {
             }
             GUI.fillPopupProgress(renderer, popupRect, 50);
             const uint32_t deadline = (useTimeout && !isForcedBook) ? (millis() + COVER_RENDER_TIMEOUT_MS) : 0;
-            bool success = xtc.generateThumbBmp(coverHeight, deadline);
+            bool success = xtc.generateThumbBmp(coverHeight);
             if (success) {
               RECENT_BOOKS.setCoverDisabled(book.path, false);
               book.coverDisabled = false;
