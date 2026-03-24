@@ -97,6 +97,9 @@ void EpubReaderActivity::onExit() {
   renderer.setOrientation(GfxRenderer::Orientation::Portrait);
 
   APP_STATE.readerActivityLoadCount = 0;
+  if (SETTINGS.coverMode == CrossPointSettings::COVER_DISABLED_MODE) {
+    RECENT_BOOKS.setCoverDisabled(epub->getPath(), true);
+  }
   APP_STATE.pendingCoverGeneration = true;
   APP_STATE.saveToFile();
   section.reset();
@@ -146,9 +149,16 @@ void EpubReaderActivity::loop() {
       bookProgress = epub->calculateProgress(currentSpineIndex, chapterProgress) * 100.0f;
     }
     const int bookProgressPercent = clampPercent(static_cast<int>(bookProgress + 0.5f));
+    bool bookCoverDisabled = false;
+    for (const auto& rb : RECENT_BOOKS.getBooks()) {
+      if (rb.path == epub->getPath()) {
+        bookCoverDisabled = rb.coverDisabled;
+        break;
+      }
+    }
     startActivityForResult(std::make_unique<EpubReaderMenuActivity>(
                                renderer, mappedInput, epub->getTitle(), currentPage, totalPages, bookProgressPercent,
-                               SETTINGS.orientation, !currentPageFootnotes.empty()),
+                               SETTINGS.orientation, !currentPageFootnotes.empty(), bookCoverDisabled),
                            [this](const ActivityResult& result) {
                              // Always apply orientation change even if the menu was cancelled
                              const auto& menu = std::get<MenuResult>(result.data);
@@ -377,6 +387,37 @@ void EpubReaderActivity::onReaderMenuConfirm(EpubReaderMenuActivity::MenuAction 
       {
         RenderLock lock(*this);
         pendingScreenshot = true;
+      }
+      requestUpdate();
+      break;
+    }
+    case EpubReaderMenuActivity::MenuAction::COVER_ACTION: {
+      if (SETTINGS.coverMode == CrossPointSettings::COVER_TIMEOUT) {
+        // Force-render with no timeout regardless of current coverDisabled state
+        RECENT_BOOKS.setCoverDisabled(epub->getPath(), false);
+        APP_STATE.forceRenderCoverPath = epub->getPath();
+      } else {
+        // ENABLED or DISABLED: toggle per-book state
+        bool wasDisabled = false;
+        for (const auto& rb : RECENT_BOOKS.getBooks()) {
+          if (rb.path == epub->getPath()) {
+            wasDisabled = rb.coverDisabled;
+            break;
+          }
+        }
+        if (!wasDisabled) {
+          // Disable: delete BMP and mark disabled
+          const std::string bmpPath =
+              UITheme::getCoverThumbPath(epub->getThumbBmpPath(), UITheme::getInstance().getMetrics().homeCoverHeight);
+          if (!bmpPath.empty() && Storage.exists(bmpPath.c_str())) {
+            Storage.remove(bmpPath.c_str());
+          }
+          RECENT_BOOKS.setCoverDisabled(epub->getPath(), true);
+        } else {
+          // Enable: force-render (works even in DISABLED global mode)
+          RECENT_BOOKS.setCoverDisabled(epub->getPath(), false);
+          APP_STATE.forceRenderCoverPath = epub->getPath();
+        }
       }
       requestUpdate();
       break;
