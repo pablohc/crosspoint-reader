@@ -493,7 +493,7 @@ uint8_t* ZipFile::readFileToMemory(const char* filename, size_t* size, const boo
   return data;
 }
 
-bool ZipFile::readFileToStream(const char* filename, Print& out, const size_t chunkSize) {
+bool ZipFile::readFileToStream(const char* filename, Print& out, const size_t chunkSize, uint32_t deadline) {
   const bool wasOpen = isOpen();
   if (!wasOpen && !open()) {
     return false;
@@ -526,6 +526,14 @@ bool ZipFile::readFileToStream(const char* filename, Print& out, const size_t ch
 
     size_t remaining = inflatedDataSize;
     while (remaining > 0) {
+      if (deadline != 0 && millis() > deadline) {
+        LOG_ERR("ZIP", "Read deadline exceeded (stored)");
+        free(buffer);
+        if (!wasOpen) {
+          close();
+        }
+        return false;
+      }
       const size_t dataRead = file.read(buffer, remaining < chunkSize ? remaining : chunkSize);
       if (dataRead == 0) {
         LOG_ERR("ZIP", "Could not read more bytes");
@@ -588,6 +596,10 @@ bool ZipFile::readFileToStream(const char* filename, Print& out, const size_t ch
     size_t totalProduced = 0;
 
     while (true) {
+      if (deadline != 0 && millis() > deadline) {
+        LOG_ERR("ZIP", "Decompress deadline exceeded after %zu bytes", totalProduced);
+        break;
+      }
       size_t produced;
       const InflateStatus status = ctx.reader.readAtMost(outputBuffer, chunkSize, &produced);
 
