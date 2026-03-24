@@ -50,6 +50,9 @@ void XtcReaderActivity::onExit() {
   Activity::onExit();
 
   APP_STATE.readerActivityLoadCount = 0;
+  if (SETTINGS.coverMode == CrossPointSettings::COVER_DISABLED_MODE) {
+    RECENT_BOOKS.setCoverDisabled(xtc->getPath(), true);
+  }
   APP_STATE.pendingCoverGeneration = true;
   APP_STATE.saveToFile();
   xtc.reset();

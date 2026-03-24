@@ -57,8 +57,13 @@ void HomeActivity::loadRecentCovers(int coverHeight) {
 
   static constexpr uint32_t COVER_RENDER_TIMEOUT_MS = 3000;
 
-  // Skip all cover generation if globally disabled
-  if (SETTINGS.coverMode == CrossPointSettings::COVER_DISABLED_MODE) {
+  // Determine if a force-render was requested for the most recent book.
+  // Force render bypasses both the coverDisabled flag and any timeout deadline.
+  const bool isForcedBook = !recentBooks.empty() && (recentBooks[0].path == APP_STATE.forceRenderCoverPath);
+
+  // Skip all cover generation if globally disabled, unless force-rendering a specific book
+  if (SETTINGS.coverMode == CrossPointSettings::COVER_DISABLED_MODE && !isForcedBook) {
+    APP_STATE.forceRenderCoverPath = "";
     recentsLoaded = true;
     recentsLoading = false;
     return;
@@ -71,7 +76,7 @@ void HomeActivity::loadRecentCovers(int coverHeight) {
   // This prevents blocking HOME with multiple simultaneous generations.
   if (!recentBooks.empty()) {
     RecentBook& book = recentBooks[0];
-    if (!book.coverBmpPath.empty()) {
+    if (!book.coverBmpPath.empty() && (!book.coverDisabled || isForcedBook)) {
       std::string coverPath = UITheme::getCoverThumbPath(book.coverBmpPath, coverHeight);
       if (!Storage.exists(coverPath.c_str())) {
         // If epub, try to load the metadata for title/author and cover
@@ -86,13 +91,17 @@ void HomeActivity::loadRecentCovers(int coverHeight) {
             popupRect = GUI.drawPopup(renderer, tr(STR_LOADING_POPUP));
           }
           GUI.fillPopupProgress(renderer, popupRect, 50);
-          const uint32_t deadline = useTimeout ? (millis() + COVER_RENDER_TIMEOUT_MS) : 0;
+          // Force-render uses no deadline regardless of global mode
+          const uint32_t deadline = (useTimeout && !isForcedBook) ? (millis() + COVER_RENDER_TIMEOUT_MS) : 0;
           bool success = epub.generateThumbBmp(coverHeight, deadline);
-          if (!success) {
-            // Clear cover path on any failure (including timeout) so HOME won't retry.
-            // coverBmpPath is restored next time the user opens the book (via addBook).
-            RECENT_BOOKS.updateBook(book.path, book.title, book.author, "");
-            book.coverBmpPath = "";
+          if (success) {
+            RECENT_BOOKS.setCoverDisabled(book.path, false);
+            book.coverDisabled = false;
+          } else {
+            // Mark cover as disabled on any failure so HOME won't retry automatically.
+            // The user can force a retry via Reader Menu → "Generate cover" / "Enable cover".
+            RECENT_BOOKS.setCoverDisabled(book.path, true);
+            book.coverDisabled = true;
           }
           // Force full re-render without restoring old buffer (which had the empty template).
           // This prevents the cover appearing "behind" the old template on e-ink displays.
@@ -108,11 +117,14 @@ void HomeActivity::loadRecentCovers(int coverHeight) {
               popupRect = GUI.drawPopup(renderer, tr(STR_LOADING_POPUP));
             }
             GUI.fillPopupProgress(renderer, popupRect, 50);
-            const uint32_t deadline = useTimeout ? (millis() + COVER_RENDER_TIMEOUT_MS) : 0;
+            const uint32_t deadline = (useTimeout && !isForcedBook) ? (millis() + COVER_RENDER_TIMEOUT_MS) : 0;
             bool success = xtc.generateThumbBmp(coverHeight, deadline);
-            if (!success) {
-              RECENT_BOOKS.updateBook(book.path, book.title, book.author, "");
-              book.coverBmpPath = "";
+            if (success) {
+              RECENT_BOOKS.setCoverDisabled(book.path, false);
+              book.coverDisabled = false;
+            } else {
+              RECENT_BOOKS.setCoverDisabled(book.path, true);
+              book.coverDisabled = true;
             }
             coverRendered = false;
             coverBufferStored = false;
@@ -123,6 +135,7 @@ void HomeActivity::loadRecentCovers(int coverHeight) {
     }
   }
 
+  APP_STATE.forceRenderCoverPath = "";  // consume force-render flag
   recentsLoaded = true;
   recentsLoading = false;
 }
@@ -273,10 +286,12 @@ void HomeActivity::render(RenderLock&&) {
     firstRenderDone = true;
     requestUpdate();
   } else if (!recentsLoaded && !recentsLoading) {
-    // Only generate covers when returning from Reader, not on every HOME entry
+    // Only generate covers when returning from Reader, not on every HOME entry.
+    // Also trigger if a force-render was requested via Reader Menu.
     recentsLoaded = true;
-    if (APP_STATE.pendingCoverGeneration &&
-        SETTINGS.coverMode != CrossPointSettings::COVER_DISABLED_MODE) {
+    const bool hasPending = APP_STATE.pendingCoverGeneration;
+    const bool hasForce = !APP_STATE.forceRenderCoverPath.empty();
+    if (hasPending || hasForce) {
       APP_STATE.pendingCoverGeneration = false;
       recentsLoaded = false;
       recentsLoading = true;
