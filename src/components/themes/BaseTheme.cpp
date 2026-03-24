@@ -395,7 +395,9 @@ void BaseTheme::drawRecentBookCover(GfxRenderer& renderer, Rect rect, const std:
   int bookWidth, bookX;
   bool hasCoverImage = false;
 
-  if (hasContinueReading && !recentBooks[0].coverBmpPath.empty()) {
+  const bool skipCover = hasContinueReading && recentBooks[0].coverDisabled;
+
+  if (hasContinueReading && !recentBooks[0].coverBmpPath.empty() && !skipCover) {
     // Try to get actual image dimensions from BMP header
     const std::string coverBmpPath =
         UITheme::getCoverThumbPath(recentBooks[0].coverBmpPath, BaseMetrics::values.homeCoverHeight);
@@ -446,7 +448,7 @@ void BaseTheme::drawRecentBookCover(GfxRenderer& renderer, Rect rect, const std:
     // Draw cover image as background if available (inside the box)
     // Only load from SD on first render, then use stored buffer
 
-    if (hasContinueReading && !recentBooks[0].coverBmpPath.empty() && !coverRendered) {
+    if (hasContinueReading && !recentBooks[0].coverBmpPath.empty() && !coverRendered && !skipCover) {
       const std::string coverBmpPath =
           UITheme::getCoverThumbPath(recentBooks[0].coverBmpPath, BaseMetrics::values.homeCoverHeight);
 

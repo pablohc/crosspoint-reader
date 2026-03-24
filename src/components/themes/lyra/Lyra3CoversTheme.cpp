@@ -7,6 +7,7 @@
 #include <string>
 #include <vector>
 
+#include "CrossPointSettings.h"
 #include "RecentBooksStore.h"
 #include "components/UITheme.h"
 #include "components/icons/cover.h"
@@ -35,7 +36,8 @@ void Lyra3CoversTheme::drawRecentBookCover(GfxRenderer& renderer, Rect rect, con
         std::string coverPath = recentBooks[i].coverBmpPath;
         bool hasCover = true;
         int tileX = Lyra3CoversMetrics::values.contentSidePadding + tileWidth * i;
-        if (coverPath.empty()) {
+        const bool skipCover = recentBooks[i].coverDisabled;
+        if (coverPath.empty() || skipCover) {
           hasCover = false;
         } else {
           const std::string coverBmpPath =

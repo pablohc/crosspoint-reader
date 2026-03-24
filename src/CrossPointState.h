@@ -13,6 +13,7 @@ class CrossPointState {
   uint8_t readerActivityLoadCount = 0;
   bool lastSleepFromReader = false;
   bool pendingCoverGeneration = false;  // set on reader exit, consumed by HomeActivity
+  std::string forceRenderCoverPath;     // book path to force-render cover (no timeout); empty = none
   ~CrossPointState() = default;
 
   // Get singleton instance
