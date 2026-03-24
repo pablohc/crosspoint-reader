@@ -97,6 +97,7 @@ void EpubReaderActivity::onExit() {
   renderer.setOrientation(GfxRenderer::Orientation::Portrait);
 
   APP_STATE.readerActivityLoadCount = 0;
+  APP_STATE.pendingCoverGeneration = true;
   APP_STATE.saveToFile();
   section.reset();
   epub.reset();
