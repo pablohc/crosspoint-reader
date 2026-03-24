@@ -2,6 +2,7 @@
 
 #include <FsHelpers.h>
 #include <HalStorage.h>
+#include <I18n.h>
 
 #include "CrossPointSettings.h"
 #include "Epub.h"
@@ -12,6 +13,7 @@
 #include "XtcReaderActivity.h"
 #include "activities/util/BmpViewerActivity.h"
 #include "activities/util/FullScreenMessageActivity.h"
+#include "components/UITheme.h"
 
 std::string ReaderActivity::extractFolderPath(const std::string& filePath) {
   const auto lastSlash = filePath.find_last_of('/');
@@ -115,6 +117,7 @@ void ReaderActivity::onEnter() {
   if (isBmpFile(initialBookPath)) {
     onGoToBmpViewer(initialBookPath);
   } else if (isXtcFile(initialBookPath)) {
+    GUI.drawPopup(renderer, tr(STR_LOADING_POPUP));
     auto xtc = loadXtc(initialBookPath);
     if (!xtc) {
       onGoBack();
@@ -122,6 +125,7 @@ void ReaderActivity::onEnter() {
     }
     onGoToXtcReader(std::move(xtc));
   } else if (isTxtFile(initialBookPath)) {
+    GUI.drawPopup(renderer, tr(STR_LOADING_POPUP));
     auto txt = loadTxt(initialBookPath);
     if (!txt) {
       onGoBack();
@@ -129,6 +133,7 @@ void ReaderActivity::onEnter() {
     }
     onGoToTxtReader(std::move(txt));
   } else {
+    GUI.drawPopup(renderer, tr(STR_LOADING_POPUP));
     auto epub = loadEpub(initialBookPath);
     if (!epub) {
       onGoBack();
