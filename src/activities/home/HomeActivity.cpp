@@ -52,7 +52,6 @@ void HomeActivity::loadRecentBooks(int maxBooks) {
 
 void HomeActivity::loadRecentCovers(int coverHeight) {
   recentsLoading = true;
-  bool showingLoading = false;
   Rect popupRect;
 
   static constexpr uint32_t COVER_RENDER_TIMEOUT_MS = 3000;
@@ -86,10 +85,7 @@ void HomeActivity::loadRecentCovers(int coverHeight) {
           epub.load(false, true);
 
           // Try to generate thumbnail image for Continue Reading card
-          if (!showingLoading) {
-            showingLoading = true;
-            popupRect = GUI.drawPopup(renderer, tr(STR_LOADING_POPUP));
-          }
+          popupRect = GUI.drawPopup(renderer, tr(STR_LOADING_POPUP));
           GUI.fillPopupProgress(renderer, popupRect, 50);
           // Force-render uses no deadline regardless of global mode
           const uint32_t deadline = (useTimeout && !isForcedBook) ? (millis() + COVER_RENDER_TIMEOUT_MS) : 0;
@@ -112,12 +108,8 @@ void HomeActivity::loadRecentCovers(int coverHeight) {
           // Handle XTC file
           Xtc xtc(book.path, "/.crosspoint");
           if (xtc.load()) {
-            if (!showingLoading) {
-              showingLoading = true;
-              popupRect = GUI.drawPopup(renderer, tr(STR_LOADING_POPUP));
-            }
+            popupRect = GUI.drawPopup(renderer, tr(STR_LOADING_POPUP));
             GUI.fillPopupProgress(renderer, popupRect, 50);
-            const uint32_t deadline = (useTimeout && !isForcedBook) ? (millis() + COVER_RENDER_TIMEOUT_MS) : 0;
             bool success = xtc.generateThumbBmp(coverHeight);
             if (success) {
               RECENT_BOOKS.setCoverDisabled(book.path, false);
