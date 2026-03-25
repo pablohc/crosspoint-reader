@@ -406,6 +406,10 @@ void EpubReaderActivity::onReaderMenuConfirm(EpubReaderMenuActivity::MenuAction 
             Storage.remove(bmpPath.c_str());
           }
           RECENT_BOOKS.setCoverDisabled(epub->getPath(), true);
+          // Clear any pending force-render so HOME won't regenerate the deleted BMP
+          if (APP_STATE.forceRenderCoverPath == epub->getPath()) {
+            APP_STATE.forceRenderCoverPath = "";
+          }
         } else {
           // Enable: force-render (works even in DISABLED global mode)
           RECENT_BOOKS.setCoverDisabled(epub->getPath(), false);
