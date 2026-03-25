@@ -10,6 +10,8 @@
 #include <Logging.h>
 #include <esp_system.h>
 
+#include <algorithm>
+
 #include "CrossPointSettings.h"
 #include "CrossPointState.h"
 #include "EpubReaderChapterSelectionActivity.h"
@@ -149,13 +151,10 @@ void EpubReaderActivity::loop() {
       bookProgress = epub->calculateProgress(currentSpineIndex, chapterProgress) * 100.0f;
     }
     const int bookProgressPercent = clampPercent(static_cast<int>(bookProgress + 0.5f));
-    bool bookCoverDisabled = false;
-    for (const auto& rb : RECENT_BOOKS.getBooks()) {
-      if (rb.path == epub->getPath()) {
-        bookCoverDisabled = rb.coverDisabled;
-        break;
-      }
-    }
+    const auto& recentBooksList = RECENT_BOOKS.getBooks();
+    const auto recentIt = std::find_if(recentBooksList.begin(), recentBooksList.end(),
+                                       [this](const RecentBook& rb) { return rb.path == epub->getPath(); });
+    const bool bookCoverDisabled = (recentIt != recentBooksList.end()) && recentIt->coverDisabled;
     startActivityForResult(std::make_unique<EpubReaderMenuActivity>(
                                renderer, mappedInput, epub->getTitle(), currentPage, totalPages, bookProgressPercent,
                                SETTINGS.orientation, !currentPageFootnotes.empty(), bookCoverDisabled),
@@ -398,13 +397,10 @@ void EpubReaderActivity::onReaderMenuConfirm(EpubReaderMenuActivity::MenuAction 
         APP_STATE.forceRenderCoverPath = epub->getPath();
       } else {
         // ENABLED or DISABLED: toggle per-book state
-        bool wasDisabled = false;
-        for (const auto& rb : RECENT_BOOKS.getBooks()) {
-          if (rb.path == epub->getPath()) {
-            wasDisabled = rb.coverDisabled;
-            break;
-          }
-        }
+        const auto& toggleBooksList = RECENT_BOOKS.getBooks();
+        const auto toggleIt = std::find_if(toggleBooksList.begin(), toggleBooksList.end(),
+                                           [this](const RecentBook& rb) { return rb.path == epub->getPath(); });
+        const bool wasDisabled = (toggleIt != toggleBooksList.end()) && toggleIt->coverDisabled;
         if (!wasDisabled) {
           // Disable: delete BMP and mark disabled
           const std::string bmpPath =
