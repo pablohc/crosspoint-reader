@@ -526,7 +526,7 @@ bool ZipFile::readFileToStream(const char* filename, Print& out, const size_t ch
 
     size_t remaining = inflatedDataSize;
     while (remaining > 0) {
-      if (deadline != 0 && millis() > deadline) {
+      if (deadline != 0 && static_cast<int32_t>(millis() - deadline) >= 0) {
         LOG_ERR("ZIP", "Read deadline exceeded (stored)");
         free(buffer);
         if (!wasOpen) {
@@ -596,7 +596,7 @@ bool ZipFile::readFileToStream(const char* filename, Print& out, const size_t ch
     size_t totalProduced = 0;
 
     while (true) {
-      if (deadline != 0 && millis() > deadline) {
+      if (deadline != 0 && static_cast<int32_t>(millis() - deadline) >= 0) {
         LOG_ERR("ZIP", "Decompress deadline exceeded after %zu bytes", totalProduced);
         break;
       }

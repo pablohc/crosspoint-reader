@@ -667,7 +667,7 @@ bool PngToBmpConverter::pngFileToBmpStreamInternal(FsFile& pngFile, Print& bmpOu
 
   // Process each scanline
   for (uint32_t y = 0; y < height; y++) {
-    if (deadline != 0 && millis() > deadline) {
+    if (deadline != 0 && static_cast<int32_t>(millis() - deadline) >= 0) {
       LOG_ERR("PNG", "Decode deadline exceeded at scanline %u", y);
       success = false;
       break;

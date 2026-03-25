@@ -99,9 +99,6 @@ void EpubReaderActivity::onExit() {
   renderer.setOrientation(GfxRenderer::Orientation::Portrait);
 
   APP_STATE.readerActivityLoadCount = 0;
-  if (SETTINGS.coverMode == CrossPointSettings::COVER_DISABLED_MODE) {
-    RECENT_BOOKS.setCoverDisabled(epub->getPath(), true);
-  }
   APP_STATE.pendingCoverGeneration = true;
   APP_STATE.saveToFile();
   section.reset();
