@@ -359,7 +359,7 @@ bool JpegToBmpConverter::jpegFileToBmpStreamInternal(FsFile& jpegFile, Print& bm
   const int mcuPixelWidth = imageInfo.m_MCUWidth;
 
   for (int mcuY = 0; mcuY < imageInfo.m_MCUSPerCol; mcuY++) {
-    if (deadline != 0 && millis() > deadline) {
+    if (deadline != 0 && static_cast<int32_t>(millis() - deadline) >= 0) {
       LOG_ERR("JPG", "Decode deadline exceeded at MCU row %d", mcuY);
       return false;
     }
