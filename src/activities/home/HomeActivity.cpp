@@ -77,9 +77,13 @@ void HomeActivity::loadRecentCovers(int coverHeight) {
     RecentBook& book = recentBooks[0];
     if (!book.coverBmpPath.empty() && (!book.coverDisabled || isForcedBook)) {
       std::string coverPath = UITheme::getCoverThumbPath(book.coverBmpPath, coverHeight);
-      if (!Storage.exists(coverPath.c_str())) {
+      if (isForcedBook || !Storage.exists(coverPath.c_str())) {
         // If epub, try to load the metadata for title/author and cover
         if (FsHelpers::hasEpubExtension(book.path)) {
+          // Force-render: delete any stale BMP so generateThumbBmp regenerates it
+          if (isForcedBook) {
+            Storage.remove(coverPath.c_str());
+          }
           Epub epub(book.path, "/.crosspoint");
           // Skip loading css since we only need metadata here
           epub.load(false, true);
