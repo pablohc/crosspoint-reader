@@ -61,7 +61,7 @@ void RecentBooksStore::updateBook(const std::string& path, const std::string& ti
 void RecentBooksStore::setCoverDisabled(const std::string& path, bool disabled) {
   auto it =
       std::find_if(recentBooks.begin(), recentBooks.end(), [&](const RecentBook& book) { return book.path == path; });
-  if (it != recentBooks.end()) {
+  if (it != recentBooks.end() && it->coverDisabled != disabled) {
     it->coverDisabled = disabled;
     saveToFile();
   }
