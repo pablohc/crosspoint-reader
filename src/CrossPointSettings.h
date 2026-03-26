@@ -203,7 +203,7 @@ class CrossPointSettings {
   // Image rendering mode in EPUB reader
   uint8_t imageRendering = IMAGES_DISPLAY;
   // Home screen cover rendering mode
-  uint8_t coverMode = COVER_TIMEOUT;
+  uint8_t coverMode = COVER_ENABLED;
 
   ~CrossPointSettings() = default;
 
