@@ -241,7 +241,7 @@ std::string getFileName(std::string filename) {
   if (filename.back() == '/') {
     filename.pop_back();
     if (!UITheme::getInstance().getTheme().showsFileIcons()) {
-      return "[" + filename + "]";
+      return "[ " + filename + " ]";
     }
     return filename;
   }
