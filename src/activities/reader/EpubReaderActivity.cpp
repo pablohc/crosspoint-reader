@@ -33,6 +33,12 @@ constexpr unsigned long skipChapterMs = 700;
 // pages per minute, first item is 1 to prevent division by zero if accessed
 const std::vector<int> PAGE_TURN_LABELS = {1, 1, 3, 6, 12};
 
+const RecentBook* findRecentBook(const std::string& path) {
+  const auto& books = RECENT_BOOKS.getBooks();
+  const auto it = std::find_if(books.begin(), books.end(), [&path](const RecentBook& rb) { return rb.path == path; });
+  return (it != books.end()) ? &*it : nullptr;
+}
+
 int clampPercent(int percent) {
   if (percent < 0) {
     return 0;
@@ -148,10 +154,8 @@ void EpubReaderActivity::loop() {
       bookProgress = epub->calculateProgress(currentSpineIndex, chapterProgress) * 100.0f;
     }
     const int bookProgressPercent = clampPercent(static_cast<int>(bookProgress + 0.5f));
-    const auto& recentBooksList = RECENT_BOOKS.getBooks();
-    const auto recentIt = std::find_if(recentBooksList.begin(), recentBooksList.end(),
-                                       [this](const RecentBook& rb) { return rb.path == epub->getPath(); });
-    const bool bookCoverDisabled = (recentIt != recentBooksList.end()) && recentIt->coverDisabled;
+    const RecentBook* recentBook = findRecentBook(epub->getPath());
+    const bool bookCoverDisabled = recentBook && recentBook->coverDisabled;
     startActivityForResult(std::make_unique<EpubReaderMenuActivity>(
                                renderer, mappedInput, epub->getTitle(), currentPage, totalPages, bookProgressPercent,
                                SETTINGS.orientation, !currentPageFootnotes.empty(), bookCoverDisabled),
@@ -394,10 +398,8 @@ void EpubReaderActivity::onReaderMenuConfirm(EpubReaderMenuActivity::MenuAction 
         APP_STATE.forceRenderCoverPath = epub->getPath();
       } else {
         // ENABLED or DISABLED: toggle per-book state
-        const auto& toggleBooksList = RECENT_BOOKS.getBooks();
-        const auto toggleIt = std::find_if(toggleBooksList.begin(), toggleBooksList.end(),
-                                           [this](const RecentBook& rb) { return rb.path == epub->getPath(); });
-        const bool wasDisabled = (toggleIt != toggleBooksList.end()) && toggleIt->coverDisabled;
+        const RecentBook* toggleBook = findRecentBook(epub->getPath());
+        const bool wasDisabled = toggleBook && toggleBook->coverDisabled;
         if (!wasDisabled) {
           // Disable: delete BMP and mark disabled
           const std::string bmpPath =
