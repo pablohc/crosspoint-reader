@@ -9,6 +9,11 @@
 class GfxRenderer;
 struct RecentBook;
 
+struct BookCoverParams {
+  std::string title;
+  std::string author;
+};
+
 struct Rect {
   int x;
   int y;
@@ -142,4 +147,6 @@ class BaseTheme {
   virtual void drawTextField(const GfxRenderer& renderer, Rect rect, const int textWidth) const;
   virtual void drawKeyboardKey(const GfxRenderer& renderer, Rect rect, const char* label, const bool isSelected) const;
   virtual bool showsFileIcons() const { return false; }
+  void drawClassicalBookCover(GfxRenderer& renderer, int x, int y, int w, int h, const BookCoverParams& params,
+                              bool inverted = false, int continueTextWidth = 0) const;
 };
