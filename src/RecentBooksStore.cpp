@@ -1,5 +1,6 @@
 #include "RecentBooksStore.h"
 
+#include <CrossPointSettings.h>
 #include <Epub.h>
 #include <FsHelpers.h>
 #include <HalStorage.h>
@@ -28,7 +29,8 @@ void RecentBooksStore::addBook(const std::string& path, const std::string& title
 
   // Preserve coverDisabled from the existing entry: generation failures and user preferences
   // are tracked there, and must not be reset just because the book was re-opened.
-  const bool existingDisabled = (it != recentBooks.end()) ? it->coverDisabled : false;
+  const bool existingDisabled =
+      (it != recentBooks.end()) ? it->coverDisabled : (SETTINGS.coverMode == CrossPointSettings::COVER_DISABLED_MODE);
 
   if (it != recentBooks.end()) {
     recentBooks.erase(it);
