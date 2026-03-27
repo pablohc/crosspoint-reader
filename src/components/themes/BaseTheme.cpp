@@ -405,7 +405,7 @@ void BaseTheme::drawRecentBookCover(GfxRenderer& renderer, Rect rect, const std:
             bookWidth = maxWidth;
           }
         } else {
-          bookWidth = rect.width / 2;  // Fallback
+          bookWidth = baseHeight * 2 / 3;  // Fallback
         }
       }
       file.close();
@@ -414,18 +414,12 @@ void BaseTheme::drawRecentBookCover(GfxRenderer& renderer, Rect rect, const std:
 
   if (!hasCoverImage) {
     // No cover: use half screen size
-    bookWidth = rect.width / 2;
+    bookWidth = baseHeight * 2 / 3;
   }
 
   bookX = rect.x + (rect.width - bookWidth) / 2;
   const int bookY = rect.y;
   const int bookHeight = baseHeight;
-
-  // Bookmark dimensions (used in multiple places)
-  const int bookmarkWidth = bookWidth / 8;
-  const int bookmarkHeight = bookHeight / 5;
-  const int bookmarkX = bookX + 20;  // top-left, 20px from the spine edge
-  const int bookmarkY = bookY;       // flush with the top of the card
 
   // Draw book card regardless, fill with message based on `hasContinueReading`
   {
@@ -449,8 +443,6 @@ void BaseTheme::drawRecentBookCover(GfxRenderer& renderer, Rect rect, const std:
           // Draw border around the card
           renderer.drawRect(bookX, bookY, bookWidth, bookHeight);
 
-          // No bookmark ribbon when cover is shown - it would just cover the art
-
           // Store the buffer with cover image for fast navigation
           coverBufferStored = storeCoverBuffer();
           coverRendered = coverBufferStored;  // Only consider it rendered if we successfully stored the buffer
@@ -458,8 +450,8 @@ void BaseTheme::drawRecentBookCover(GfxRenderer& renderer, Rect rect, const std:
           // First render: if selected, draw selection indicators now
           if (bookSelected) {
             LOG_DBG("THEME", "Drawing selection");
-            renderer.drawRect(bookX + 1, bookY + 1, bookWidth - 2, bookHeight - 2);
-            renderer.drawRect(bookX + 2, bookY + 2, bookWidth - 4, bookHeight - 4);
+            renderer.drawRect(bookX + 1, bookY + 1, bookWidth - 2, bookHeight - 2, true);
+            renderer.drawRect(bookX + 2, bookY + 2, bookWidth - 4, bookHeight - 4, true);
           }
         }
         file.close();
@@ -467,87 +459,32 @@ void BaseTheme::drawRecentBookCover(GfxRenderer& renderer, Rect rect, const std:
     }
 
     if (!bufferRestored && !coverRendered) {
-      // No cover image: draw border or fill, plus bookmark as visual flair
       if (bookSelected) {
         renderer.fillRect(bookX, bookY, bookWidth, bookHeight);
-      } else {
-        renderer.drawRect(bookX, bookY, bookWidth, bookHeight);
-      }
-
-      // Draw bookmark ribbon when no cover image (visual decoration)
-      if (hasContinueReading) {
-        const int notchDepth = bookmarkHeight / 3;
-        const int centerX = bookmarkX + bookmarkWidth / 2;
-
-        const int xPoints[5] = {
-            bookmarkX,                  // top-left
-            bookmarkX + bookmarkWidth,  // top-right
-            bookmarkX + bookmarkWidth,  // bottom-right
-            centerX,                    // center notch point
-            bookmarkX                   // bottom-left
-        };
-        const int yPoints[5] = {
-            bookmarkY,                                // top-left
-            bookmarkY,                                // top-right
-            bookmarkY + bookmarkHeight,               // bottom-right
-            bookmarkY + bookmarkHeight - notchDepth,  // center notch point
-            bookmarkY + bookmarkHeight                // bottom-left
-        };
-
-        // Draw bookmark ribbon (inverted if selected)
-        renderer.fillPolygon(xPoints, yPoints, 5, !bookSelected);
       }
     }
 
     // If buffer was restored, draw selection indicators if needed
     if (bufferRestored && bookSelected && coverRendered) {
-      // Draw selection border (no bookmark inversion needed since cover has no bookmark)
-      renderer.drawRect(bookX + 1, bookY + 1, bookWidth - 2, bookHeight - 2);
-      renderer.drawRect(bookX + 2, bookY + 2, bookWidth - 4, bookHeight - 4);
-    } else if (!coverRendered && !bufferRestored) {
-      // Selection border already handled above in the no-cover case
+      renderer.drawRect(bookX + 1, bookY + 1, bookWidth - 2, bookHeight - 2, true);
+      renderer.drawRect(bookX + 2, bookY + 2, bookWidth - 4, bookHeight - 4, true);
     }
   }
 
   if (hasContinueReading) {
-    // Only show title + author when there is no cover image (alt-text placeholder).
-    // When the cover is available, it speaks for itself — the overlay would obscure the art.
+    const char* continueText = tr(STR_CONTINUE_READING);
+    const int continueTextW = renderer.getTextWidth(UI_10_FONT_ID, continueText);
+
     if (!hasCoverImage) {
-      const std::string& lastBookTitle = recentBooks[0].title;
-      const std::string& lastBookAuthor = recentBooks[0].author;
-
-      auto lines = renderer.wrappedText(UI_12_FONT_ID, lastBookTitle.c_str(), bookWidth - 40, 3);
-
-      int totalTextHeight = renderer.getLineHeight(UI_12_FONT_ID) * static_cast<int>(lines.size());
-      if (!lastBookAuthor.empty()) {
-        totalTextHeight += renderer.getLineHeight(UI_10_FONT_ID) * 3 / 2;
-      }
-
-      int titleYStart = bookY + (bookHeight - totalTextHeight) / 2;
-
-      const auto truncatedAuthor = lastBookAuthor.empty()
-                                       ? std::string{}
-                                       : renderer.truncatedText(UI_10_FONT_ID, lastBookAuthor.c_str(), bookWidth - 40);
-
-      for (const auto& line : lines) {
-        renderer.drawCenteredText(UI_12_FONT_ID, titleYStart, line.c_str(), !bookSelected);
-        titleYStart += renderer.getLineHeight(UI_12_FONT_ID);
-      }
-
-      if (!truncatedAuthor.empty()) {
-        titleYStart += renderer.getLineHeight(UI_10_FONT_ID) / 2;
-        renderer.drawCenteredText(UI_10_FONT_ID, titleYStart, truncatedAuthor.c_str(), !bookSelected);
-      }
+      BookCoverParams coverParams{recentBooks[0].title, recentBooks[0].author};
+      drawClassicalBookCover(renderer, bookX, bookY, bookWidth, bookHeight, coverParams, bookSelected, continueTextW);
+      renderer.drawRect(bookX, bookY, bookWidth, bookHeight, 3, true);
     }
 
-    // "Continue Reading" label at the bottom — always visible.
-    // When a cover is present, draw it inside a box so it stands out over the image.
-    const int continueY = bookY + bookHeight - renderer.getLineHeight(UI_10_FONT_ID) * 3 / 2;
+    const int continueY = bookY + bookHeight - renderer.getLineHeight(UI_10_FONT_ID) * 3 / 2 - 2;
     if (hasCoverImage) {
-      const char* continueText = tr(STR_CONTINUE_READING);
-      const int continueTextWidth = renderer.getTextWidth(UI_10_FONT_ID, continueText);
       constexpr int continuePadding = 6;
-      const int continueBoxWidth = continueTextWidth + continuePadding * 2;
+      const int continueBoxWidth = continueTextW + continuePadding * 2;
       const int continueBoxHeight = renderer.getLineHeight(UI_10_FONT_ID) + continuePadding;
       const int continueBoxX = rect.x + (rect.width - continueBoxWidth) / 2;
       const int continueBoxY = continueY - continuePadding / 2;
@@ -555,14 +492,12 @@ void BaseTheme::drawRecentBookCover(GfxRenderer& renderer, Rect rect, const std:
       renderer.drawRect(continueBoxX, continueBoxY, continueBoxWidth, continueBoxHeight, !bookSelected);
       renderer.drawCenteredText(UI_10_FONT_ID, continueY, continueText, !bookSelected);
     } else {
-      renderer.drawCenteredText(UI_10_FONT_ID, continueY, tr(STR_CONTINUE_READING), !bookSelected);
+      renderer.drawCenteredText(UI_10_FONT_ID, continueY, continueText, !bookSelected);
     }
   } else {
-    // No book to continue reading
-    const int y =
-        bookY + (bookHeight - renderer.getLineHeight(UI_12_FONT_ID) - renderer.getLineHeight(UI_10_FONT_ID)) / 2;
-    renderer.drawCenteredText(UI_12_FONT_ID, y, "No open book");
-    renderer.drawCenteredText(UI_10_FONT_ID, y + renderer.getLineHeight(UI_12_FONT_ID), "Start reading below");
+    renderer.drawRect(bookX, bookY, bookWidth, bookHeight, 3, true);
+    const int textLineH = renderer.getLineHeight(UI_12_FONT_ID);
+    renderer.drawCenteredText(UI_12_FONT_ID, bookY + (bookHeight - textLineH) / 2, tr(STR_NO_OPEN_BOOK), true);
   }
 }
 
@@ -743,4 +678,88 @@ void BaseTheme::drawKeyboardKey(const GfxRenderer& renderer, Rect rect, const ch
     renderer.drawText(UI_10_FONT_ID, textX + itemWidth, rect.y, "]");
   }
   renderer.drawText(UI_10_FONT_ID, textX, rect.y, label);
+}
+
+void BaseTheme::drawClassicalBookCover(GfxRenderer& renderer, int x, int y, int w, int h, const BookCoverParams& params,
+                                       bool inverted, int continueTextWidth) const {
+  renderer.fillRect(x + 1, y + 1, w - 2, h - 2, inverted);
+
+  renderer.drawRect(x + 10, y + 10, 12, 12, !inverted);
+  renderer.drawRect(x + w - 22, y + 10, 12, 12, !inverted);
+  renderer.drawRect(x + 10, y + h - 22, 12, 12, !inverted);
+  renderer.drawRect(x + w - 22, y + h - 22, 12, 12, !inverted);
+
+  const int innerL = x + 21;
+  const int innerR = x + w - 22;
+  const int innerT = y + 21;
+  const int innerB = y + h - 22;
+  const int innerCX = x + w / 2;
+  renderer.drawLine(innerL, innerT, innerR, innerT, !inverted);
+  renderer.drawLine(innerL, innerT, innerL, innerB, !inverted);
+  renderer.drawLine(innerR, innerT, innerR, innerB, !inverted);
+  const int textGapHalf = (continueTextWidth / 2) + 8;
+  renderer.drawLine(innerL, innerB, innerCX - textGapHalf, innerB, !inverted);
+  renderer.drawLine(innerCX + textGapHalf, innerB, innerR, innerB, !inverted);
+
+  const int t = 2;
+  const int s = 30;
+  const int midY = y + h / 2;
+
+  renderer.fillRect(x + 10, y + s, t, midY - y - s, !inverted);
+  renderer.fillRect(x + 10, y + s, s - 10 + t, t, !inverted);
+  renderer.fillRect(x + s, y + 10, t, s - 10, !inverted);
+  renderer.fillRect(x + s, y + 10, w - 2 * s, t, !inverted);
+  renderer.fillRect(x + w - 12, y + s, t, h - 2 * s, !inverted);
+  renderer.fillRect(x + w - 10 - (s - 10 + t), y + s, s - 10 + t, t, !inverted);
+  renderer.fillRect(x + w - 10 - (s - 10 + t), y + 10, t, s - 10, !inverted);
+  renderer.fillRect(x + w - 10 - (s - 10 + t), y + h - s - t, s - 10 + t, t, !inverted);
+  renderer.fillRect(x + w - 10 - (s - 10 + t), y + h - s, t, s - 10, !inverted);
+  renderer.fillRect(x + s, y + h - 12, w - 2 * s, t, !inverted);
+  renderer.fillRect(x + s, y + h - s, t, s - 10, !inverted);
+  renderer.fillRect(x + 10, y + h - s - t, s - 10 + t, t, !inverted);
+  renderer.fillRect(x + 10, midY, t, y + h - s - midY, !inverted);
+
+  const int titleMaxW = w - 130;
+  auto titleLines = renderer.wrappedText(BOOKERLY_12_FONT_ID, params.title.c_str(), titleMaxW, 3);
+
+  const int lineH = renderer.getLineHeight(BOOKERLY_12_FONT_ID);
+  const int gap = lineH / 2;
+
+  std::vector<std::string> authorLines;
+  int authorLineCount = 0;
+  if (!params.author.empty()) {
+    authorLines = renderer.wrappedText(BOOKERLY_12_FONT_ID, params.author.c_str(), titleMaxW, 2);
+    authorLineCount = static_cast<int>(authorLines.size());
+  }
+
+  int totalBlockH = (static_cast<int>(titleLines.size()) + authorLineCount) * lineH + 4 * gap + 1;
+
+  const int center = y + (innerB - innerT) * 45 / 100;
+  const int blockY = center - totalBlockH / 2;
+
+  renderer.fillRect(x + 42, blockY, w - 84, totalBlockH + 16, false);
+  renderer.drawRect(x + 42, blockY, w - 84, totalBlockH + 16, 2, true);
+  renderer.drawRect(x + 50, blockY + 8, w - 100, totalBlockH, 1, true);
+
+  int centerX = x + w / 2;
+  int textY = blockY + 8 + gap;
+
+  for (const auto& line : titleLines) {
+    int tw = renderer.getTextWidth(BOOKERLY_12_FONT_ID, line.c_str(), EpdFontFamily::BOLD);
+    renderer.drawText(BOOKERLY_12_FONT_ID, centerX - tw / 2, textY, line.c_str(), true, EpdFontFamily::BOLD);
+    textY += lineH;
+  }
+
+  textY += gap;
+  if (!authorLines.empty()) {
+    renderer.drawLine(centerX - 40, textY, centerX + 40, textY, true);
+    textY += 1;
+  }
+  textY += gap;
+
+  for (const auto& line : authorLines) {
+    int aw = renderer.getTextWidth(BOOKERLY_12_FONT_ID, line.c_str());
+    renderer.drawText(BOOKERLY_12_FONT_ID, centerX - aw / 2, textY, line.c_str(), true);
+    textY += lineH;
+  }
 }
