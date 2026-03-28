@@ -394,7 +394,6 @@ void EpubReaderActivity::onReaderMenuConfirm(EpubReaderMenuActivity::MenuAction 
     case EpubReaderMenuActivity::MenuAction::COVER_ACTION: {
       if (SETTINGS.coverMode == CrossPointSettings::COVER_TIMEOUT) {
         // Force-render with no timeout regardless of current coverDisabled state
-        RECENT_BOOKS.setCoverDisabled(epub->getPath(), false);
         APP_STATE.forceRenderCoverPath = epub->getPath();
       } else {
         // ENABLED or DISABLED: toggle per-book state
@@ -414,7 +413,6 @@ void EpubReaderActivity::onReaderMenuConfirm(EpubReaderMenuActivity::MenuAction 
           }
         } else {
           // Enable: force-render (works even in DISABLED global mode)
-          RECENT_BOOKS.setCoverDisabled(epub->getPath(), false);
           APP_STATE.forceRenderCoverPath = epub->getPath();
         }
       }
