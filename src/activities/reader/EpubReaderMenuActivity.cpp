@@ -11,9 +11,9 @@
 EpubReaderMenuActivity::EpubReaderMenuActivity(GfxRenderer& renderer, MappedInputManager& mappedInput,
                                                const std::string& title, const int currentPage, const int totalPages,
                                                const int bookProgressPercent, const uint8_t currentOrientation,
-                                               const bool hasFootnotes, const bool bookCoverDisabled)
+                                               const bool hasFootnotes, const bool hasCoverForTheme)
     : Activity("EpubReaderMenu", renderer, mappedInput),
-      menuItems(buildMenuItems(hasFootnotes, bookCoverDisabled)),
+      menuItems(buildMenuItems(hasFootnotes, hasCoverForTheme)),
       title(title),
       pendingOrientation(currentOrientation),
       currentPage(currentPage),
@@ -21,7 +21,7 @@ EpubReaderMenuActivity::EpubReaderMenuActivity(GfxRenderer& renderer, MappedInpu
       bookProgressPercent(bookProgressPercent) {}
 
 std::vector<EpubReaderMenuActivity::MenuItem> EpubReaderMenuActivity::buildMenuItems(bool hasFootnotes,
-                                                                                     bool bookCoverDisabled) {
+                                                                                     bool hasCoverForTheme) {
   std::vector<MenuItem> items;
   items.reserve(11);
   items.push_back({MenuAction::SELECT_CHAPTER, StrId::STR_SELECT_CHAPTER});
@@ -36,11 +36,11 @@ std::vector<EpubReaderMenuActivity::MenuItem> EpubReaderMenuActivity::buildMenuI
   items.push_back({MenuAction::GO_HOME, StrId::STR_GO_HOME_BUTTON});
   items.push_back({MenuAction::SYNC, StrId::STR_SYNC_PROGRESS});
   items.push_back({MenuAction::DELETE_CACHE, StrId::STR_DELETE_CACHE});
-  // Cover action: TIMEOUT always shows "Generate cover"; ENABLED/DISABLED toggle per-book state
   if (SETTINGS.coverMode == CrossPointSettings::COVER_TIMEOUT) {
-    items.push_back({MenuAction::COVER_ACTION, StrId::STR_COVER_ACTION_GENERATE});
+    items.push_back({MenuAction::COVER_ACTION, StrId::STR_HOME_COVER_ACTION_GENERATE});
   } else {
-    const StrId coverLabel = bookCoverDisabled ? StrId::STR_COVER_ACTION_ENABLE : StrId::STR_COVER_ACTION_DISABLE;
+    const StrId coverLabel =
+        hasCoverForTheme ? StrId::STR_HOME_COVER_ACTION_DISABLE : StrId::STR_HOME_COVER_ACTION_ENABLE;
     items.push_back({MenuAction::COVER_ACTION, coverLabel});
   }
   return items;
