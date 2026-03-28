@@ -139,8 +139,10 @@ void HomeActivity::loadRecentCovers(int coverHeight) {
 void HomeActivity::onEnter() {
   Activity::onEnter();
 
-  // Check if OPDS browser URL is configured
   hasOpdsUrl = strlen(SETTINGS.opdsServerUrl) > 0;
+
+  coverRendered = false;
+  coverBufferStored = false;
 
   selectorIndex = 0;
 
