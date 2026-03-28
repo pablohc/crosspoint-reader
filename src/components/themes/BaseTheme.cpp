@@ -421,6 +421,8 @@ void BaseTheme::drawRecentBookCover(GfxRenderer& renderer, Rect rect, const std:
     if (bufferRestored) {
       renderer.fillRect(rect.x, rect.y, rect.width, rect.height, false);
       bufferRestored = false;
+      coverRendered = false;
+      coverBufferStored = false;
     }
   }
 
