@@ -28,7 +28,7 @@ class EpubReaderMenuActivity final : public Activity {
   explicit EpubReaderMenuActivity(GfxRenderer& renderer, MappedInputManager& mappedInput, const std::string& title,
                                   const int currentPage, const int totalPages, const int bookProgressPercent,
                                   const uint8_t currentOrientation, const bool hasFootnotes,
-                                  const bool bookCoverDisabled);
+                                  const bool hasCoverForTheme);
 
   void onEnter() override;
   void onExit() override;
@@ -41,7 +41,7 @@ class EpubReaderMenuActivity final : public Activity {
     StrId labelId;
   };
 
-  static std::vector<MenuItem> buildMenuItems(bool hasFootnotes, bool bookCoverDisabled);
+  static std::vector<MenuItem> buildMenuItems(bool hasFootnotes, bool hasCoverForTheme);
 
   // Fixed menu layout
   const std::vector<MenuItem> menuItems;

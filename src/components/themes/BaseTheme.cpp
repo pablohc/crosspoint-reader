@@ -371,6 +371,9 @@ void BaseTheme::drawRecentBookCover(GfxRenderer& renderer, Rect rect, const std:
   const bool hasContinueReading = !recentBooks.empty();
   const bool bookSelected = hasContinueReading && selectorIndex == 0;
 
+  LOG_DBG("THEME", "drawRecentBookCover: hasContinue=%d selected=%d coverRendered=%d bufferStored=%d bufferRestored=%d",
+          hasContinueReading, bookSelected, coverRendered, coverBufferStored, bufferRestored);
+
   // --- Top "book" card for the current title (selectorIndex == 0) ---
   // When there's no cover image, use fixed size (half screen)
   // When there's cover image, adapt width to image aspect ratio, keep height fixed at 400px
@@ -413,12 +416,9 @@ void BaseTheme::drawRecentBookCover(GfxRenderer& renderer, Rect rect, const std:
   }
 
   if (!hasCoverImage) {
-    // No cover: use half screen size
     bookWidth = baseHeight * 2 / 3;
-
-    // If buffer was restored from a previous full-width cover, clear the
-    // full slot so stale pixels don't leak behind the narrower placeholder.
     if (bufferRestored) {
+      LOG_DBG("THEME", "drawRecentBookCover: clearing stale buffer (no cover, bufferRestored)");
       renderer.fillRect(rect.x, rect.y, rect.width, rect.height, false);
       bufferRestored = false;
       coverRendered = false;
@@ -446,22 +446,21 @@ void BaseTheme::drawRecentBookCover(GfxRenderer& renderer, Rect rect, const std:
         if (bitmap.parseHeaders() == BmpReaderError::Ok) {
           LOG_DBG("THEME", "Rendering bmp");
 
-          // Draw the cover image (bookWidth and bookHeight already match image aspect ratio)
-          renderer.drawBitmap(bitmap, bookX, bookY, bookWidth, bookHeight);
+          if (renderer.drawBitmap(bitmap, bookX, bookY, bookWidth, bookHeight)) {
+            renderer.drawRect(bookX, bookY, bookWidth, bookHeight);
+            coverRendered = true;
+            coverBufferStored = storeCoverBuffer();
 
-          // Draw border around the card
-          renderer.drawRect(bookX, bookY, bookWidth, bookHeight);
-
-          coverRendered = true;
-
-          // Store the buffer with cover image for fast navigation
-          coverBufferStored = storeCoverBuffer();
-
-          // First render: if selected, draw selection indicators now
-          if (bookSelected) {
-            LOG_DBG("THEME", "Drawing selection");
-            renderer.drawRect(bookX + 1, bookY + 1, bookWidth - 2, bookHeight - 2, true);
-            renderer.drawRect(bookX + 2, bookY + 2, bookWidth - 4, bookHeight - 4, true);
+            if (bookSelected) {
+              LOG_DBG("THEME", "Drawing selection");
+              renderer.drawRect(bookX + 1, bookY + 1, bookWidth - 2, bookHeight - 2, true);
+              renderer.drawRect(bookX + 2, bookY + 2, bookWidth - 4, bookHeight - 4, true);
+            }
+          } else {
+            LOG_DBG("THEME", "drawBitmap failed, falling back to placeholder");
+            hasCoverImage = false;
+            bookWidth = baseHeight * 2 / 3;
+            bookX = rect.x + (rect.width - bookWidth) / 2;
           }
         }
         file.close();
