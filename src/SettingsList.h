@@ -36,8 +36,8 @@ inline const std::vector<SettingInfo>& getSettingsList() {
       SettingInfo::Toggle(StrId::STR_SUNLIGHT_FADING_FIX, &CrossPointSettings::fadingFix, "fadingFix",
                           StrId::STR_CAT_DISPLAY),
       SettingInfo::Enum(StrId::STR_HOME_COVER, &CrossPointSettings::coverMode,
-                        {StrId::STR_COVER_ENABLED, StrId::STR_COVER_TIMEOUT, StrId::STR_COVER_DISABLED}, "coverMode",
-                        StrId::STR_CAT_DISPLAY),
+                        {StrId::STR_HOME_COVER_ENABLED, StrId::STR_HOME_COVER_TIMEOUT, StrId::STR_HOME_COVER_DISABLED},
+                        "coverMode", StrId::STR_CAT_DISPLAY),
 
       // --- Reader ---
       SettingInfo::Enum(StrId::STR_FONT_FAMILY, &CrossPointSettings::fontFamily,

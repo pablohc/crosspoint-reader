@@ -55,9 +55,11 @@ void Lyra3CoversTheme::drawRecentBookCover(GfxRenderer& renderer, Rect rect, con
                                       static_cast<float>(Lyra3CoversMetrics::values.homeCoverHeight);
               float cropX = 1.0f - (tileRatio / ratio);
 
-              renderer.drawBitmap(bitmap, tileX + hPaddingInSelection, tileY + hPaddingInSelection,
-                                  tileWidth - 2 * hPaddingInSelection, Lyra3CoversMetrics::values.homeCoverHeight,
-                                  cropX);
+              if (!renderer.drawBitmap(bitmap, tileX + hPaddingInSelection, tileY + hPaddingInSelection,
+                                       tileWidth - 2 * hPaddingInSelection, Lyra3CoversMetrics::values.homeCoverHeight,
+                                       cropX)) {
+                hasCover = false;
+              }
             } else {
               hasCover = false;
             }
