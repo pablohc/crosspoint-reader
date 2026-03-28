@@ -155,10 +155,15 @@ void EpubReaderActivity::loop() {
     }
     const int bookProgressPercent = clampPercent(static_cast<int>(bookProgress + 0.5f));
     const RecentBook* recentBook = findRecentBook(epub->getPath());
-    const bool bookCoverDisabled = recentBook && recentBook->coverDisabled;
+    bool hasCoverForTheme = false;
+    if (recentBook && !recentBook->coverBmpPath.empty()) {
+      const std::string coverPath =
+          UITheme::getCoverThumbPath(recentBook->coverBmpPath, UITheme::getInstance().getMetrics().homeCoverHeight);
+      hasCoverForTheme = Storage.exists(coverPath.c_str());
+    }
     startActivityForResult(std::make_unique<EpubReaderMenuActivity>(
                                renderer, mappedInput, epub->getTitle(), currentPage, totalPages, bookProgressPercent,
-                               SETTINGS.orientation, !currentPageFootnotes.empty(), bookCoverDisabled),
+                               SETTINGS.orientation, !currentPageFootnotes.empty(), hasCoverForTheme),
                            [this](const ActivityResult& result) {
                              // Always apply orientation change even if the menu was cancelled
                              const auto& menu = std::get<MenuResult>(result.data);
@@ -393,27 +398,29 @@ void EpubReaderActivity::onReaderMenuConfirm(EpubReaderMenuActivity::MenuAction 
     }
     case EpubReaderMenuActivity::MenuAction::COVER_ACTION: {
       if (SETTINGS.coverMode == CrossPointSettings::COVER_TIMEOUT) {
-        // Force-render with no timeout regardless of current coverDisabled state
+        LOG_DBG("ERS", "COVER_ACTION: TIMEOUT mode → force-render (no coverDisabled change)");
         APP_STATE.forceRenderCoverPath = epub->getPath();
       } else {
-        // ENABLED or DISABLED: toggle per-book state
-        const RecentBook* toggleBook = findRecentBook(epub->getPath());
-        const bool wasDisabled = toggleBook && toggleBook->coverDisabled;
-        if (!wasDisabled) {
-          // Disable: delete BMP and mark disabled
-          const std::string bmpPath =
-              UITheme::getCoverThumbPath(epub->getThumbBmpPath(), UITheme::getInstance().getMetrics().homeCoverHeight);
-          if (!bmpPath.empty() && Storage.exists(bmpPath.c_str())) {
-            Storage.remove(bmpPath.c_str());
+        const std::string bmpPath =
+            UITheme::getCoverThumbPath(epub->getThumbBmpPath(), UITheme::getInstance().getMetrics().homeCoverHeight);
+        const bool hasCover = !bmpPath.empty() && Storage.exists(bmpPath.c_str());
+        LOG_DBG("ERS", "COVER_ACTION: ENABLED/DISABLED toggle, hasCover=%d", hasCover);
+        if (hasCover) {
+          for (const int h : UITheme::getAllCoverHeights()) {
+            const std::string pathToRemove = UITheme::getCoverThumbPath(epub->getThumbBmpPath(), h);
+            if (Storage.exists(pathToRemove.c_str())) {
+              Storage.remove(pathToRemove.c_str());
+              LOG_DBG("ERS", "COVER_ACTION: deleted BMP '%s'", pathToRemove.c_str());
+            }
           }
           RECENT_BOOKS.setCoverDisabled(epub->getPath(), true);
-          // Clear any pending force-render so HOME won't regenerate the deleted BMP
           if (APP_STATE.forceRenderCoverPath == epub->getPath()) {
             APP_STATE.forceRenderCoverPath = "";
           }
+          LOG_DBG("ERS", "COVER_ACTION: cover disabled, cleared forcePath");
         } else {
-          // Enable: force-render (works even in DISABLED global mode)
           APP_STATE.forceRenderCoverPath = epub->getPath();
+          LOG_DBG("ERS", "COVER_ACTION: cover enabled, set forcePath='%s'", epub->getPath().c_str());
         }
       }
       requestUpdate();

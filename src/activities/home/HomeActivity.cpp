@@ -6,6 +6,7 @@
 #include <GfxRenderer.h>
 #include <HalStorage.h>
 #include <I18n.h>
+#include <Logging.h>
 #include <Utf8.h>
 #include <Xtc.h>
 
@@ -18,9 +19,8 @@
 #include "RecentBooksStore.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
-
 int HomeActivity::getMenuItemCount() const {
-  int count = 4;  // File Browser, Recents, File transfer, Settings
+  int count = 4;
   if (!recentBooks.empty()) {
     count += recentBooks.size();
   }
@@ -34,18 +34,13 @@ void HomeActivity::loadRecentBooks(int maxBooks) {
   recentBooks.clear();
   const auto& books = RECENT_BOOKS.getBooks();
   recentBooks.reserve(std::min(static_cast<int>(books.size()), maxBooks));
-
   for (const RecentBook& book : books) {
-    // Limit to maximum number of recent books
     if (recentBooks.size() >= maxBooks) {
       break;
     }
-
-    // Skip if file no longer exists
     if (!Storage.exists(book.path.c_str())) {
       continue;
     }
-
     recentBooks.push_back(book);
   }
 }
@@ -53,63 +48,59 @@ void HomeActivity::loadRecentBooks(int maxBooks) {
 void HomeActivity::loadRecentCovers(int coverHeight) {
   recentsLoading = true;
   Rect popupRect;
-
-  static constexpr uint32_t COVER_RENDER_TIMEOUT_MS = 3000;
-
-  // Determine if a force-render was requested for the most recent book.
-  // Force render bypasses both the coverDisabled flag and any timeout deadline.
+  static constexpr uint32_t COVER_RENDER_TIMEOUT_MS = 10000;
   const bool isForcedBook = !recentBooks.empty() && (recentBooks[0].path == APP_STATE.forceRenderCoverPath);
-
-  // Skip all cover generation if globally disabled, unless force-rendering a specific book
+  LOG_DBG("HOME", "loadRecentCovers: coverMode=%d isForced=%d forcePath='%s'", SETTINGS.coverMode, isForcedBook,
+          APP_STATE.forceRenderCoverPath.c_str());
   if (SETTINGS.coverMode == CrossPointSettings::COVER_DISABLED_MODE && !isForcedBook) {
+    LOG_DBG("HOME", "loadRecentCovers: skipped (globally disabled)");
     APP_STATE.forceRenderCoverPath = "";
     recentsLoaded = true;
     recentsLoading = false;
     return;
   }
-
   const bool useTimeout = (SETTINGS.coverMode == CrossPointSettings::COVER_TIMEOUT);
-
-  // Only attempt cover generation for the most recently opened book (recentBooks[0]).
-  // Other books get their cover generated when the user opens them individually.
-  // This prevents blocking HOME with multiple simultaneous generations.
+  LOG_DBG("HOME", "loadRecentCovers: useTimeout=%d timeoutMs=%u", useTimeout, COVER_RENDER_TIMEOUT_MS);
   if (!recentBooks.empty()) {
     RecentBook& book = recentBooks[0];
-    if (!book.coverBmpPath.empty() && (!book.coverDisabled || isForcedBook)) {
+    LOG_DBG("HOME", "loadRecentCovers: book='%s' coverBmp='%s' coverDisabled=%d", book.path.c_str(),
+            book.coverBmpPath.c_str(), book.coverDisabled);
+    if (!book.coverBmpPath.empty()) {
       std::string coverPath = UITheme::getCoverThumbPath(book.coverBmpPath, coverHeight);
-      if (isForcedBook || !Storage.exists(coverPath.c_str())) {
-        // If epub, try to load the metadata for title/author and cover
+      bool coverExists = Storage.exists(coverPath.c_str());
+      LOG_DBG("HOME", "loadRecentCovers: coverPath='%s' exists=%d isForced=%d", coverPath.c_str(), coverExists,
+              isForcedBook);
+      if (coverExists && !isForcedBook) {
+        if (book.coverDisabled) {
+          RECENT_BOOKS.setCoverDisabled(book.path, false);
+          book.coverDisabled = false;
+        }
+      }
+      if ((isForcedBook || !coverExists) && (!book.coverDisabled || isForcedBook)) {
         if (FsHelpers::hasEpubExtension(book.path)) {
-          // Force-render: delete any stale BMP so generateThumbBmp regenerates it
           if (isForcedBook) {
             Storage.remove(coverPath.c_str());
+            LOG_DBG("HOME", "loadRecentCovers: force-render removed stale BMP");
           }
           Epub epub(book.path, "/.crosspoint");
-          // Skip loading css since we only need metadata here
           epub.load(false, true);
-
-          // Try to generate thumbnail image for Continue Reading card
           popupRect = GUI.drawPopup(renderer, tr(STR_LOADING_POPUP));
           GUI.fillPopupProgress(renderer, popupRect, 50);
-          // Force-render uses no deadline regardless of global mode
           const uint32_t deadline = (useTimeout && !isForcedBook) ? (millis() + COVER_RENDER_TIMEOUT_MS) : 0;
+          LOG_DBG("HOME", "loadRecentCovers: generating cover (deadline=%u ms)", deadline);
           bool success = epub.generateThumbBmp(coverHeight, deadline);
+          LOG_DBG("HOME", "loadRecentCovers: generateThumbBmp result=%d", success);
           if (success) {
             RECENT_BOOKS.setCoverDisabled(book.path, false);
             book.coverDisabled = false;
           } else {
-            // Mark cover as disabled on any failure so HOME won't retry automatically.
-            // The user can force a retry via Reader Menu → "Generate cover" / "Enable cover".
             RECENT_BOOKS.setCoverDisabled(book.path, true);
             book.coverDisabled = true;
           }
-          // Force full re-render without restoring old buffer (which had the empty template).
-          // This prevents the cover appearing "behind" the old template on e-ink displays.
           coverRendered = false;
           coverBufferStored = false;
           requestUpdate();
         } else if (FsHelpers::hasXtcExtension(book.path)) {
-          // Handle XTC file
           Xtc xtc(book.path, "/.crosspoint");
           if (xtc.load()) {
             popupRect = GUI.drawPopup(renderer, tr(STR_LOADING_POPUP));
@@ -131,69 +122,56 @@ void HomeActivity::loadRecentCovers(int coverHeight) {
     }
   }
 
-  APP_STATE.forceRenderCoverPath = "";  // consume force-render flag
+  APP_STATE.forceRenderCoverPath = "";
   recentsLoaded = true;
   recentsLoading = false;
 }
 
 void HomeActivity::onEnter() {
   Activity::onEnter();
-
   hasOpdsUrl = strlen(SETTINGS.opdsServerUrl) > 0;
-
   coverRendered = false;
   coverBufferStored = false;
-
+  LOG_DBG("HOME", "onEnter: resetting coverRendered=%d coverBufferStored=%d coverBuffer=%p", coverRendered,
+          coverBufferStored, static_cast<const void*>(coverBuffer));
   selectorIndex = 0;
-
   const auto& metrics = UITheme::getInstance().getMetrics();
   loadRecentBooks(metrics.homeRecentBooksCount);
-
-  // Trigger first update
   requestUpdate();
 }
-
 void HomeActivity::onExit() {
   Activity::onExit();
-
-  // Free the stored cover buffer if any
+  LOG_DBG("HOME", "onExit: coverRendered=%d coverBufferStored=%d", coverRendered, coverBufferStored);
   freeCoverBuffer();
 }
-
 bool HomeActivity::storeCoverBuffer() {
   uint8_t* frameBuffer = renderer.getFrameBuffer();
   if (!frameBuffer) {
     return false;
   }
-
-  // Free any existing buffer first
   freeCoverBuffer();
-
-  const size_t bufferSize = renderer.getBufferSize();
+  const size_t bufferSize = GfxRenderer::getBufferSize();
   coverBuffer = static_cast<uint8_t*>(malloc(bufferSize));
   if (!coverBuffer) {
     return false;
   }
-
   memcpy(coverBuffer, frameBuffer, bufferSize);
+  LOG_DBG("HOME", "storeCoverBuffer: stored %d bytes", bufferSize);
   return true;
 }
-
 bool HomeActivity::restoreCoverBuffer() {
   if (!coverBuffer) {
     return false;
   }
-
   uint8_t* frameBuffer = renderer.getFrameBuffer();
   if (!frameBuffer) {
     return false;
   }
-
-  const size_t bufferSize = renderer.getBufferSize();
+  const size_t bufferSize = GfxRenderer::getBufferSize();
   memcpy(frameBuffer, coverBuffer, bufferSize);
+  LOG_DBG("HOME", "restoreCoverBuffer: restored %d bytes", bufferSize);
   return true;
 }
-
 void HomeActivity::freeCoverBuffer() {
   if (coverBuffer) {
     free(coverBuffer);
@@ -201,22 +179,17 @@ void HomeActivity::freeCoverBuffer() {
   }
   coverBufferStored = false;
 }
-
 void HomeActivity::loop() {
   const int menuCount = getMenuItemCount();
-
   buttonNavigator.onNext([this, menuCount] {
     selectorIndex = ButtonNavigator::nextIndex(selectorIndex, menuCount);
     requestUpdate();
   });
-
   buttonNavigator.onPrevious([this, menuCount] {
     selectorIndex = ButtonNavigator::previousIndex(selectorIndex, menuCount);
     requestUpdate();
   });
-
   if (mappedInput.wasReleased(MappedInputManager::Button::Confirm)) {
-    // Calculate dynamic indices based on which options are available
     int idx = 0;
     int menuSelectedIndex = selectorIndex - static_cast<int>(recentBooks.size());
     const int fileBrowserIdx = idx++;
@@ -224,8 +197,7 @@ void HomeActivity::loop() {
     const int opdsLibraryIdx = hasOpdsUrl ? idx++ : -1;
     const int fileTransferIdx = idx++;
     const int settingsIdx = idx;
-
-    if (selectorIndex < recentBooks.size()) {
+    if (selectorIndex < static_cast<int>(recentBooks.size())) {
       onSelectBook(recentBooks[selectorIndex].path);
     } else if (menuSelectedIndex == fileBrowserIdx) {
       onFileBrowserOpen();
@@ -240,32 +212,32 @@ void HomeActivity::loop() {
     }
   }
 }
-
 void HomeActivity::render(RenderLock&&) {
   const auto& metrics = UITheme::getInstance().getMetrics();
   const auto pageWidth = renderer.getScreenWidth();
   const auto pageHeight = renderer.getScreenHeight();
-
   renderer.clearScreen();
+  if (!recentBooks.empty() && recentBooks[0].coverDisabled && !recentBooks[0].coverBmpPath.empty()) {
+    const std::string coverPath = UITheme::getCoverThumbPath(recentBooks[0].coverBmpPath, metrics.homeCoverHeight);
+    if (Storage.exists(coverPath.c_str())) {
+      RECENT_BOOKS.setCoverDisabled(recentBooks[0].path, false);
+      recentBooks[0].coverDisabled = false;
+    }
+  }
   bool bufferRestored = coverBufferStored && restoreCoverBuffer();
-
+  LOG_DBG("HOME", "render: bufferRestored=%d coverRendered=%d coverBufferStored=%d", bufferRestored, coverRendered,
+          coverBufferStored);
   GUI.drawHeader(renderer, Rect{0, metrics.topPadding, pageWidth, metrics.homeTopPadding}, nullptr);
-
   GUI.drawRecentBookCover(renderer, Rect{0, metrics.homeTopPadding, pageWidth, metrics.homeCoverTileHeight},
                           recentBooks, selectorIndex, coverRendered, coverBufferStored, bufferRestored,
                           std::bind(&HomeActivity::storeCoverBuffer, this));
-
-  // Build menu items dynamically
   std::vector<const char*> menuItems = {tr(STR_BROWSE_FILES), tr(STR_MENU_RECENT_BOOKS), tr(STR_FILE_TRANSFER),
                                         tr(STR_SETTINGS_TITLE)};
   std::vector<UIIcon> menuIcons = {Folder, Recent, Transfer, Settings};
-
   if (hasOpdsUrl) {
-    // Insert OPDS Browser after File Browser
     menuItems.insert(menuItems.begin() + 2, tr(STR_OPDS_BROWSER));
     menuIcons.insert(menuIcons.begin() + 2, Library);
   }
-
   GUI.drawButtonMenu(
       renderer,
       Rect{0, metrics.homeTopPadding + metrics.homeCoverTileHeight + metrics.verticalSpacing, pageWidth,
@@ -274,21 +246,17 @@ void HomeActivity::render(RenderLock&&) {
       static_cast<int>(menuItems.size()), selectorIndex - recentBooks.size(),
       [&menuItems](int index) { return std::string(menuItems[index]); },
       [&menuIcons](int index) { return menuIcons[index]; });
-
   const auto labels = mappedInput.mapLabels("", tr(STR_SELECT), tr(STR_DIR_UP), tr(STR_DIR_DOWN));
   GUI.drawButtonHints(renderer, labels.btn1, labels.btn2, labels.btn3, labels.btn4);
-
   renderer.displayBuffer();
-
   if (!firstRenderDone) {
     firstRenderDone = true;
     requestUpdate();
   } else if (!recentsLoaded && !recentsLoading) {
-    // Only generate covers when returning from Reader, not on every HOME entry.
-    // Also trigger if a force-render was requested via Reader Menu.
     recentsLoaded = true;
     const bool hasPending = APP_STATE.pendingCoverGeneration;
     const bool hasForce = !APP_STATE.forceRenderCoverPath.empty();
+    LOG_DBG("HOME", "render: checking covers generation: hasPending=%d hasForce=%d", hasPending, hasForce);
     if (hasPending || hasForce) {
       APP_STATE.pendingCoverGeneration = false;
       recentsLoaded = false;
@@ -299,13 +267,8 @@ void HomeActivity::render(RenderLock&&) {
 }
 
 void HomeActivity::onSelectBook(const std::string& path) { activityManager.goToReader(path); }
-
 void HomeActivity::onFileBrowserOpen() { activityManager.goToFileBrowser(); }
-
 void HomeActivity::onRecentsOpen() { activityManager.goToRecentBooks(); }
-
 void HomeActivity::onSettingsOpen() { activityManager.goToSettings(); }
-
 void HomeActivity::onFileTransferOpen() { activityManager.goToFileTransfer(); }
-
 void HomeActivity::onOpdsBrowserOpen() { activityManager.goToBrowser(); }
