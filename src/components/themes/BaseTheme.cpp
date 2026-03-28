@@ -431,6 +431,13 @@ void BaseTheme::drawRecentBookCover(GfxRenderer& renderer, Rect rect, const std:
   if (!hasCoverImage) {
     // No cover: use half screen size
     bookWidth = baseHeight * 2 / 3;
+
+    // If buffer was restored from a previous full-width cover, clear the
+    // full slot so stale pixels don't leak behind the narrower placeholder.
+    if (bufferRestored) {
+      renderer.fillRect(rect.x, rect.y, rect.width, rect.height, false);
+      bufferRestored = false;
+    }
   }
 
   bookX = rect.x + (rect.width - bookWidth) / 2;
@@ -459,9 +466,10 @@ void BaseTheme::drawRecentBookCover(GfxRenderer& renderer, Rect rect, const std:
           // Draw border around the card
           renderer.drawRect(bookX, bookY, bookWidth, bookHeight);
 
+          coverRendered = true;
+
           // Store the buffer with cover image for fast navigation
           coverBufferStored = storeCoverBuffer();
-          coverRendered = coverBufferStored;  // Only consider it rendered if we successfully stored the buffer
 
           // First render: if selected, draw selection indicators now
           if (bookSelected) {
