@@ -509,6 +509,7 @@ void BaseTheme::drawRecentBookCover(GfxRenderer& renderer, Rect rect, const std:
       renderer.drawRect(bookX, bookY, bookWidth, bookHeight, 3, true);
     }
 
+    // "Continue Reading" label — always visible, positioned over inner frame bottom
     const int continueY = bookY + bookHeight - renderer.getLineHeight(UI_10_FONT_ID) * 3 / 2 - 2;
     if (hasCoverImage) {
       constexpr int continuePadding = 6;
