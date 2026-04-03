@@ -293,24 +293,20 @@
     .file-table tr:hover {
       background-color: var(--accent-color-10);
     }
-    .epub-badge {
+    .badge {
       display: inline-block;
       padding: 2px 8px;
-      background-color: #27ae60;
       color: white;
       border-radius: 10px;
       font-size: 0.75em;
-      margin-left: 8px;
+      font-weight: 600;
     }
-    .folder-badge {
-      display: inline-block;
-      padding: 2px 8px;
-      background-color: #f39c12;
-      color: white;
-      border-radius: 10px;
-      font-size: 0.75em;
-      margin-left: 8px;
-    }
+    .badge-epub { background-color: #219a52; }
+    .badge-xtc { background-color: #9b59b6; }
+    .badge-txt { background-color: #7f8c8d; }
+    .badge-image { background-color: #3498db; }
+    .badge-pdf { background-color: #e74c3c; }
+    .badge-folder { background-color: #f39c12; }
     .file-icon {
       margin-right: 8px;
     }
@@ -319,6 +315,14 @@
       color: var(--accent-color);
       text-decoration: none;
       cursor: pointer;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 300px;
+      word-break: break-word;
+      line-height: 1.3;
     }
     .folder-link:hover,
     .file-link:hover {
@@ -333,8 +337,8 @@
       width: 100%;
     }
     .upload-form input[type="file"]::file-selector-button {
-      background-color: #27ae60;
-      color: white;
+      background-color: #bdc3c7;
+      color: #2c3e50;
       border: none;
       padding: 6px 14px;
       border-radius: 4px;
@@ -342,8 +346,12 @@
       font-size: 0.9em;
       margin-right: 8px;
     }
-    .upload-form input[type="file"].has-files::file-selector-button {
+    .upload-form input[type="file"]:hover::file-selector-button {
       background-color: #95a5a6;
+    }
+    .upload-form input[type="file"].has-files::file-selector-button {
+      background-color: #7f8c8d;
+      color: white;
     }
     .upload-btn {
       background-color: #27ae60;
@@ -375,6 +383,9 @@
       padding: 12px;
       border-radius: 6px;
       border: 1px solid var(--accent-color);
+    }
+    .convert-options.violet {
+      border-color: #9b59b6;
     }
     .convert-checkbox {
       display: flex;
@@ -1083,7 +1094,8 @@
       background-color: #e6f7f4;
     }
     .actions-col {
-      width: 140px;
+      width: auto;
+      white-space: nowrap;
       text-align: center;
     }
     .action-icon-group {
@@ -1201,7 +1213,7 @@
       background-color: #c0392b;
     }
     .delete-btn-cancel {
-      background-color: #95a5a6;
+      background-color: #3498db;
       color: white;
       padding: 10px 20px;
       border: none;
@@ -1212,10 +1224,10 @@
       margin-top: 10px;
     }
     .delete-btn-cancel:hover {
-      background-color: var(--label-color);
+      background-color: #2e86c1;
     }
     .rename-btn-confirm {
-      background-color: #3498db;
+      background-color: #27ae60;
       color: white;
       padding: 10px 20px;
       border: none;
@@ -1225,10 +1237,10 @@
       width: 100%;
     }
     .rename-btn-confirm:hover {
-      background-color: #2e86c1;
+      background-color: #219a52;
     }
     .move-btn-confirm {
-      background-color: #16a085;
+      background-color: #27ae60;
       color: white;
       padding: 10px 20px;
       border: none;
@@ -1238,7 +1250,7 @@
       width: 100%;
     }
     .move-btn-confirm:hover {
-      background-color: #138d75;
+      background-color: #219a52;
     }
     .loader-container {
       display: flex;
@@ -1311,12 +1323,6 @@
       .file-icon {
         margin-right: 4px;
       }
-      .epub-badge,
-      .folder-badge {
-        padding: 2px 5px;
-        font-size: 0.65em;
-        margin-left: 4px;
-      }
       .contents-header {
         margin-bottom: 8px;
         flex-wrap: wrap;
@@ -1333,9 +1339,6 @@
       }
       .modal h3 {
         font-size: 1.1em;
-      }
-      .actions-col {
-        width: 120px;
       }
       .delete-btn,
       .rename-btn,
@@ -1707,7 +1710,7 @@
         Please back up or disable sync before proceeding.
       </div>
       <!-- Image Optimizer Section (for standalone images -> sleep screen) -->
-      <div class="convert-options" id="imageOptimizerOptions" style="display:none;">
+      <div class="convert-options violet" id="imageOptimizerOptions" style="display:none;">
         <div class="convert-row">
           <label class="convert-checkbox">
             <input type="checkbox" id="imageOptimizerEnabled" onchange="toggleImageOptimizer()">
@@ -1896,6 +1899,16 @@
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)).toLocaleString() + ' ' + sizes[i];
   }
 
+  const IMAGE_EXTS = new Set(['jpg','jpeg','png','gif','bmp','webp','avif','svg','ico','tiff','tif']);
+  function getFileCategory(ext) {
+    if (ext === 'epub') return { order: 1, cls: 'badge-epub', icon: '📗' };
+    if (ext === 'xtc' || ext === 'xtch') return { order: 2, cls: 'badge-xtc', icon: '📕' };
+    if (ext === 'txt') return { order: 3, cls: 'badge-txt', icon: '📄' };
+    if (IMAGE_EXTS.has(ext)) return { order: 4, cls: 'badge-image', icon: '🖼️' };
+    if (ext === 'pdf') return { order: 5, cls: 'badge-pdf', icon: '📕' };
+    return { order: 6, cls: '', icon: '📄' };
+  }
+
   async function hydrate() {
     // Fetch CrossPoint version
     fetchVersion();
@@ -1967,11 +1980,13 @@
 
 
       const sortedFiles = files.sort((a, b) => {
-        // Directories first, then epub files, then other files, alphabetically within each group
         if (a.isDirectory && !b.isDirectory) return -1;
         if (!a.isDirectory && b.isDirectory) return 1;
-        if (a.isEpub && !b.isEpub) return -1;
-        if (!a.isEpub && b.isEpub) return 1;
+        const aExt = a.name.includes('.') ? a.name.split('.').pop().toLowerCase() : '';
+        const bExt = b.name.includes('.') ? b.name.split('.').pop().toLowerCase() : '';
+        const aOrder = getFileCategory(aExt).order;
+        const bOrder = getFileCategory(bExt).order;
+        if (aOrder !== bOrder) return aOrder - bOrder;
         return a.name.localeCompare(b.name);
       });
 
@@ -1982,10 +1997,10 @@
           folderPath += file.name;
 
          // Checkbox cell + folder row
-          fileTableContent += `<tr class="folder-row">`;
-          fileTableContent += `<td><input type="checkbox" class="select-item" data-path="${encodeURIComponent(folderPath)}" data-name="${escapeHtml(file.name)}" data-type="folder"></td>`;
-          fileTableContent += `<td><span class="file-icon">📁</span><a href="/files?path=${encodeURIComponent(folderPath)}" class="folder-link">${escapeHtml(file.name)}</a><span class="folder-badge">FOLDER</span></td>`;
-          fileTableContent += '<td>Folder</td>';
+           fileTableContent += `<tr class="folder-row">`;
+           fileTableContent += `<td><input type="checkbox" class="select-item" data-path="${encodeURIComponent(folderPath)}" data-name="${escapeHtml(file.name)}" data-type="folder"></td>`;
+           fileTableContent += `<td><span class="file-icon">📁</span><a href="/files?path=${encodeURIComponent(folderPath)}" class="folder-link" title="${escapeHtml(file.name).replace(/"/g, '&quot;')}">${escapeHtml(file.name)}</a></td>`;
+           fileTableContent += '<td><span class="badge badge-folder">FOLDER</span></td>';
           fileTableContent += '<td>-</td>';
           fileTableContent += `<td class="actions-col"><div class="action-icon-group"><button class="delete-btn" onclick="openDeleteModal('${file.name.replaceAll("'", "\\'")}', '${folderPath.replaceAll("'", "\\'")}', true)" title="Delete folder">🗑️</button></div></td>`;
           fileTableContent += '</tr>';
@@ -1994,14 +2009,19 @@
           if (!filePath.endsWith("/")) filePath += "/";
           filePath += file.name;
 
-          // Checkbox cell + file row
-          fileTableContent += `<tr class="${file.isEpub ? 'epub-file' : ''}">`;
+          const ext = file.name.includes('.') ? file.name.split('.').pop().toLowerCase() : '';
+          const cat = getFileCategory(ext);
+          const extUpper = ext.toUpperCase();
+          const typeCell = cat.cls
+            ? `<span class="badge ${cat.cls}">${extUpper}</span>`
+            : extUpper;
+
+          fileTableContent += `<tr class="${ext === 'epub' ? 'epub-file' : ''}">`;
           fileTableContent += `<td><input type="checkbox" class="select-item" data-path="${encodeURIComponent(filePath)}" data-name="${escapeHtml(file.name)}" data-type="file"></td>`;
-          fileTableContent += `<td><span class="file-icon">${file.isEpub ? '📗' : '📄'}</span>`;
-          fileTableContent += `<a rel="noopener noreferrer" target="_blank" href="/download?path=${encodeURIComponent(filePath)}" class="file-link">${escapeHtml(file.name)}</a>`;
-          if (file.isEpub) fileTableContent += '<span class="epub-badge">EPUB</span>';
+          fileTableContent += `<td><span class="file-icon">${cat.icon}</span>`;
+          fileTableContent += `<a rel="noopener noreferrer" target="_blank" href="/download?path=${encodeURIComponent(filePath)}" class="file-link" title="${escapeHtml(file.name).replace(/"/g, '&quot;')}">${escapeHtml(file.name)}</a>`;
           fileTableContent += '</td>';
-          fileTableContent += `<td>${file.name.split('.').pop().toUpperCase()}</td>`;
+          fileTableContent += `<td>${typeCell}</td>`;
           fileTableContent += `<td>${formatFileSize(file.size)}</td>`;
           fileTableContent += `<td class="actions-col"><div class="action-icon-group">`;
           fileTableContent += `<button class="move-btn" onclick="openMoveModal('${file.name.replaceAll("'", "\\'")}', '${filePath.replaceAll("'", "\\'")}' )" title="Move file">📂</button>`;
