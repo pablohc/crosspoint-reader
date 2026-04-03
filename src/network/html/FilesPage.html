@@ -144,6 +144,10 @@
       align-items: center;
       gap: 6px;
     }
+    .action-btn:disabled {
+      opacity: 0.35;
+      cursor: not-allowed;
+    }
     .upload-action-btn {
       background-color: #27ae60;
     }
@@ -155,6 +159,12 @@
     }
     .folder-action-btn:hover {
       background-color: #d68910;
+    }
+    .move-action-btn {
+      background-color: #2980b9;
+    }
+    .move-action-btn:hover {
+      background-color: #2471a3;
     }
     .delete-action-btn {
       background-color: #e74c3c;
@@ -300,6 +310,12 @@
     .file-table {
       width: 100%;
       border-collapse: collapse;
+      table-layout: fixed;
+    }
+    .file-table .col-name {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
     }
     .file-table th,
     .file-table td {
@@ -310,6 +326,19 @@
     .file-table th {
       font-weight: 600;
       color: var(--label-color);
+      text-align: center;
+    }
+    .file-table th.sortable {
+      cursor: pointer;
+      user-select: none;
+    }
+    .file-table th.sortable:hover {
+      background: rgba(128, 128, 128, 0.1);
+    }
+    .sort-indicator {
+      font-size: 0.7em;
+      margin-left: 3px;
+      opacity: 0.6;
     }
     .file-table tr:hover {
       background-color: var(--accent-color-10);
@@ -1065,6 +1094,8 @@
       font-size: 1em;
       margin-bottom: 10px;
       box-sizing: border-box;
+      background: var(--card-bg);
+      color: var(--font-color);
     }
     .folder-btn {
       background-color: #f39c12;
@@ -1115,7 +1146,7 @@
       background-color: #e6f7f4;
     }
     .actions-col {
-      width: auto;
+      width: 1px;
       white-space: nowrap;
       text-align: center;
     }
@@ -1546,7 +1577,8 @@
   <div class="toolbar action-buttons">
     <button class="action-btn upload-action-btn" onclick="openUploadModal()">📤 Upload</button>
     <button class="action-btn folder-action-btn" onclick="openFolderModal()">📁 New Folder</button>
-    <button class="action-btn delete-action-btn" onclick="openDeleteSelectedModal()">🗑️ Delete Selected</button>
+    <button id="moveActionBtn" class="action-btn move-action-btn" onclick="openMoveSelectedModal()" disabled>📂 Move</button>
+    <button id="deleteActionBtn" class="action-btn delete-action-btn" onclick="openDeleteSelectedModal()" disabled>🗑️ Delete</button>
   </div>
 
 <!-- Failed Uploads Banner -->
@@ -1814,8 +1846,7 @@
     <h3>📂 Move File</h3>
     <div class="folder-form">
       <p class="file-info">Moving <strong id="moveItemName"></strong></p>
-      <input type="text" id="moveDestPath" class="folder-input" list="moveFolderOptions" placeholder="/Destination/Folder">
-      <datalist id="moveFolderOptions"></datalist>
+      <select id="moveDestPath" class="folder-input"></select>
       <input type="hidden" id="moveItemPath">
       <button class="move-btn-confirm" onclick="confirmMove()">Move</button>
       <button class="delete-btn-cancel" onclick="closeMoveModal()">Cancel</button>
@@ -1826,6 +1857,10 @@
 <script>
   // get current path from query parameter
   const currentPath = decodeURIComponent(new URLSearchParams(window.location.search).get('path') || '/');
+
+  // Sort state
+  let sortState = { column: 'default', dir: 1 };
+  let currentFiles = [];
 
   // Network status monitoring
   let isNetworkOnline = navigator.onLine;
@@ -1957,13 +1992,12 @@
     }
     breadcrumbs.innerHTML = pathContent;
 
-    let files = [];
     try {
       const response = await fetch('/api/files?path=' + encodeURIComponent(currentPath) + '&_=' + Date.now());
       if (!response.ok) {
         throw new Error('Failed to load files: ' + response.status + ' ' + response.statusText);
       }
-      files = await response.json();
+      currentFiles = await response.json();
     } catch (e) {
       console.error(e);
       fileTable.innerHTML = '<div class="no-files">An error occurred while loading the files</div>';
@@ -1972,7 +2006,7 @@
 
     let folderCount = 0;
     let totalSize = 0;
-    files.forEach(file => {
+    currentFiles.forEach(file => {
       if (file.isDirectory) folderCount++;
       totalSize += file.size;
     });
@@ -1982,71 +2016,117 @@
     const fileLabel = fileCount === 1 ? 'file' : 'files';
     document.getElementById('folder-summary').innerHTML = `${folderCount} ${folderLabel}, ${fileCount} ${fileLabel}, ${formatFileSize(totalSize)}`;
 
-    if (files.length === 0) {
-      fileTable.innerHTML = '<div class="no-files">This folder is empty</div>';
+    renderFileTable();
+  }
+
+  function getSortIndicator(column) {
+    if (sortState.column !== column) return '';
+    return `<span class="sort-indicator">${sortState.dir === 1 ? '▲' : '▼'}</span>`;
+  }
+
+  function sortBy(column) {
+    if (sortState.column === column) {
+      sortState.dir *= -1;
     } else {
-      let fileTableContent = '<table class="file-table">';
+      sortState.column = column;
+      sortState.dir = 1;
+    }
+    renderFileTable();
+  }
 
-				// Add select-all checkbox column
-      fileTableContent += '<tr><th style="width:40px"><input type="checkbox" id="selectAllCheckbox" onchange="toggleSelectAll(this)"></th><th>Name</th><th>Type</th><th>Size</th><th class="actions-col">Actions</th></tr>';
+  function renderFileTable() {
+    const fileTable = document.getElementById('file-table');
 
+    if (currentFiles.length === 0) {
+      fileTable.innerHTML = '<div class="no-files">This folder is empty</div>';
+      updateToolbarState();
+      return;
+    }
 
-      const sortedFiles = files.sort((a, b) => {
-        if (a.isDirectory && !b.isDirectory) return -1;
-        if (!a.isDirectory && b.isDirectory) return 1;
+    const sortedFiles = [...currentFiles].sort((a, b) => {
+      // Directories always first
+      if (a.isDirectory && !b.isDirectory) return -1;
+      if (!a.isDirectory && b.isDirectory) return 1;
+
+      if (sortState.column === 'name') {
+        return sortState.dir * a.name.localeCompare(b.name);
+      }
+      if (sortState.column === 'type') {
         const aExt = a.name.includes('.') ? a.name.split('.').pop().toLowerCase() : '';
         const bExt = b.name.includes('.') ? b.name.split('.').pop().toLowerCase() : '';
         const aOrder = getFileCategory(aExt).order;
         const bOrder = getFileCategory(bExt).order;
-        if (aOrder !== bOrder) return aOrder - bOrder;
+        if (aOrder !== bOrder) return sortState.dir * (aOrder - bOrder);
         return a.name.localeCompare(b.name);
-      });
+      }
+      if (sortState.column === 'size') {
+        if (a.size !== b.size) return sortState.dir * (a.size - b.size);
+        return a.name.localeCompare(b.name);
+      }
+      // default: by type then name
+      const aExt = a.name.includes('.') ? a.name.split('.').pop().toLowerCase() : '';
+      const bExt = b.name.includes('.') ? b.name.split('.').pop().toLowerCase() : '';
+      const aOrder = getFileCategory(aExt).order;
+      const bOrder = getFileCategory(bExt).order;
+      if (aOrder !== bOrder) return aOrder - bOrder;
+      return a.name.localeCompare(b.name);
+    });
 
-      sortedFiles.forEach(file => {
-        if (file.isDirectory) {
-          let folderPath = currentPath;
-          if (!folderPath.endsWith("/")) folderPath += "/";
-          folderPath += file.name;
+    let fileTableContent = '<table class="file-table">';
+    fileTableContent += '<tr>';
+    fileTableContent += '<th style="width:32px"><input type="checkbox" id="selectAllCheckbox" onchange="toggleSelectAll(this)"></th>';
+    fileTableContent += `<th class="col-name sortable" onclick="sortBy('name')">Name${getSortIndicator('name')}</th>`;
+    fileTableContent += `<th style="width:72px" class="sortable" onclick="sortBy('type')">Type${getSortIndicator('type')}</th>`;
+    fileTableContent += `<th style="width:80px" class="sortable" onclick="sortBy('size')">Size${getSortIndicator('size')}</th>`;
+    fileTableContent += '<th class="actions-col"></th>';
+    fileTableContent += '</tr>';
 
-         // Checkbox cell + folder row
-           fileTableContent += `<tr class="folder-row">`;
-           fileTableContent += `<td><input type="checkbox" class="select-item" data-path="${encodeURIComponent(folderPath)}" data-name="${escapeHtml(file.name)}" data-type="folder"></td>`;
-           fileTableContent += `<td><span class="file-icon">📁</span><a href="/files?path=${encodeURIComponent(folderPath)}" class="folder-link" title="${escapeHtml(file.name).replace(/"/g, '&quot;')}">${escapeHtml(file.name)}</a></td>`;
-           fileTableContent += '<td><span class="badge badge-folder">FOLDER</span></td>';
-          fileTableContent += '<td>-</td>';
-          fileTableContent += `<td class="actions-col"><div class="action-icon-group"><button class="delete-btn" onclick="openDeleteModal('${file.name.replaceAll("'", "\\'")}', '${folderPath.replaceAll("'", "\\'")}', true)" title="Delete folder">🗑️</button></div></td>`;
-          fileTableContent += '</tr>';
-        } else {
-          let filePath = currentPath;
-          if (!filePath.endsWith("/")) filePath += "/";
-          filePath += file.name;
+    sortedFiles.forEach(file => {
+      if (file.isDirectory) {
+        let folderPath = currentPath;
+        if (!folderPath.endsWith("/")) folderPath += "/";
+        folderPath += file.name;
 
-          const ext = file.name.includes('.') ? file.name.split('.').pop().toLowerCase() : '';
-          const cat = getFileCategory(ext);
-          const extUpper = ext.toUpperCase();
-          const typeCell = cat.cls
-            ? `<span class="badge ${cat.cls}">${extUpper}</span>`
-            : extUpper;
+        const isProtected = file.name.startsWith('.');
+        fileTableContent += `<tr class="folder-row">`;
+        fileTableContent += isProtected
+          ? '<td></td>'
+          : `<td><input type="checkbox" class="select-item" data-path="${encodeURIComponent(folderPath)}" data-name="${escapeHtml(file.name)}" data-type="folder"></td>`;
+        fileTableContent += `<td class="col-name"><span class="file-icon">📁</span><a href="/files?path=${encodeURIComponent(folderPath)}" class="folder-link" title="${escapeHtml(file.name).replace(/"/g, '&quot;')}">${escapeHtml(file.name)}</a></td>`;
+        fileTableContent += '<td style="text-align:center"><span class="badge badge-folder">DIR</span></td>';
+        fileTableContent += '<td style="text-align:right">-</td>';
+        fileTableContent += '<td class="actions-col"></td>';
+        fileTableContent += '</tr>';
+      } else {
+        let filePath = currentPath;
+        if (!filePath.endsWith("/")) filePath += "/";
+        filePath += file.name;
 
-          fileTableContent += `<tr class="${ext === 'epub' ? 'epub-file' : ''}">`;
-          fileTableContent += `<td><input type="checkbox" class="select-item" data-path="${encodeURIComponent(filePath)}" data-name="${escapeHtml(file.name)}" data-type="file"></td>`;
-          fileTableContent += `<td><span class="file-icon">${cat.icon}</span>`;
-          fileTableContent += `<a rel="noopener noreferrer" target="_blank" href="/download?path=${encodeURIComponent(filePath)}" class="file-link" title="${escapeHtml(file.name).replace(/"/g, '&quot;')}">${escapeHtml(file.name)}</a>`;
-          fileTableContent += '</td>';
-          fileTableContent += `<td>${typeCell}</td>`;
-          fileTableContent += `<td>${formatFileSize(file.size)}</td>`;
-          fileTableContent += `<td class="actions-col"><div class="action-icon-group">`;
-          fileTableContent += `<button class="move-btn" onclick="openMoveModal('${file.name.replaceAll("'", "\\'")}', '${filePath.replaceAll("'", "\\'")}' )" title="Move file">📂</button>`;
-          fileTableContent += `<button class="rename-btn" onclick="openRenameModal('${file.name.replaceAll("'", "\\'")}', '${filePath.replaceAll("'", "\\'")}' )" title="Rename file">✏️</button>`;
-          fileTableContent += `<button class="delete-btn" onclick="openDeleteModal('${file.name.replaceAll("'", "\\'")}', '${filePath.replaceAll("'", "\\'")}', false)" title="Delete file">🗑️</button>`;
-          fileTableContent += `</div></td>`;
-          fileTableContent += '</tr>';
-        }
-      });
+        const ext = file.name.includes('.') ? file.name.split('.').pop().toLowerCase() : '';
+        const cat = getFileCategory(ext);
+        const extUpper = ext.toUpperCase();
+        const typeCell = cat.cls
+          ? `<span class="badge ${cat.cls}">${extUpper}</span>`
+          : extUpper;
 
-      fileTableContent += '</table>';
-      fileTable.innerHTML = fileTableContent;
-    }
+        fileTableContent += `<tr class="${ext === 'epub' ? 'epub-file' : ''}">`;
+        fileTableContent += `<td style="text-align:center"><input type="checkbox" class="select-item" data-path="${encodeURIComponent(filePath)}" data-name="${escapeHtml(file.name)}" data-type="file"></td>`;
+        fileTableContent += `<td class="col-name"><span class="file-icon">${cat.icon}</span>`;
+        fileTableContent += `<a rel="noopener noreferrer" target="_blank" href="/download?path=${encodeURIComponent(filePath)}" class="file-link" title="${escapeHtml(file.name).replace(/"/g, '&quot;')}">${escapeHtml(file.name)}</a>`;
+        fileTableContent += '</td>';
+        fileTableContent += `<td style="text-align:center">${typeCell}</td>`;
+        fileTableContent += `<td style="text-align:right">${formatFileSize(file.size)}</td>`;
+        fileTableContent += `<td class="actions-col"><button class="rename-btn" onclick="openRenameModal('${file.name.replaceAll("'", "\\'")}', '${filePath.replaceAll("'", "\\'")}' )" title="Rename file">✏️</button></td>`;
+        fileTableContent += '</tr>';
+      }
+    });
+
+    fileTableContent += '</table>';
+    fileTable.innerHTML = fileTableContent;
+    document.getElementById('file-table').addEventListener('change', function (e) {
+      if (e.target.classList.contains('select-item')) updateToolbarState();
+    });
+    updateToolbarState();
   }
 
   // Modal functions
@@ -2953,6 +3033,7 @@
     document.querySelectorAll('.select-item').forEach(cb => {
       cb.checked = checked;
     });
+    updateToolbarState();
   }
 
   function getSelectedItems() {
@@ -2965,6 +3046,28 @@
       });
     });
     return items;
+  }
+
+  function updateToolbarState() {
+    const items = getSelectedItems();
+    const fileCount = items.filter(it => !it.isFolder).length;
+    const folderCount = items.filter(it => it.isFolder).length;
+    document.getElementById('deleteActionBtn').disabled = items.length === 0;
+    document.getElementById('moveActionBtn').disabled = fileCount === 0 || folderCount > 0;
+  }
+
+  // Open move modal for a single selected file
+  function openMoveSelectedModal() {
+    const items = getSelectedItems().filter(it => !it.isFolder);
+    if (items.length === 0) {
+      alert('Select a file to move.');
+      return;
+    }
+    if (items.length > 1) {
+      alert('Select only one file to move at a time.');
+      return;
+    }
+    openMoveModal(items[0].name, items[0].path);
   }
 
   // Open delete modal for currently selected checkboxes
@@ -5750,8 +5853,8 @@ function retryAllFailedUploads() {
     });
 
     if (currentPath !== '/') {
-      const currentFiles = await fetchFolders(currentPath);
-      currentFiles.forEach(file => {
+      const dirFiles = await fetchFolders(currentPath);
+      dirFiles.forEach(file => {
         if (file.isDirectory) {
           let folderPath = currentPath;
           if (!folderPath.endsWith('/')) folderPath += '/';
@@ -5761,24 +5864,26 @@ function retryAllFailedUploads() {
       });
     }
 
-    const dataList = document.getElementById('moveFolderOptions');
-    dataList.innerHTML = '';
+    const select = document.getElementById('moveDestPath');
+    const prevValue = select.value;
+    select.innerHTML = '';
     Array.from(options).sort().forEach(path => {
       const option = document.createElement('option');
       option.value = path;
-      dataList.appendChild(option);
+      option.textContent = path;
+      select.appendChild(option);
     });
+    // Restore selection or default to current path
+    const defaultDest = currentPath === '/' ? '/' : currentPath;
+    select.value = prevValue || defaultDest;
+    if (!select.value) select.value = defaultDest;
   }
 
   function openMoveModal(name, path) {
     document.getElementById('moveItemName').textContent = '📄 ' + name;
     document.getElementById('moveItemPath').value = path;
-    document.getElementById('moveDestPath').value = currentPath === '/' ? '/' : currentPath;
     document.getElementById('moveModal').classList.add('open');
     loadMoveFolderOptions();
-    setTimeout(() => {
-      document.getElementById('moveDestPath').focus();
-    }, 50);
   }
 
   function closeMoveModal() {
