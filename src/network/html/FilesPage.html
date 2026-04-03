@@ -36,10 +36,11 @@
     }
     .card {
       background: var(--card-bg);
-      border-radius: 8px;
+      border-radius: 12px;
       padding: 20px;
       margin: 15px 0;
-      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+      transition: box-shadow 0.2s;
     }
     .app-header {
       display: flex;
@@ -86,30 +87,36 @@
       gap: 6px;
       background: var(--accent-color-10);
       border: 1px solid var(--border-color);
-      border-radius: 6px;
-      padding: 7px 12px;
+      border-radius: 8px;
+      padding: 12px 20px;
       margin-bottom: 12px;
       margin-top: 16px;
-      font-size: 13px;
+      font-size: 15px;
+      font-weight: 500;
       overflow: hidden;
+      transition: border-color 0.2s;
+    }
+    .path-bar:hover {
+      border-color: var(--accent-color);
     }
     .path-bar .path-icon { flex-shrink: 0; }
     .path-bar a {
       color: var(--accent-color);
       text-decoration: none;
       white-space: nowrap;
+      font-weight: 500;
     }
     .path-bar a:hover { text-decoration: underline; }
     .path-bar .path-current {
       color: var(--title-color);
-      font-weight: 500;
+      font-weight: 600;
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
     }
     .path-bar .path-sep {
       color: var(--label-color);
-      margin: 0 2px;
+      margin: 0 4px;
       flex-shrink: 0;
     }
     .toolbar {
@@ -136,13 +143,21 @@
       color: white;
       padding: 10px 16px;
       border: none;
-      border-radius: 4px;
+      border-radius: 8px;
       cursor: pointer;
       font-size: 0.95em;
       font-weight: 600;
       display: flex;
       align-items: center;
       gap: 6px;
+      transition: transform 0.15s, box-shadow 0.15s, opacity 0.15s;
+    }
+    .action-btn:hover:not(:disabled) {
+      transform: translateY(-1px);
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+    }
+    .action-btn:active:not(:disabled) {
+      transform: translateY(0);
     }
     .action-btn:disabled {
       opacity: 0.35;
@@ -202,15 +217,65 @@
       max-width: 920px;
     }
     .modal.drag-over {
-      border: 2px dashed var(--accent-color);
-      background-color: var(--accent-color-10);
+      border-color: var(--accent-color);
+    }
+    .drop-zone {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+      border: 2px dashed var(--border-color);
+      border-radius: 8px;
+      padding: 20px 16px;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+    .drop-zone:hover {
+      border-color: var(--accent-color);
+    }
+    .drop-zone.has-files {
+      border: none;
+      padding: 0;
+      background: none;
+      margin-bottom: 12px;
+    }
+    .drop-zone.has-files .drag-drop-hint {
+      display: none;
+    }
+    .drop-zone.has-files .choose-file-btn {
+      width: 100%;
+      text-align: center;
+      box-sizing: border-box;
+    }
+    .choose-file-btn {
+      background-color: #bdc3c7;
+      color: #2c3e50;
+      border: none;
+      padding: 6px 14px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 0.9em;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 100%;
+      user-select: none;
+    }
+    .choose-file-btn:hover {
+      background-color: #95a5a6;
+    }
+    .drop-zone.has-files .choose-file-btn {
+      background-color: #7f8c8d;
+      color: white;
     }
     .drag-drop-hint {
       text-align: center;
       color: var(--label-color);
       font-size: 0.82em;
-      margin-top: 6px;
-      opacity: 0.6;
+      opacity: 0.7;
+    }
+    .modal.drag-over .drop-zone {
+      border-color: var(--accent-color);
+      box-shadow: inset 0 0 0 3px var(--accent-color-10);
     }
     .image-fit-crop-row .setting-title {
       font-size: 0.85em;
@@ -313,9 +378,19 @@
       table-layout: fixed;
     }
     .file-table .col-name {
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
+      width: auto;
+      vertical-align: middle;
+      padding: 8px 12px;
+    }
+    .name-cell {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .name-cell .file-icon {
+      flex-shrink: 0;
+      margin-right: 0;
+      line-height: 1.35;
     }
     .file-table th,
     .file-table td {
@@ -327,20 +402,43 @@
       font-weight: 600;
       color: var(--label-color);
       text-align: center;
+      vertical-align: middle;
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      background: var(--card-bg);
+      border-bottom: 2px solid var(--accent-color);
+    }
+    .file-table th.col-name {
+      text-align: left;
+      padding-left: 12px;
     }
     .file-table th.sortable {
       cursor: pointer;
       user-select: none;
+      transition: background 0.15s, color 0.15s;
     }
     .file-table th.sortable:hover {
-      background: rgba(128, 128, 128, 0.1);
+      background: var(--accent-color-10);
+      color: var(--accent-color);
     }
     .sort-indicator {
       font-size: 0.7em;
       margin-left: 3px;
       opacity: 0.6;
     }
-    .file-table tr:hover {
+    .file-table tr {
+      transition: background-color 0.15s;
+    }
+    .file-table td {
+      padding: 10px 12px;
+      height: 44px;
+      vertical-align: middle;
+    }
+    .file-table tbody tr:nth-child(even) {
+      background-color: rgba(128, 128, 128, 0.03);
+    }
+    .file-table tbody tr:hover {
       background-color: var(--accent-color-10);
     }
     .badge {
@@ -352,9 +450,9 @@
       font-weight: 600;
     }
     .badge-epub { background-color: #219a52; }
-    .badge-xtc { background-color: #9b59b6; }
+    .badge-xtc { background-color: #2980b9; }
     .badge-txt { background-color: #7f8c8d; }
-    .badge-image { background-color: #3498db; }
+    .badge-image { background-color: #9b59b6; }
     .badge-pdf { background-color: #e74c3c; }
     .badge-folder { background-color: #f39c12; }
     .file-icon {
@@ -362,7 +460,6 @@
     }
     .folder-link,
     .file-link {
-      color: var(--accent-color);
       text-decoration: none;
       cursor: pointer;
       display: -webkit-box;
@@ -370,17 +467,41 @@
       -webkit-box-orient: vertical;
       overflow: hidden;
       text-overflow: ellipsis;
-      max-width: 300px;
       word-break: break-word;
-      line-height: 1.3;
+      line-height: 1.35;
     }
-    .folder-link:hover,
-    .file-link:hover {
+    .folder-link {
+      color: var(--accent-color);
+      font-weight: 500;
+    }
+    .folder-link:hover {
       color: var(--accent-hover-color);
       text-decoration: underline;
     }
+    .file-link {
+      color: var(--title-color);
+    }
+    .file-link:hover {
+      color: var(--accent-color);
+      text-decoration: underline;
+    }
+    .parent-folder-row {
+      background-color: rgba(128, 128, 128, 0.04);
+    }
+    .parent-folder-row:hover {
+      background-color: var(--accent-color-10);
+    }
+    .up-folder-link {
+      color: var(--label-color);
+      text-decoration: none;
+      font-weight: 600;
+    }
+    .up-folder-link:hover {
+      color: var(--accent-color);
+      text-decoration: underline;
+    }
     .upload-form {
-      margin-bottom: 10px;
+      margin-bottom: 0;
     }
     .upload-form input[type="file"] {
       margin: 10px 0;
@@ -412,7 +533,7 @@
       cursor: pointer;
       font-size: 1em;
       width: 100%;
-      margin-top: 12px;
+      margin-top: 24px;
     }
     .upload-btn:hover {
       background-color: #219a52;
@@ -432,7 +553,7 @@
       margin-bottom: 10px;
       padding: 12px;
       border-radius: 6px;
-      border: 1px solid var(--accent-color);
+      border: 1px solid #27ae60;
     }
     .convert-options.violet {
       border-color: #9b59b6;
@@ -476,10 +597,10 @@
       font-size: 0.8em;
       color: var(--label-color);
       margin-top: 6px;
-      padding-left: 26px;
+      padding: 0 4px;
       display: flex;
       flex-wrap: wrap;
-      gap: 16px;
+      gap: 10px;
     }
     .convert-settings span {
       display: inline-block;
@@ -1102,6 +1223,7 @@
       color: white;
       padding: 10px 20px;
       border: none;
+      margin-top: 24px;
       border-radius: 4px;
       cursor: pointer;
       font-size: 1em;
@@ -1122,9 +1244,12 @@
       border: none;
       cursor: pointer;
       font-size: 1.1em;
-      padding: 4px 8px;
-      border-radius: 4px;
+      padding: 6px 8px;
+      border-radius: 6px;
       transition: all 0.15s;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
     }
     .delete-btn {
       color: #95a5a6;
@@ -1140,15 +1265,38 @@
       background-color: #e8f4fd;
     }
     .move-btn {
-      color: #16a085;
+      color: #2980b9;
     }
     .move-btn:hover {
-      background-color: #e6f7f4;
+      background-color: #e8f4fd;
     }
     .actions-col {
-      width: 1px;
+      width: 48px;
       white-space: nowrap;
       text-align: center;
+      vertical-align: middle;
+      padding: 4px 4px;
+    }
+    .size-cell {
+      text-align: right;
+      vertical-align: middle;
+      white-space: nowrap;
+    }
+    .size-cell-inner {
+      display: inline-flex;
+      align-items: baseline;
+      gap: 6px;
+      justify-content: flex-end;
+      width: 100%;
+    }
+    .size-value {
+      text-align: right;
+      font-variant-numeric: tabular-nums;
+    }
+    .size-unit {
+      text-align: left;
+      color: var(--label-color);
+      font-size: 0.85em;
     }
     .action-icon-group {
       display: inline-flex;
@@ -1256,6 +1404,7 @@
       color: white;
       padding: 10px 20px;
       border: none;
+      margin-top: 24px;
       border-radius: 4px;
       cursor: pointer;
       font-size: 1em;
@@ -1278,9 +1427,41 @@
     .delete-btn-cancel:hover {
       background-color: #2e86c1;
     }
+    .rename-input-row {
+      display: flex;
+      align-items: center;
+      gap: 0;
+      width: 100%;
+    }
+    .rename-input-row .folder-input {
+      flex: 1;
+      min-width: 0;
+      width: auto;
+      margin-bottom: 0;
+      border-radius: 4px 0 0 4px;
+      border-right: none;
+    }
+    .rename-ext-suffix {
+      display: inline-flex;
+      align-items: center;
+      align-self: stretch;
+      padding: 0 12px;
+      background: var(--bg-alt, #f0f0f0);
+      border: 1px solid #ddd;
+      border-left: none;
+      border-radius: 0 4px 4px 0;
+      color: var(--label-color);
+      font-size: 1em;
+      white-space: nowrap;
+      user-select: none;
+    }
+    .rename-ext-suffix:empty {
+      display: none;
+    }
     .rename-btn-confirm {
       background-color: #27ae60;
       color: white;
+      margin-top: 24px;
       padding: 10px 20px;
       border: none;
       border-radius: 4px;
@@ -1300,6 +1481,7 @@
       cursor: pointer;
       font-size: 1em;
       width: 100%;
+      margin-top: 24px;
     }
     .move-btn-confirm:hover {
       background-color: #219a52;
@@ -1577,7 +1759,7 @@
   <div class="toolbar action-buttons">
     <button class="action-btn upload-action-btn" onclick="openUploadModal()">📤 Upload</button>
     <button class="action-btn folder-action-btn" onclick="openFolderModal()">📁 New Folder</button>
-    <button id="moveActionBtn" class="action-btn move-action-btn" onclick="openMoveSelectedModal()" disabled>📂 Move</button>
+    <button id="moveActionBtn" class="action-btn move-action-btn" onclick="openMoveSelectedModal()" disabled>➡️ Move</button>
     <button id="deleteActionBtn" class="action-btn delete-action-btn" onclick="openDeleteSelectedModal()" disabled>🗑️ Delete</button>
   </div>
 
@@ -1617,9 +1799,12 @@
     <h3>📤 Upload file</h3>
     <div class="upload-form">
       <p class="file-info">Select a file to upload to <strong id="uploadPathDisplay"></strong></p>
-      <input type="file" id="fileInput" onchange="validateFile()" multiple>
-      <div class="drag-drop-hint">or drag & drop files here</div>
-      <div class="picker-columns" id="pickerColumns">
+      <div class="drop-zone" onclick="document.getElementById('fileInput').click()">
+        <input type="file" id="fileInput" onchange="validateFile()" multiple style="display:none;">
+        <label class="choose-file-btn" onclick="event.stopPropagation(); document.getElementById('fileInput').click()">📁 Choose Files</label>
+        <div class="drag-drop-hint">or drag &amp; drop files here</div>
+      </div>
+      <div class="picker-columns" id="pickerColumns" style="display:none;">
         <div class="convert-options" id="convertOptions" style="display:none;">
           <div class="convert-row">
             <label class="convert-checkbox">
@@ -1636,12 +1821,12 @@
           <div id="convertInfo" style="display:none; margin-bottom: 10px; font-size: 0.9em;">
           </div>
 
-          <div class="convert-settings" id="convertSettings" style="display:block;">
+          <div class="convert-settings" id="convertSettings">
+            <span>📏 480×800px</span>
             <span>⚫ True-Grayscale</span>
-          <span>📏 Max 480×800px</span>
-          <span>📦 85% JPEG</span>
-          <span>🔧 Fix SVG</span>
-        </div>
+            <span>📦 JPEG 85%</span>
+            <span>🔧 Fix SVG</span>
+          </div>
         <!-- Advanced Settings Content -->
         <div class="advanced-settings-content" id="advancedSettingsContent">
           <!-- JPEG Quality -->
@@ -1754,14 +1939,14 @@
         Please back up or disable sync before proceeding.
       </div>
       <!-- Image Optimizer Section (for standalone images -> sleep screen) -->
-      <div class="convert-options violet" id="imageOptimizerOptions" style="display:none;">
+      <div class="convert-options" id="imageOptimizerOptions" style="display:none;">
         <div class="convert-row">
           <label class="convert-checkbox">
             <input type="checkbox" id="imageOptimizerEnabled" onchange="toggleImageOptimizer()">
             <span>Optimize for Sleep Screen</span>
           </label>
         </div>
-        <div class="convert-settings" id="imageOptimizerSettings" style="display:none;">
+        <div class="convert-settings" id="imageOptimizerSettings">
           <span>📏 480×800px</span>
           <span>⚫ True-Grayscale</span>
           <span>📦 JPEG 85%</span>
@@ -1831,8 +2016,12 @@
     <h3>✏️ Rename File</h3>
     <div class="folder-form">
       <p class="file-info">Renaming <strong id="renameItemName"></strong></p>
-      <input type="text" id="renameNewName" class="folder-input" placeholder="New file name...">
+      <div class="rename-input-row">
+        <input type="text" id="renameNewName" class="folder-input" placeholder="New name...">
+        <span id="renameExtSuffix" class="rename-ext-suffix"></span>
+      </div>
       <input type="hidden" id="renameItemPath">
+      <input type="hidden" id="renameExtension">
       <button class="rename-btn-confirm" onclick="confirmRename()">Rename</button>
       <button class="delete-btn-cancel" onclick="closeRenameModal()">Cancel</button>
     </div>
@@ -1843,7 +2032,7 @@
 <div class="modal-overlay" id="moveModal">
   <div class="modal">
     <button class="modal-close" onclick="closeMoveModal()">&times;</button>
-    <h3>📂 Move File</h3>
+    <h3>➡️ Move File</h3>
     <div class="folder-form">
       <p class="file-info">Moving <strong id="moveItemName"></strong></p>
       <select id="moveDestPath" class="folder-input"></select>
@@ -1939,18 +2128,20 @@
   }
 
   function formatFileSize(bytes) {
-    if (bytes === 0) return '0 B';
+    if (bytes === 0) return '<div class="size-cell-inner"><span class="size-value">0</span><span class="size-unit">B</span></div>';
     const k = 1024;
     const sizes = ['B', 'KB', 'MB', 'GB', 'TB', 'PB', 'EB', 'ZB', 'YB'];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)).toLocaleString() + ' ' + sizes[i];
+    const val = parseFloat((bytes / Math.pow(k, i)).toFixed(2)).toLocaleString();
+    return `<div class="size-cell-inner"><span class="size-value">${val}</span><span class="size-unit">${sizes[i]}</span></div>`;
   }
 
   const IMAGE_EXTS = new Set(['jpg','jpeg','png','gif','bmp','webp','avif','svg','ico','tiff','tif']);
   function getFileCategory(ext) {
     if (ext === 'epub') return { order: 1, cls: 'badge-epub', icon: '📗' };
-    if (ext === 'xtc' || ext === 'xtch') return { order: 2, cls: 'badge-xtc', icon: '📕' };
+    if (ext === 'xtc' || ext === 'xtch') return { order: 2, cls: 'badge-xtc', icon: '📘' };
     if (ext === 'txt') return { order: 3, cls: 'badge-txt', icon: '📄' };
+    if (ext === 'md' || ext === 'markdown') return { order: 3, cls: 'badge-txt', icon: '📓' };
     if (IMAGE_EXTS.has(ext)) return { order: 4, cls: 'badge-image', icon: '🖼️' };
     if (ext === 'pdf') return { order: 5, cls: 'badge-pdf', icon: '📕' };
     return { order: 6, cls: '', icon: '📄' };
@@ -1978,17 +2169,23 @@
     const breadcrumbs = document.getElementById('directory-breadcrumbs');
     const fileTable = document.getElementById('file-table');
 
-    let pathContent = '<span class="path-icon">📁</span>';
+    let pathContent;
     if (currentPath === '/') {
-      pathContent += '<span class="path-current">🏠 root</span>';
+      pathContent = '<span class="path-current">🏠 root</span>';
     } else {
-      pathContent += '<a href="/files">🏠 root</a>';
-      const pathSegments = currentPath.split('/');
-      pathSegments.slice(1, pathSegments.length - 1).forEach(function(segment, index) {
-        pathContent += '<span class="path-sep">/</span><a href="/files?path=' + encodeURIComponent(pathSegments.slice(0, index + 2).join('/')) + '">' + escapeHtml(segment) + '</a>';
+      pathContent = '<span class="path-icon">📁</span>';
+      const segments = currentPath.split('/').filter(Boolean);
+      let builtPath = '';
+      segments.forEach(function(segment, i) {
+        builtPath += '/' + segment;
+        const isLast = i === segments.length - 1;
+        pathContent += '<span class="path-sep">/</span>';
+        if (isLast) {
+          pathContent += '<span class="path-current">' + escapeHtml(segment) + '</span>';
+        } else {
+          pathContent += '<a href="/files?path=' + encodeURIComponent(builtPath) + '">' + escapeHtml(segment) + '</a>';
+        }
       });
-      pathContent += '<span class="path-sep">/</span>';
-      pathContent += '<span class="path-current">' + escapeHtml(pathSegments[pathSegments.length - 1]) + '</span>';
     }
     breadcrumbs.innerHTML = pathContent;
 
@@ -2037,8 +2234,29 @@
   function renderFileTable() {
     const fileTable = document.getElementById('file-table');
 
+    let fileTableContent = '<table class="file-table">';
+    fileTableContent += '<tr>';
+    fileTableContent += '<th style="width:32px; text-align:center"><input type="checkbox" id="selectAllCheckbox" onchange="toggleSelectAll(this)"></th>';
+    fileTableContent += `<th class="col-name sortable" onclick="sortBy('name')">Name${getSortIndicator('name')}</th>`;
+    fileTableContent += `<th style="width:72px" class="sortable" onclick="sortBy('type')">Type${getSortIndicator('type')}</th>`;
+    fileTableContent += `<th style="width:80px" class="sortable" onclick="sortBy('size')">Size${getSortIndicator('size')}</th>`;
+    fileTableContent += '<th class="actions-col"></th>';
+    fileTableContent += '</tr>';
+
+    // Parent directory row (when not in root) — always shown regardless of folder content
+    if (currentPath !== '/') {
+      let parentPath = currentPath;
+      if (parentPath.endsWith('/')) parentPath = parentPath.slice(0, -1);
+      parentPath = parentPath.substring(0, parentPath.lastIndexOf('/') + 1) || '/';
+      fileTableContent += `<tr class="parent-folder-row">`;
+      fileTableContent += `<td></td>`;
+      fileTableContent += `<td class="col-name" colspan="4"><div class="name-cell"><span class="file-icon">📂</span><a href="/files?path=${encodeURIComponent(parentPath)}" class="up-folder-link" title="Go to parent directory">Up</a></div></td>`;
+      fileTableContent += '</tr>';
+    }
+
     if (currentFiles.length === 0) {
-      fileTable.innerHTML = '<div class="no-files">This folder is empty</div>';
+      fileTableContent += '</table>';
+      fileTable.innerHTML = fileTableContent + '<div class="no-files">This folder is empty</div>';
       updateToolbarState();
       return;
     }
@@ -2072,15 +2290,6 @@
       return a.name.localeCompare(b.name);
     });
 
-    let fileTableContent = '<table class="file-table">';
-    fileTableContent += '<tr>';
-    fileTableContent += '<th style="width:32px"><input type="checkbox" id="selectAllCheckbox" onchange="toggleSelectAll(this)"></th>';
-    fileTableContent += `<th class="col-name sortable" onclick="sortBy('name')">Name${getSortIndicator('name')}</th>`;
-    fileTableContent += `<th style="width:72px" class="sortable" onclick="sortBy('type')">Type${getSortIndicator('type')}</th>`;
-    fileTableContent += `<th style="width:80px" class="sortable" onclick="sortBy('size')">Size${getSortIndicator('size')}</th>`;
-    fileTableContent += '<th class="actions-col"></th>';
-    fileTableContent += '</tr>';
-
     sortedFiles.forEach(file => {
       if (file.isDirectory) {
         let folderPath = currentPath;
@@ -2090,12 +2299,14 @@
         const isProtected = file.name.startsWith('.');
         fileTableContent += `<tr class="folder-row">`;
         fileTableContent += isProtected
-          ? '<td></td>'
-          : `<td><input type="checkbox" class="select-item" data-path="${encodeURIComponent(folderPath)}" data-name="${escapeHtml(file.name)}" data-type="folder"></td>`;
-        fileTableContent += `<td class="col-name"><span class="file-icon">📁</span><a href="/files?path=${encodeURIComponent(folderPath)}" class="folder-link" title="${escapeHtml(file.name).replace(/"/g, '&quot;')}">${escapeHtml(file.name)}</a></td>`;
+          ? '<td style="text-align:center"></td>'
+          : `<td style="text-align:center"><input type="checkbox" class="select-item" data-path="${encodeURIComponent(folderPath)}" data-name="${escapeHtml(file.name)}" data-type="folder"></td>`;
+        fileTableContent += `<td class="col-name"><div class="name-cell"><span class="file-icon">📁</span><a href="/files?path=${encodeURIComponent(folderPath)}" class="folder-link" title="${escapeHtml(file.name).replace(/"/g, '&quot;')}">${escapeHtml(file.name)}</a></div></td>`;
         fileTableContent += '<td style="text-align:center"><span class="badge badge-folder">DIR</span></td>';
-        fileTableContent += '<td style="text-align:right">-</td>';
-        fileTableContent += '<td class="actions-col"></td>';
+        fileTableContent += '<td class="size-cell"></td>';
+        fileTableContent += isProtected
+          ? '<td class="actions-col"></td>'
+          : `<td class="actions-col"><button class="rename-btn" onclick="openRenameModal('${file.name.replaceAll("'", "\\'")}', '${folderPath.replaceAll("'", "\\'")}' )" title="Rename folder">✏️</button></td>`;
         fileTableContent += '</tr>';
       } else {
         let filePath = currentPath;
@@ -2111,11 +2322,10 @@
 
         fileTableContent += `<tr class="${ext === 'epub' ? 'epub-file' : ''}">`;
         fileTableContent += `<td style="text-align:center"><input type="checkbox" class="select-item" data-path="${encodeURIComponent(filePath)}" data-name="${escapeHtml(file.name)}" data-type="file"></td>`;
-        fileTableContent += `<td class="col-name"><span class="file-icon">${cat.icon}</span>`;
-        fileTableContent += `<a rel="noopener noreferrer" target="_blank" href="/download?path=${encodeURIComponent(filePath)}" class="file-link" title="${escapeHtml(file.name).replace(/"/g, '&quot;')}">${escapeHtml(file.name)}</a>`;
-        fileTableContent += '</td>';
+        fileTableContent += `<td class="col-name"><div class="name-cell"><span class="file-icon">${cat.icon}</span>`;
+        fileTableContent += `<a rel="noopener noreferrer" target="_blank" href="/download?path=${encodeURIComponent(filePath)}" class="file-link" title="${escapeHtml(file.name).replace(/"/g, '&quot;')}">${escapeHtml(file.name)}</a></div>`;
         fileTableContent += `<td style="text-align:center">${typeCell}</td>`;
-        fileTableContent += `<td style="text-align:right">${formatFileSize(file.size)}</td>`;
+        fileTableContent += `<td class="size-cell">${formatFileSize(file.size)}</td>`;
         fileTableContent += `<td class="actions-col"><button class="rename-btn" onclick="openRenameModal('${file.name.replaceAll("'", "\\'")}', '${filePath.replaceAll("'", "\\'")}' )" title="Rename file">✏️</button></td>`;
         fileTableContent += '</tr>';
       }
@@ -2143,6 +2353,7 @@
     if (convertOptions) {
       convertOptions.style.display = 'none';
     }
+    document.getElementById('pickerColumns').style.display = 'none';
 
     // Reset rotation and overlap UI
     setHandedness('right');
@@ -2195,6 +2406,9 @@
     const fileInput = document.getElementById('fileInput');
     fileInput.value = '';
     fileInput.classList.remove('has-files');
+    const dropZone = fileInput.closest('.drop-zone');
+    dropZone.classList.remove('has-files');
+    dropZone.querySelector('.choose-file-btn').textContent = '📁 Choose Files';
     const uploadBtn = document.getElementById('uploadBtn');
     uploadBtn.disabled = true;
     uploadBtn.style.display = 'block';
@@ -3056,18 +3270,14 @@
     document.getElementById('moveActionBtn').disabled = fileCount === 0 || folderCount > 0;
   }
 
-  // Open move modal for a single selected file
+  // Open move modal for selected files
   function openMoveSelectedModal() {
     const items = getSelectedItems().filter(it => !it.isFolder);
     if (items.length === 0) {
       alert('Select a file to move.');
       return;
     }
-    if (items.length > 1) {
-      alert('Select only one file to move at a time.');
-      return;
-    }
-    openMoveModal(items[0].name, items[0].path);
+    openMoveModal(items);
   }
 
   // Open delete modal for currently selected checkboxes
@@ -3177,16 +3387,27 @@
     const convertOptions = document.getElementById('convertOptions');
     const imageOptimizer = document.getElementById('imageOptimizerOptions');
     fileInput.classList.toggle('has-files', files.length > 0);
+    const dropZone = fileInput.closest('.drop-zone');
+    dropZone.classList.toggle('has-files', files.length > 0);
+    const chooseBtn = dropZone.querySelector('.choose-file-btn');
+    if (files.length > 0) {
+      chooseBtn.textContent = files.length === 1 ? files[0].name : `${files.length} files selected`;
+    } else {
+      chooseBtn.textContent = '📁 Choose Files';
+    }
 
+    const pickerColumns = document.getElementById('pickerColumns');
     if (files.length === 0) {
       clearImagePicker();
       convertOptions.style.display = 'none';
       imageOptimizer.style.display = 'none';
+      pickerColumns.style.display = 'none';
       updateBatchModeUI(false);
       uploadBtn.disabled = true;
       resetImageOptimizer();
       return;
     }
+    pickerColumns.style.display = '';
 
     const fileList = Array.from(files);
     const imageFiles = fileList.filter(f => f.type.startsWith('image/'));
@@ -3196,6 +3417,7 @@
 
     if (hasImages && !hasEpubs) {
       updateBatchModeUI(false);
+      document.getElementById('convertWarning').style.display = 'none';
       const warningEl = document.getElementById('imageOptimizerWarning');
       warningEl.style.display = 'none';
       warningEl.innerHTML = '';
@@ -3215,6 +3437,7 @@
       convertOptions.style.display = 'block';
       const advancedContent = document.getElementById('advancedSettingsContent');
       const convertEnabled = document.getElementById('convertBeforeUpload').checked;
+      document.getElementById('convertWarning').style.display = convertEnabled ? 'block' : 'none';
       if (advancedContent.classList.contains('visible') && files.length === 1 && convertEnabled && files[0].name.toLowerCase().endsWith('.epub')) {
         showImagePicker(files[0]).catch(err => console.error('Image picker error:', err));
       }
@@ -3224,6 +3447,7 @@
       updateBatchModeUI(files.length > 1);
       uploadBtn.disabled = false;
     } else {
+      document.getElementById('convertWarning').style.display = 'none';
       convertOptions.style.display = 'none';
       imageOptimizer.style.display = 'none';
       resetImageOptimizer();
@@ -3363,10 +3587,11 @@ function toggleImageOptimizer() {
   const preview = document.getElementById('imageOptimizerPreview');
   const pathDisplay = document.getElementById('uploadPathDisplay');
 
+  const optsBox = document.getElementById('imageOptimizerOptions');
   if (checked) {
     uploadBtn.textContent = 'Optimize & Upload';
     uploadBtn.classList.add('optimize');
-    if (settingsEl) settingsEl.style.display = 'block';
+    if (optsBox) optsBox.classList.add('violet');
     if (pathDisplay) pathDisplay.textContent = '.sleep/';
     if (sleepImageFiles.length === 1) {
       if (fitCropRow && !sleepAspectExact) fitCropRow.style.display = 'block';
@@ -3375,10 +3600,9 @@ function toggleImageOptimizer() {
   } else {
     uploadBtn.textContent = 'Upload';
     uploadBtn.classList.remove('optimize');
-    if (settingsEl) settingsEl.style.display = 'none';
+    if (optsBox) optsBox.classList.remove('violet');
     if (pathDisplay) pathDisplay.textContent = currentPath === '/' ? '/ 🏠' : currentPath;
     if (fitCropRow) fitCropRow.style.display = 'none';
-    if (preview) { preview.style.display = 'none'; preview.innerHTML = ''; }
   }
 }
 
@@ -3401,7 +3625,8 @@ async function setupImageOptimizer(imageFiles) {
         const effW = sleepNeedsRotation ? sleepOrigH : sleepOrigW;
         const effH = sleepNeedsRotation ? sleepOrigW : sleepOrigH;
         sleepAspectExact = Math.abs(effW / effH - DEFAULT_MAX_WIDTH / DEFAULT_MAX_HEIGHT) < 0.01;
-        fitCropRow.style.display = sleepAspectExact ? 'none' : 'block';
+        const optChecked = document.getElementById('imageOptimizerEnabled').checked;
+        fitCropRow.style.display = (optChecked && !sleepAspectExact) ? 'block' : 'none';
         if (sleepAspectExact) imageResizeMode = 'fit';
         document.querySelectorAll('.fit-crop-btn').forEach(btn => {
           btn.classList.toggle('active', btn.dataset.value === 'fit');
@@ -5759,9 +5984,16 @@ function retryAllFailedUploads() {
 
   // Rename functions
   function openRenameModal(name, path) {
+    const dotIndex = name.lastIndexOf('.');
+    const hasExt = dotIndex > 0; // ignore leading dot (hidden files/dirs)
+    const baseName = hasExt ? name.substring(0, dotIndex) : name;
+    const ext = hasExt ? name.substring(dotIndex) : '';
+
     document.getElementById('renameItemName').textContent = '📄 ' + name;
     document.getElementById('renameItemPath').value = path;
-    document.getElementById('renameNewName').value = name;
+    document.getElementById('renameExtension').value = ext;
+    document.getElementById('renameExtSuffix').textContent = ext;
+    document.getElementById('renameNewName').value = baseName;
     document.getElementById('renameModal').classList.add('open');
     setTimeout(() => {
       const input = document.getElementById('renameNewName');
@@ -5776,7 +6008,8 @@ function retryAllFailedUploads() {
 
   function confirmRename() {
     const path = document.getElementById('renameItemPath').value;
-    const newName = document.getElementById('renameNewName').value.trim();
+    const ext = document.getElementById('renameExtension').value;
+    const newName = document.getElementById('renameNewName').value.trim() + ext;
 
     if (!newName) {
       alert('Please enter a new name.');
@@ -5879,9 +6112,12 @@ function retryAllFailedUploads() {
     if (!select.value) select.value = defaultDest;
   }
 
-  function openMoveModal(name, path) {
-    document.getElementById('moveItemName').textContent = '📄 ' + name;
-    document.getElementById('moveItemPath').value = path;
+  function openMoveModal(items) {
+    const label = items.length === 1
+      ? '📄 ' + items[0].name
+      : `📄 ${items.length} files`;
+    document.getElementById('moveItemName').textContent = label;
+    document.getElementById('moveItemPath').value = JSON.stringify(items.map(it => it.path));
     document.getElementById('moveModal').classList.add('open');
     loadMoveFolderOptions();
   }
@@ -5891,7 +6127,7 @@ function retryAllFailedUploads() {
   }
 
   function confirmMove() {
-    const path = document.getElementById('moveItemPath').value;
+    const paths = JSON.parse(document.getElementById('moveItemPath').value);
     const destPath = normalizePath(document.getElementById('moveDestPath').value);
 
     if (!destPath) {
@@ -5899,28 +6135,33 @@ function retryAllFailedUploads() {
       return;
     }
 
-    const formData = new FormData();
-    formData.append('path', path);
-    formData.append('dest', destPath);
+    closeMoveModal();
 
-    const xhr = new XMLHttpRequest();
-    xhr.open('POST', '/move', true);
-
-    xhr.onload = function() {
-      if (xhr.status === 200) {
+    function moveNext(index) {
+      if (index >= paths.length) {
         window.location.reload();
-      } else {
-        alert('Failed to move: ' + xhr.responseText);
+        return;
       }
-      closeMoveModal();
-    };
+      const formData = new FormData();
+      formData.append('path', paths[index]);
+      formData.append('dest', destPath);
 
-    xhr.onerror = function() {
-      alert('Failed to move - network error');
-      closeMoveModal();
-    };
+      const xhr = new XMLHttpRequest();
+      xhr.open('POST', '/move', true);
+      xhr.onload = function() {
+        if (xhr.status !== 200) {
+          alert('Failed to move ' + paths[index] + ': ' + xhr.responseText);
+        }
+        moveNext(index + 1);
+      };
+      xhr.onerror = function() {
+        alert('Failed to move ' + paths[index] + ' - network error');
+        moveNext(index + 1);
+      };
+      xhr.send(formData);
+    }
 
-    xhr.send(formData);
+    moveNext(0);
   }
   hydrate();
 </script>
