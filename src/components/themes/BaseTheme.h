@@ -91,8 +91,8 @@ constexpr ThemeMetrics values = {.batteryWidth = 15,
                                  .scrollBarWidth = 4,
                                  .scrollBarRightOffset = 5,
                                  .homeTopPadding = 40,
-                                 .homeCoverHeight = 400,
-                                 .homeCoverTileHeight = 400,
+                                 .homeCoverHeight = 480,
+                                 .homeCoverTileHeight = 480,
                                  .homeRecentBooksCount = 1,
                                  .buttonHintsHeight = 40,
                                  .sideButtonHintsWidth = 30,
@@ -110,6 +110,8 @@ constexpr ThemeMetrics values = {.batteryWidth = 15,
 class BaseTheme {
  public:
   virtual ~BaseTheme() = default;
+
+  mutable int lastBookWidth = 0;
 
   // Component drawing methods
   virtual void drawProgressBar(const GfxRenderer& renderer, Rect rect, size_t current, size_t total) const;
