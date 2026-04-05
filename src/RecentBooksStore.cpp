@@ -22,15 +22,21 @@ RecentBooksStore RecentBooksStore::instance;
 
 void RecentBooksStore::addBook(const std::string& path, const std::string& title, const std::string& author,
                                const std::string& coverBmpPath) {
+  int8_t embeddedStyleOverride = -1;
+  int8_t imageRenderingOverride = -1;
+
   // Remove existing entry if present
   auto it =
       std::find_if(recentBooks.begin(), recentBooks.end(), [&](const RecentBook& book) { return book.path == path; });
   if (it != recentBooks.end()) {
+    embeddedStyleOverride = it->embeddedStyleOverride;
+    imageRenderingOverride = it->imageRenderingOverride;
     recentBooks.erase(it);
   }
 
   // Add to front
-  recentBooks.insert(recentBooks.begin(), {path, title, author, coverBmpPath});
+  recentBooks.insert(recentBooks.begin(),
+                     {path, title, author, coverBmpPath, embeddedStyleOverride, imageRenderingOverride});
 
   // Trim to max size
   if (recentBooks.size() > MAX_RECENT_BOOKS) {
@@ -53,12 +59,37 @@ void RecentBooksStore::updateBook(const std::string& path, const std::string& ti
   }
 }
 
+RecentBook RecentBooksStore::getBookByPath(const std::string& path) const {
+  auto it =
+      std::find_if(recentBooks.begin(), recentBooks.end(), [&](const RecentBook& book) { return book.path == path; });
+  if (it != recentBooks.end()) {
+    return *it;
+  }
+  return RecentBook{};
+}
+
+bool RecentBooksStore::setReaderOverrides(const std::string& path, const int8_t embeddedStyleOverride,
+                                          const int8_t imageRenderingOverride) {
+  auto it =
+      std::find_if(recentBooks.begin(), recentBooks.end(), [&](const RecentBook& book) { return book.path == path; });
+  if (it == recentBooks.end()) {
+    LOG_ERR("RBS",
+            "Cannot set reader overrides: path not found '%s' (embeddedStyleOverride=%d, imageRenderingOverride=%d)",
+            path.c_str(), static_cast<int>(embeddedStyleOverride), static_cast<int>(imageRenderingOverride));
+    return false;
+  }
+
+  it->embeddedStyleOverride = embeddedStyleOverride;
+  it->imageRenderingOverride = imageRenderingOverride;
+  return saveToFile();
+}
+
 bool RecentBooksStore::saveToFile() const {
   Storage.mkdir("/.crosspoint");
   return JsonSettingsIO::saveRecentBooks(*this, RECENT_BOOKS_FILE_JSON);
 }
 
-RecentBook RecentBooksStore::getDataFromBook(std::string path) const {
+RecentBook RecentBooksStore::loadBookMetadataFromFile(const std::string& path) const {
   std::string lastBookFileName = "";
   const size_t lastSlash = path.find_last_of('/');
   if (lastSlash != std::string::npos) {
@@ -127,7 +158,7 @@ bool RecentBooksStore::loadFromBinaryFile() {
       serialization::readString(inputFile, path);
 
       // load book to get missing data
-      RecentBook book = getDataFromBook(path);
+      RecentBook book = loadBookMetadataFromFile(path);
       if (book.title.empty() && book.author.empty() && version == 2) {
         // Fall back to loading what we can from the store
         std::string title, author;
