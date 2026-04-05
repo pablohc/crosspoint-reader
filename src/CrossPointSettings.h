@@ -17,7 +17,15 @@ class CrossPointSettings {
   CrossPointSettings(const CrossPointSettings&) = delete;
   CrossPointSettings& operator=(const CrossPointSettings&) = delete;
 
-  enum SLEEP_SCREEN_MODE { LOGO = 0, CUSTOM = 1, COVER_FIT = 2, COVER_CROP = 3, BLANK = 4, SLEEP_SCREEN_MODE_COUNT };
+  enum SLEEP_SCREEN_MODE {
+    LOGO = 0,
+    CUSTOM = 1,
+    COVER_FIT = 2,
+    COVER_CROP = 3,
+    COVER_PROGRESS = 4,
+    BLANK = 5,
+    SLEEP_SCREEN_MODE_COUNT
+  };
   enum SLEEP_SCREEN_FILTER { FILTER_NONE = 0, FILTER_CONTRAST = 1, FILTER_NEGATIVE = 2, SLEEP_SCREEN_FILTER_COUNT };
 
   // Status bar enum - legacy

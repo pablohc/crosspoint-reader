@@ -26,5 +26,7 @@ extern const char* const STRINGS_DA[];
 extern const char* const STRINGS_NL[];
 extern const char* const STRINGS_TR[];
 extern const char* const STRINGS_KK[];
+extern const char* const STRINGS_HU[];
+extern const char* const STRINGS_LT[];
 
 }  // namespace i18n_strings

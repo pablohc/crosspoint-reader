@@ -1,7 +1,18 @@
 #pragma once
+
+#include <string>
+
 #include "../Activity.h"
 
 class Bitmap;
+
+struct BookOverlayInfo {
+  std::string title;
+  std::string author;
+  std::string progressText;
+  std::string chapterName;
+  std::string progressSuffix;
+};
 
 class SleepActivity final : public Activity {
  public:
@@ -14,5 +25,7 @@ class SleepActivity final : public Activity {
   bool renderCustomSleepScreen() const;
   bool renderCoverSleepScreen() const;
   void renderBitmapSleepScreen(const Bitmap& bitmap, bool allowCrop) const;
+  void renderBitmapSleepScreen(const Bitmap& bitmap, const BookOverlayInfo& overlayInfo) const;
   void renderBlankSleepScreen() const;
+  BookOverlayInfo getBookOverlayInfo(const std::string& bookPath) const;
 };
