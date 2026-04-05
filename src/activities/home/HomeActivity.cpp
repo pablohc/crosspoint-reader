@@ -150,7 +150,7 @@ bool HomeActivity::storeCoverBuffer() {
     return false;
   }
   freeCoverBuffer();
-  const size_t bufferSize = GfxRenderer::getBufferSize();
+  const size_t bufferSize = renderer.getBufferSize();
   coverBuffer = static_cast<uint8_t*>(malloc(bufferSize));
   if (!coverBuffer) {
     return false;
@@ -167,7 +167,7 @@ bool HomeActivity::restoreCoverBuffer() {
   if (!frameBuffer) {
     return false;
   }
-  const size_t bufferSize = GfxRenderer::getBufferSize();
+  const size_t bufferSize = renderer.getBufferSize();
   memcpy(frameBuffer, coverBuffer, bufferSize);
   LOG_DBG("HOME", "restoreCoverBuffer: restored %d bytes", bufferSize);
   return true;
