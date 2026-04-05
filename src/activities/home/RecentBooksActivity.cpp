@@ -6,14 +6,11 @@
 
 #include <algorithm>
 
+#include "../util/ConfirmationActivity.h"
 #include "MappedInputManager.h"
 #include "RecentBooksStore.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
-
-namespace {
-constexpr unsigned long GO_HOME_MS = 1000;
-}  // namespace
 
 void RecentBooksActivity::loadRecentBooks() {
   recentBooks.clear();
@@ -57,6 +54,33 @@ void RecentBooksActivity::loop() {
 
   if (mappedInput.wasReleased(MappedInputManager::Button::Back)) {
     onGoHome();
+  }
+
+  // Left button: remove selected book from recent list
+  if (!recentBooks.empty() && selectorIndex < static_cast<int>(recentBooks.size()) &&
+      mappedInput.wasReleased(MappedInputManager::Button::Left)) {
+    const std::string bookPath = recentBooks[selectorIndex].path;
+    const std::string bookTitle = recentBooks[selectorIndex].title;
+
+    auto handler = [this, bookPath](const ActivityResult& res) {
+      if (!res.isCancelled) {
+        LOG_DBG("RBA", "Removing from recent books: %s", bookPath.c_str());
+        RECENT_BOOKS.removeBook(bookPath);
+        loadRecentBooks();
+        if (recentBooks.empty()) {
+          selectorIndex = 0;
+        } else if (selectorIndex >= static_cast<int>(recentBooks.size())) {
+          selectorIndex = static_cast<int>(recentBooks.size()) - 1;
+        }
+        requestUpdate(true);
+      } else {
+        LOG_DBG("RBA", "Remove cancelled by user");
+      }
+    };
+
+    std::string heading = std::string(tr(STR_REMOVE)) + "? ";
+    startActivityForResult(std::make_unique<ConfirmationActivity>(renderer, mappedInput, heading, bookTitle), handler);
+    return;
   }
 
   int listSize = static_cast<int>(recentBooks.size());
@@ -105,7 +129,9 @@ void RecentBooksActivity::render(RenderLock&&) {
   }
 
   // Help text
-  const auto labels = mappedInput.mapLabels(tr(STR_HOME), tr(STR_OPEN), tr(STR_DIR_UP), tr(STR_DIR_DOWN));
+  const bool hasBooks = !recentBooks.empty();
+  const auto labels =
+      mappedInput.mapLabels(tr(STR_HOME), hasBooks ? tr(STR_OPEN) : "", hasBooks ? tr(STR_REMOVE) : "", "");
   GUI.drawButtonHints(renderer, labels.btn1, labels.btn2, labels.btn3, labels.btn4);
 
   renderer.displayBuffer();
