@@ -189,7 +189,7 @@ const char* const CHARACTER_SETS[] = {
     "\x80"
     "\xA6"
     "",  // Deutsch
-    " !%()*+,./012345:=?ABCDEFGHIJKLMNOPQRSTUVWYZ[]abcdefghijklmnoprstuvwxyz|\xC2"
+    " !%()*+,-./012345:=?ABCDEFGHIJKLMNOPQRSTUVWYZ[]abcdefghijklmnoprstuvwxyz|\xC2"
     "\xAB"
     "\xC3"
     "\x81"
@@ -760,7 +760,7 @@ const char* const CHARACTER_SETS[] = {
     "\xC3"
     "\xBC"
     "",  // Nederlands
-    " !\"%'()*+,./012345:=?ABCDEFGHIKLMNOPQRSTUVWYZ[]abcdefghiklmnoprstuvxyz|\xC2"
+    " !\"%'()*+,-./012345:=?ABCDEFGHIKLMNOPQRSTUVWYZ[]abcdefghiklmnoprstuvxyz|\xC2"
     "\xAB"
     "\xC3"
     "\x87"
@@ -1280,9 +1280,9 @@ const char* const STRINGS_EN[] = {
     "Take screenshot",
     "Auto Turn Enabled: ",
     "Auto Turn (Pages Per Minute)",
-    "Page %lu/%lu (%.1f%%)",
-    "Page %lu",
-    " (%d/%d, %.1f%%)",
+    "Reading progress: Page %lu/%u - %.0f%%",
+    "Reading progress: Page %lu",
+    " - Page %d/%d - %.0f%% read",
 };
 
 const char* const STRINGS_ES[] = {
@@ -1811,9 +1811,9 @@ const char* const STRINGS_ES[] = {
     "Leer p\xC3"
     "\xA1"
     "ginas por minuto",
-    "Page %lu/%lu (%.1f%%)",
-    "Page %lu",
-    " (%d/%d, %.1f%%)",
+    "Reading progress: Page %lu/%u - %.0f%%",
+    "Reading progress: Page %lu",
+    " - Page %d/%d - %.0f%% read",
 };
 
 const char* const STRINGS_FR[] = {
@@ -2458,9 +2458,9 @@ const char* const STRINGS_FR[] = {
     "cran",
     "Tourne-page auto : ",
     "Tourne-page auto (pages par minute)",
-    "Page %lu/%lu (%.1f%%)",
-    "Page %lu",
-    " (%d/%d, %.1f%%)",
+    "Reading progress: Page %lu/%u - %.0f%%",
+    "Reading progress: Page %lu",
+    " - Page %d/%d - %.0f%% read",
 };
 
 const char* const STRINGS_DE[] = {
@@ -2909,9 +2909,9 @@ const char* const STRINGS_DE[] = {
     "Auto-Umbl\xC3"
     "\xA4"
     "ttern (Seiten/Min.)",
-    "Page %lu/%lu (%.1f%%)",
-    "Page %lu",
-    " (%d/%d, %.1f%%)",
+    "Reading progress: Page %lu/%u - %.0f%%",
+    "Reading progress: Page %lu",
+    " - Page %d/%d - %.0f%% read",
 };
 
 const char* const STRINGS_CS[] = {
@@ -4245,9 +4245,9 @@ const char* const STRINGS_CS[] = {
     "mek obrazovky",
     "Auto Turn Enabled: ",
     "Auto Turn (Pages Per Minute)",
-    "Page %lu/%lu (%.1f%%)",
-    "Page %lu",
-    " (%d/%d, %.1f%%)",
+    "Reading progress: Page %lu/%u - %.0f%%",
+    "Reading progress: Page %lu",
+    " - Page %d/%d - %.0f%% read",
 };
 
 const char* const STRINGS_PO[] = {
@@ -4816,9 +4816,9 @@ const char* const STRINGS_PO[] = {
     "Capturar tela",
     "Auto Turn Enabled: ",
     "Auto Turn (Pages Per Minute)",
-    "Page %lu/%lu (%.1f%%)",
-    "Page %lu",
-    " (%d/%d, %.1f%%)",
+    "Reading progress: Page %lu/%u - %.0f%%",
+    "Reading progress: Page %lu",
+    " - Page %d/%d - %.0f%% read",
 };
 
 const char* const STRINGS_RU[] = {
@@ -12143,9 +12143,9 @@ const char* const STRINGS_RU[] = {
     "\xD1"
     "\x83"
     ")",
-    "Page %lu/%lu (%.1f%%)",
-    "Page %lu",
-    " (%d/%d, %.1f%%)",
+    "Reading progress: Page %lu/%u - %.0f%%",
+    "Reading progress: Page %lu",
+    " - Page %d/%d - %.0f%% read",
 };
 
 const char* const STRINGS_SV[] = {
@@ -12859,9 +12859,9 @@ const char* const STRINGS_SV[] = {
     "Automatisk v\xC3"
     "\xA4"
     "ndning (sidor per minut)",
-    "Page %lu/%lu (%.1f%%)",
-    "Page %lu",
-    " (%d/%d, %.1f%%)",
+    "Reading progress: Page %lu/%u - %.0f%%",
+    "Reading progress: Page %lu",
+    " - Page %d/%d - %.0f%% read",
 };
 
 const char* const STRINGS_RO[] = {
@@ -13718,9 +13718,9 @@ const char* const STRINGS_RO[] = {
     "\x83"
     ": ",
     "Pagini pe minut",
-    "Page %lu/%lu (%.1f%%)",
-    "Page %lu",
-    " (%d/%d, %.1f%%)",
+    "Reading progress: Page %lu/%u - %.0f%%",
+    "Reading progress: Page %lu",
+    " - Page %d/%d - %.0f%% read",
 };
 
 const char* const STRINGS_CA[] = {
@@ -14301,9 +14301,9 @@ const char* const STRINGS_CA[] = {
     "tic (p\xC3"
     "\xA0"
     "gines per minut)",
-    "Page %lu/%lu (%.1f%%)",
-    "Page %lu",
-    " (%d/%d, %.1f%%)",
+    "Reading progress: Page %lu/%u - %.0f%%",
+    "Reading progress: Page %lu",
+    " - Page %d/%d - %.0f%% read",
 };
 
 const char* const STRINGS_UK[] = {
@@ -22372,9 +22372,9 @@ const char* const STRINGS_UK[] = {
     "\xD0"
     "\xB2"
     ")",
-    "Page %lu/%lu (%.1f%%)",
-    "Page %lu",
-    " (%d/%d, %.1f%%)",
+    "Reading progress: Page %lu/%u - %.0f%%",
+    "Reading progress: Page %lu",
+    " - Page %d/%d - %.0f%% read",
 };
 
 const char* const STRINGS_BE[] = {
@@ -29835,9 +29835,9 @@ const char* const STRINGS_BE[] = {
     "\xD1"
     "\x83"
     ")",
-    "Page %lu/%lu (%.1f%%)",
-    "Page %lu",
-    " (%d/%d, %.1f%%)",
+    "Reading progress: Page %lu/%u - %.0f%%",
+    "Reading progress: Page %lu",
+    " - Page %d/%d - %.0f%% read",
 };
 
 const char* const STRINGS_IT[] = {
@@ -30174,9 +30174,9 @@ const char* const STRINGS_IT[] = {
     "Cattura schermata",
     "Auto Turn Enabled: ",
     "Auto Turn (Pages Per Minute)",
-    "Page %lu/%lu (%.1f%%)",
-    "Page %lu",
-    " (%d/%d, %.1f%%)",
+    "Reading progress: Page %lu/%u - %.0f%%",
+    "Reading progress: Page %lu",
+    " - Page %d/%d - %.0f%% read",
 };
 
 const char* const STRINGS_PL[] = {
@@ -31045,9 +31045,9 @@ const char* const STRINGS_PL[] = {
     "b zrzut ekranu",
     "Auto-kartkowanie: ",
     "Auto-kartkowanie (str./min)",
-    "Page %lu/%lu (%.1f%%)",
-    "Page %lu",
-    " (%d/%d, %.1f%%)",
+    "Reading progress: Page %lu/%u - %.0f%%",
+    "Reading progress: Page %lu",
+    " - Page %d/%d - %.0f%% read",
 };
 
 const char* const STRINGS_FI[] = {
@@ -31732,9 +31732,9 @@ const char* const STRINGS_FI[] = {
     "Ota kuvakaappaus",
     "Auto Turn Enabled: ",
     "Auto Turn (Pages Per Minute)",
-    "Page %lu/%lu (%.1f%%)",
-    "Page %lu",
-    " (%d/%d, %.1f%%)",
+    "Reading progress: Page %lu/%u - %.0f%%",
+    "Reading progress: Page %lu",
+    " - Page %d/%d - %.0f%% read",
 };
 
 const char* const STRINGS_DA[] = {
@@ -32225,9 +32225,9 @@ const char* const STRINGS_DA[] = {
     "rmbillede",
     "Automatisk sidevendning aktiveret: ",
     "Automatisk vending (sider per minut)",
-    "Page %lu/%lu (%.1f%%)",
-    "Page %lu",
-    " (%d/%d, %.1f%%)",
+    "Reading progress: Page %lu/%u - %.0f%%",
+    "Reading progress: Page %lu",
+    " - Page %d/%d - %.0f%% read",
 };
 
 const char* const STRINGS_NL[] = {
@@ -32538,9 +32538,9 @@ const char* const STRINGS_NL[] = {
     "Screenshot maken",
     "Automatisch omslaan ingeschakeld: ",
     "Autom. omslaan (pagina's per minuut)",
-    "Page %lu/%lu (%.1f%%)",
-    "Page %lu",
-    " (%d/%d, %.1f%%)",
+    "Reading progress: Page %lu/%u - %.0f%%",
+    "Reading progress: Page %lu",
+    " - Page %d/%d - %.0f%% read",
 };
 
 const char* const STRINGS_TR[] = {
@@ -33709,9 +33709,9 @@ const char* const STRINGS_TR[] = {
     "Otomatik \xC3"
     "\x87"
     "evirme (Dakikada Sayfa)",
-    "Page %lu/%lu (%.1f%%)",
-    "Page %lu",
-    " (%d/%d, %.1f%%)",
+    "Reading progress: Page %lu/%u - %.0f%%",
+    "Reading progress: Page %lu",
+    " - Page %d/%d - %.0f%% read",
 };
 
 const char* const STRINGS_KK[] = {
@@ -41192,9 +41192,9 @@ const char* const STRINGS_KK[] = {
     "\xD1"
     "\x8B"
     ")",
-    "Page %lu/%lu (%.1f%%)",
-    "Page %lu",
-    " (%d/%d, %.1f%%)",
+    "Reading progress: Page %lu/%u - %.0f%%",
+    "Reading progress: Page %lu",
+    " - Page %d/%d - %.0f%% read",
 };
 
 const char* const STRINGS_HU[] = {
@@ -42499,9 +42499,9 @@ const char* const STRINGS_HU[] = {
     "Automatikus lapoz\xC3"
     "\xA1"
     "s (oldal/perc)",
-    "Page %lu/%lu (%.1f%%)",
-    "Page %lu",
-    " (%d/%d, %.1f%%)",
+    "Reading progress: Page %lu/%u - %.0f%%",
+    "Reading progress: Page %lu",
+    " - Page %d/%d - %.0f%% read",
 };
 
 const char* const STRINGS_LT[] = {
@@ -43168,9 +43168,9 @@ const char* const STRINGS_LT[] = {
     "Ekrano nuotrauka",
     "Auto-vertimas: ",
     "Auto-vertimas (psl/min)",
-    "Page %lu/%lu (%.1f%%)",
-    "Page %lu",
-    " (%d/%d, %.1f%%)",
+    "Reading progress: Page %lu/%u - %.0f%%",
+    "Reading progress: Page %lu",
+    " - Page %d/%d - %.0f%% read",
 };
 
 }  // namespace i18n_strings
