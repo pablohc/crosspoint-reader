@@ -330,6 +330,10 @@ void XMLCALL ChapterHtmlSlimParser::startElement(void* userData, const XML_Char*
 
                 int displayWidth = 0;
                 int displayHeight = 0;
+                if (strcmp(name, "ul") == 0 || strcmp(name, "ol") == 0) {
+                  self->listStack.push_back({self->depth, name[0] == 'o', 0});
+                }
+
                 const float emSize = static_cast<float>(self->renderer.getFontAscenderSize(self->fontId));
                 CssStyle imgStyle = self->cssParser ? self->cssParser->resolveStyle("img", classAttr) : CssStyle{};
                 // Merge inline style (e.g. style="height: 2em") so it overrides stylesheet rules
@@ -581,7 +585,14 @@ void XMLCALL ChapterHtmlSlimParser::startElement(void* userData, const XML_Char*
       self->updateEffectiveInlineStyle();
 
       if (strcmp(name, "li") == 0) {
-        self->currentTextBlock->addWord("\xe2\x80\xa2", EpdFontFamily::REGULAR);
+        char marker[12];
+        if (!self->listStack.empty() && self->listStack.back().isOrdered) {
+          self->listStack.back().counter += 1;
+          snprintf(marker, sizeof(marker), "%d.", self->listStack.back().counter);
+        } else {
+          strcpy(marker, "\xe2\x80\xa2");
+        }
+        self->currentTextBlock->addWord(marker, EpdFontFamily::REGULAR);
       }
     }
   } else if (matches(name, UNDERLINE_TAGS, NUM_UNDERLINE_TAGS)) {
@@ -892,6 +903,10 @@ void XMLCALL ChapterHtmlSlimParser::endElement(void* userData, const XML_Char* n
   }
 
   self->depth -= 1;
+
+  while (!self->listStack.empty() && self->listStack.back().depth >= self->depth) {
+    self->listStack.pop_back();
+  }
 
   // Closing a footnote link — create entry from collected text and href
   if (self->insideFootnoteLink && self->depth == self->footnoteLinkDepth) {
