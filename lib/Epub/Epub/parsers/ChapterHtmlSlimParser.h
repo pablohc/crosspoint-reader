@@ -6,6 +6,7 @@
 #include <functional>
 #include <memory>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 #include "../FootnoteEntry.h"
@@ -83,6 +84,9 @@ class ChapterHtmlSlimParser {
   char currentFootnoteLinkHref[64] = {};
   std::vector<std::pair<int, FootnoteEntry>> pendingFootnotes;  // <wordIndex, entry>
   int wordsExtractedInBlock = 0;
+
+  std::unordered_map<std::string, CssStyle> cssStyleCache_;
+  std::unordered_map<std::string, CssStyle> inlineStyleCache_;
 
   void updateEffectiveInlineStyle();
   void startNewTextBlock(const BlockStyle& blockStyle);
