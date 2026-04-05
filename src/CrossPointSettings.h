@@ -137,6 +137,8 @@ class CrossPointSettings {
   // Image rendering in EPUB reader
   enum IMAGE_RENDERING { IMAGES_DISPLAY = 0, IMAGES_PLACEHOLDER = 1, IMAGES_SUPPRESS = 2, IMAGE_RENDERING_COUNT };
 
+  enum SLEEP_COVER_OVERLAY { OVERLAY_OFF = 0, OVERLAY_WHITE = 1, OVERLAY_GRAY = 2, OVERLAY_BLACK = 3 };
+
   // Sleep screen settings
   uint8_t sleepScreen = DARK;
   // Sleep screen cover mode settings
