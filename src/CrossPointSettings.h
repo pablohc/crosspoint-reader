@@ -140,6 +140,8 @@ class CrossPointSettings {
   // Home screen cover rendering mode
   enum COVER_MODE { COVER_ENABLED = 0, COVER_TIMEOUT = 1, COVER_DISABLED_MODE = 2, COVER_MODE_COUNT };
 
+  enum SLEEP_COVER_OVERLAY { OVERLAY_OFF = 0, OVERLAY_WHITE = 1, OVERLAY_GRAY = 2, OVERLAY_BLACK = 3 };
+
   // Sleep screen settings
   uint8_t sleepScreen = DARK;
   // Sleep screen cover mode settings

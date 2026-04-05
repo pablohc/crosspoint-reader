@@ -340,16 +340,16 @@ void SleepActivity::renderBitmapSleepScreen(const Bitmap& bitmap, const BookOver
       textBlockHeight += lineHeight10;
     }
 
-    const bool textBlack = (overlayMode != 3);
+    const bool textBlack = (overlayMode != CrossPointSettings::OVERLAY_BLACK);
     const int topPadding = lineHeight12 / 3;
     const int bottomPadding = lineHeight10 * 2 / 3;
     const int overlayHeight = textBlockHeight + topPadding + bottomPadding;
     const int overlayY = pageHeight - overlayHeight;
 
-    if (overlayMode == 2) {
+    if (overlayMode == CrossPointSettings::OVERLAY_GRAY) {
       renderer.fillRectDither(0, overlayY, pageWidth, overlayHeight, Color::LightGray);
     } else {
-      renderer.fillRect(0, overlayY, pageWidth, overlayHeight, overlayMode == 3);
+      renderer.fillRect(0, overlayY, pageWidth, overlayHeight, overlayMode == CrossPointSettings::OVERLAY_BLACK);
     }
 
     int currentY = overlayY + topPadding;
@@ -483,8 +483,9 @@ void SleepActivity::renderCoverSleepScreen() const {
     if (bitmap.parseHeaders() == BmpReaderError::Ok) {
       LOG_DBG("SLP", "Rendering sleep cover: %s", coverBmpPath.c_str());
       const uint8_t overlayMode = SETTINGS.sleepCoverOverlay;
-      const BookOverlayInfo coverOverlayInfo =
-          overlayMode != 0 ? getBookOverlayInfo(APP_STATE.openEpubPath) : BookOverlayInfo{};
+      const BookOverlayInfo coverOverlayInfo = overlayMode != CrossPointSettings::OVERLAY_OFF
+                                                   ? getBookOverlayInfo(APP_STATE.openEpubPath)
+                                                   : BookOverlayInfo{};
       renderBitmapSleepScreen(bitmap, coverOverlayInfo);
       file.close();
       return;
