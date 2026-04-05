@@ -132,11 +132,24 @@ void KOReaderSyncActivity::performSync() {
 
   // Convert remote progress to CrossPoint position
   hasRemoteProgress = true;
+  {
+    RenderLock lock(*this);
+    statusMessage = tr(STR_MAPPING_REMOTE);
+  }
+  requestUpdateAndWait();
+
   KOReaderPosition koPos = {remoteProgress.progress, remoteProgress.percentage};
   remotePosition = ProgressMapper::toCrossPoint(epub, koPos, currentSpineIndex, totalPagesInSpine);
 
   // Calculate local progress in KOReader format (for display)
-  CrossPointPosition localPos = {currentSpineIndex, currentPage, totalPagesInSpine};
+  {
+    RenderLock lock(*this);
+    statusMessage = tr(STR_MAPPING_LOCAL);
+  }
+  requestUpdateAndWait();
+
+  CrossPointPosition localPos = {currentSpineIndex, currentPage, totalPagesInSpine, localParagraphIndex,
+                                 hasLocalParagraphIndex};
   localProgress = ProgressMapper::toKOReader(epub, localPos);
 
   {
@@ -162,7 +175,8 @@ void KOReaderSyncActivity::performUpload() {
   requestUpdateAndWait();
 
   // Convert current position to KOReader format
-  CrossPointPosition localPos = {currentSpineIndex, currentPage, totalPagesInSpine};
+  CrossPointPosition localPos = {currentSpineIndex, currentPage, totalPagesInSpine, localParagraphIndex,
+                                 hasLocalParagraphIndex};
   KOReaderPosition koPos = ProgressMapper::toKOReader(epub, localPos);
 
   KOReaderProgress progress;
@@ -187,6 +201,7 @@ void KOReaderSyncActivity::performUpload() {
   {
     RenderLock lock(*this);
     state = UPLOAD_COMPLETE;
+    uploadCompleteTime = millis();
   }
   requestUpdate(true);
 }
@@ -218,6 +233,18 @@ void KOReaderSyncActivity::onExit() {
   Activity::onExit();
 
   wifiOff();
+}
+
+void KOReaderSyncActivity::closeCancelled() {
+  if (closeRequested) {
+    return;
+  }
+
+  closeRequested = true;
+  ActivityResult result;
+  result.isCancelled = true;
+  setResult(std::move(result));
+  finish();
 }
 
 void KOReaderSyncActivity::render(RenderLock&&) {
@@ -337,10 +364,12 @@ void KOReaderSyncActivity::render(RenderLock&&) {
 void KOReaderSyncActivity::loop() {
   if (state == NO_CREDENTIALS || state == SYNC_FAILED || state == UPLOAD_COMPLETE) {
     if (mappedInput.wasReleased(MappedInputManager::Button::Back)) {
-      ActivityResult result;
-      result.isCancelled = true;
-      setResult(std::move(result));
-      finish();
+      closeCancelled();
+      return;
+    }
+
+    if (state == UPLOAD_COMPLETE && millis() - uploadCompleteTime >= 3000) {
+      closeCancelled();
     }
     return;
   }
@@ -360,7 +389,8 @@ void KOReaderSyncActivity::loop() {
     if (mappedInput.wasReleased(MappedInputManager::Button::Confirm)) {
       if (selectedOption == 0) {
         // Wifi will be turned off in onExit()
-        setResult(SyncResult{remotePosition.spineIndex, remotePosition.pageNumber});
+        setResult(SyncResult{remotePosition.spineIndex, remotePosition.pageNumber, remotePosition.paragraphIndex,
+                             remotePosition.hasParagraphIndex});
         finish();
       } else if (selectedOption == 1) {
         // Upload local progress
@@ -369,10 +399,7 @@ void KOReaderSyncActivity::loop() {
     }
 
     if (mappedInput.wasReleased(MappedInputManager::Button::Back)) {
-      ActivityResult result;
-      result.isCancelled = true;
-      setResult(std::move(result));
-      finish();
+      closeCancelled();
     }
     return;
   }
@@ -391,10 +418,7 @@ void KOReaderSyncActivity::loop() {
     }
 
     if (mappedInput.wasReleased(MappedInputManager::Button::Back)) {
-      ActivityResult result;
-      result.isCancelled = true;
-      setResult(std::move(result));
-      finish();
+      closeCancelled();
     }
     return;
   }
