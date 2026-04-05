@@ -415,7 +415,7 @@ BookOverlayInfo SleepActivity::getBookOverlayInfo(const std::string& bookPath) c
           uint32_t currentPage = static_cast<uint32_t>(data[0]) | (static_cast<uint32_t>(data[1]) << 8) |
                                  (static_cast<uint32_t>(data[2]) << 16) | (static_cast<uint32_t>(data[3]) << 24);
           uint32_t totalPages = xtc.getPageCount();
-          float progress = xtc.calculateProgress(currentPage) * 100.0f;
+          float progress = static_cast<float>(xtc.calculateProgress(currentPage));
           char buf[64];
           snprintf(buf, sizeof(buf), tr(STR_OVERLAY_READING_PROGRESS), (unsigned long)currentPage + 1, totalPages,
                    progress);
@@ -480,7 +480,7 @@ BookOverlayInfo SleepActivity::getBookOverlayInfo(const std::string& bookPath) c
           int currentPage = data[2] + (data[3] << 8);
           int pageCount = data[4] + (data[5] << 8);
           if (pageCount > 0) {
-            float chapterProgress = static_cast<float>(currentPage) / static_cast<float>(pageCount);
+            float chapterProgress = static_cast<float>(currentPage + 1) / static_cast<float>(pageCount);
             float bookProgress = epub.calculateProgress(currentSpineIndex, chapterProgress) * 100.0f;
 
             const int tocIndex = epub.getTocIndexForSpineIndex(currentSpineIndex);
