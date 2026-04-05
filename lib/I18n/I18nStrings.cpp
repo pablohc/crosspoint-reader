@@ -189,7 +189,7 @@ const char* const CHARACTER_SETS[] = {
     "\x80"
     "\xA6"
     "",  // Deutsch
-    " !%()*+,./012345:=?ABCDEFHIJKLMNOPQRSTUVWYZ[]abcdefghijklmnoprstuvwxyz|\xC2"
+    " !%()*+,./012345:=?ABCDEFGHIJKLMNOPQRSTUVWYZ[]abcdefghijklmnoprstuvwxyz|\xC2"
     "\xAB"
     "\xC3"
     "\x81"
@@ -269,7 +269,7 @@ const char* const CHARACTER_SETS[] = {
     "\x80"
     "\x91"
     "",  // Português (Brasil)
-    " !%()*+,-./012345:=?ABCDEFIKLMNOPQRSTUW[]abcdefghiklmnoprstuvxyz|\xC2"
+    " !%()*+,-./012345:=?ABCDEFGHIKLMNOPQRSTUW[]abcdefghiklmnoprstuvxyz|\xC2"
     "\xAB"
     "\xC2"
     "\xBB"
@@ -449,7 +449,7 @@ const char* const CHARACTER_SETS[] = {
     "\xC3"
     "\xBC"
     "",  // Català
-    " !\"%'()*+,-./012345:=?ABCDEFIKLMNOPQRSUW[]abcdefghiklmnoprstuvxyz|\xC2"
+    " !\"%'()*+,-./012345:=?ABCDEFGHIKLMNOPQRSTUW[]abcdefghiklmnoprstuvxyz|\xC2"
     "\xAB"
     "\xD0"
     "\x86"
@@ -570,7 +570,7 @@ const char* const CHARACTER_SETS[] = {
     "\xD1"
     "\x97"
     "",  // Українська
-    " !%()*+,-./012345:=?ABCDEFIKLMNOPQRSTUW[]abcdefghiklmnoprstuvxyz|\xC2"
+    " !%()*+,-./012345:=?ABCDEFGHIKLMNOPQRSTUW[]abcdefghiklmnoprstuvxyz|\xC2"
     "\xAB"
     "\xC2"
     "\xBB"
@@ -729,7 +729,7 @@ const char* const CHARACTER_SETS[] = {
     "\xC5"
     "\xBC"
     "",  // Polski
-    " !\"%()*+,-./012345:=?ABCDEFHIJKLMNOPQRSTUVWY[]abcdefghijklmnoprstuvwxyz|\xC2"
+    " !\"%()*+,-./012345:=?ABCDEFGHIJKLMNOPQRSTUVWY[]abcdefghijklmnoprstuvwxyz|\xC2"
     "\xAB"
     "\xC3"
     "\x84"
@@ -783,7 +783,7 @@ const char* const CHARACTER_SETS[] = {
     "\xC5"
     "\x9F"
     "",  // Türkçe
-    " !\"%()*+,-./012345:=?ABCDFHIKLMNOPQRSUW[]abcdefghiklmnoprstuvwxyz|\xC2"
+    " !\"%()*+,-./012345:=?ABCDEFGHIKLMNOPQRSTUW[]abcdefghiklmnoprstuvwxyz|\xC2"
     "\xAB"
     "\xD0"
     "\x86"
@@ -941,7 +941,7 @@ const char* const CHARACTER_SETS[] = {
     "\xC5"
     "\xB1"
     "",  // Magyar
-    " !%()*+,-./012345:=?ABCDEFGIJKLMNOPQRSTUVWX[]abcdefghijklmnoprstuvwxyz|\xC2"
+    " !%()*+,-./012345:=?ABCDEFGHIJKLMNOPQRSTUVWX[]abcdefghijklmnoprstuvwxyz|\xC2"
     "\xAB"
     "\xC4"
     "\x85"
@@ -1211,6 +1211,13 @@ const char* const STRINGS_EN[] = {
     "Lyra",
     "Lyra Extended",
     "Sunlight Fading Fix",
+    "Home Cover",
+    "Enabled",
+    "Timeout (10s)",
+    "Disabled",
+    "Disable Home Cover",
+    "Enable Home Cover",
+    "Generate Home Cover",
     "Remap Front Buttons",
     "OPDS Browser",
     "Recent Books",
@@ -1671,6 +1678,13 @@ const char* const STRINGS_ES[] = {
     "Correcci\xC3"
     "\xB3"
     "n de desvanecimiento",
+    "Home Cover",
+    "Enabled",
+    "Timeout (10s)",
+    "Disabled",
+    "Disable Home Cover",
+    "Enable Home Cover",
+    "Generate Home Cover",
     "Reconfigurar botones frontales",
     "Navegador OPDS",
     "Libros recientes",
@@ -2302,6 +2316,13 @@ const char* const STRINGS_FR[] = {
     "Correction lisibilit\xC3"
     "\xA9"
     " au soleil",
+    "Home Cover",
+    "Enabled",
+    "Timeout (10s)",
+    "Disabled",
+    "Disable Home Cover",
+    "Enable Home Cover",
+    "Generate Home Cover",
     "Configurer boutons fa\xC3"
     "\xA7"
     "ade",
@@ -2781,6 +2802,13 @@ const char* const STRINGS_DE[] = {
     "Lyra",
     "Lyra Extended",
     "Anti-Verblassen",
+    "Home Cover",
+    "Enabled",
+    "Timeout (10s)",
+    "Disabled",
+    "Disable Home Cover",
+    "Enable Home Cover",
+    "Generate Home Cover",
     "Vordere Tasten belegen",
     "OPDS-Browser",
     "Zuletzt gelesen",
@@ -3866,6 +3894,13 @@ const char* const STRINGS_CS[] = {
     "Oprava blednut\xC3"
     "\xAD"
     " na slunci",
+    "Home Cover",
+    "Enabled",
+    "Timeout (10s)",
+    "Disabled",
+    "Disable Home Cover",
+    "Enable Home Cover",
+    "Generate Home Cover",
     "P\xC5"
     "\x99"
     "emapovat p\xC5"
@@ -4638,6 +4673,13 @@ const char* const STRINGS_PO[] = {
     "Lyra",
     "Lyra Extended",
     "Ajuste desbotamento ao sol",
+    "Home Cover",
+    "Enabled",
+    "Timeout (10s)",
+    "Disabled",
+    "Disable Home Cover",
+    "Enable Home Cover",
+    "Generate Home Cover",
     "Remapear bot\xC3"
     "\xB5"
     "es frontais",
@@ -10030,6 +10072,13 @@ const char* const STRINGS_RU[] = {
     "\xD1"
     "\x8F"
     "",
+    "Home Cover",
+    "Enabled",
+    "Timeout (10s)",
+    "Disabled",
+    "Disable Home Cover",
+    "Enable Home Cover",
+    "Generate Home Cover",
     "\xD0"
     "\x9F"
     "\xD0"
@@ -12639,6 +12688,13 @@ const char* const STRINGS_SV[] = {
     "Fix f\xC3"
     "\xB6"
     "r solskensmattning",
+    "Home Cover",
+    "Enabled",
+    "Timeout (10s)",
+    "Disabled",
+    "Disable Home Cover",
+    "Enable Home Cover",
+    "Generate Home Cover",
     "\xC3"
     "\x84"
     "ndra frontknappar",
@@ -13465,6 +13521,13 @@ const char* const STRINGS_RO[] = {
     "ie estompare lumin\xC4"
     "\x83"
     "",
+    "Home Cover",
+    "Enabled",
+    "Timeout (10s)",
+    "Disabled",
+    "Disable Home Cover",
+    "Enable Home Cover",
+    "Generate Home Cover",
     "Remapare butoane frontale",
     "Browser OPDS",
     "C\xC4"
@@ -14091,6 +14154,13 @@ const char* const STRINGS_CA[] = {
     " de l'esva\xC3"
     "\xAF"
     "ment pel sol",
+    "Home Cover",
+    "Enabled",
+    "Timeout (10s)",
+    "Disabled",
+    "Disable Home Cover",
+    "Enable Home Cover",
+    "Generate Home Cover",
     "Reassigna els botons frontals",
     "Navegador OPDS",
     "Llibres recents",
@@ -20119,6 +20189,13 @@ const char* const STRINGS_UK[] = {
     "\xD1"
     "\x96"
     "",
+    "Home Cover",
+    "Enabled",
+    "Timeout (10s)",
+    "Disabled",
+    "Disable Home Cover",
+    "Enable Home Cover",
+    "Generate Home Cover",
     "\xD0"
     "\x9D"
     "\xD0"
@@ -27679,6 +27756,13 @@ const char* const STRINGS_BE[] = {
     "\xD1"
     "\x8F"
     "",
+    "Home Cover",
+    "Enabled",
+    "Timeout (10s)",
+    "Disabled",
+    "Disable Home Cover",
+    "Enable Home Cover",
+    "Generate Home Cover",
     "\xD0"
     "\x9F"
     "\xD0"
@@ -30007,6 +30091,13 @@ const char* const STRINGS_IT[] = {
     "Lyra",
     "Lyra Esteso",
     "Fix Sbiadimento da Luce Solare",
+    "Home Cover",
+    "Enabled",
+    "Timeout (10s)",
+    "Disabled",
+    "Disable Home Cover",
+    "Enable Home Cover",
+    "Generate Home Cover",
     "Rimappa Pulsanti Frontali",
     "Browser OPDS",
     "Libri Recenti",
@@ -30751,6 +30842,13 @@ const char* const STRINGS_PL[] = {
     "o\xC5"
     "\x84"
     "ca",
+    "Home Cover",
+    "Enabled",
+    "Timeout (10s)",
+    "Disabled",
+    "Disable Home Cover",
+    "Enable Home Cover",
+    "Generate Home Cover",
     "Skonfiguruj przednie przyciski",
     "OPDS Browser",
     "Ostatnio czytane",
@@ -31459,6 +31557,13 @@ const char* const STRINGS_FI[] = {
     "Lyra",
     "Lyra Extended",
     "Auringonvalon haalistumiskorjaus",
+    "Home Cover",
+    "Enabled",
+    "Timeout (10s)",
+    "Disabled",
+    "Disable Home Cover",
+    "Enable Home Cover",
+    "Generate Home Cover",
     "Uudelleenm\xC3"
     "\xA4"
     "\xC3"
@@ -32015,6 +32120,13 @@ const char* const STRINGS_DA[] = {
     "Lyra",
     "Lyra Extended",
     "Sollysfading-rettelse",
+    "Home Cover",
+    "Enabled",
+    "Timeout (10s)",
+    "Disabled",
+    "Disable Home Cover",
+    "Enable Home Cover",
+    "Generate Home Cover",
     "Omtildel frontknapper",
     "OPDS Browser",
     "Seneste b\xC3"
@@ -32355,6 +32467,13 @@ const char* const STRINGS_NL[] = {
     "Lyra",
     "Lyra Uitgebreid",
     "Zonlicht vervaging fix",
+    "Home Cover",
+    "Enabled",
+    "Timeout (10s)",
+    "Disabled",
+    "Disable Home Cover",
+    "Enable Home Cover",
+    "Generate Home Cover",
     "Knoppen voorzijde wijzigen",
     "OPDS-browser",
     "Recente boeken",
@@ -33349,6 +33468,13 @@ const char* const STRINGS_TR[] = {
     " Solma D\xC3"
     "\xBC"
     "zeltmesi",
+    "Home Cover",
+    "Enabled",
+    "Timeout (10s)",
+    "Disabled",
+    "Disable Home Cover",
+    "Enable Home Cover",
+    "Generate Home Cover",
     "\xC3"
     "\x96"
     "n Tu\xC5"
@@ -38881,6 +39007,13 @@ const char* const STRINGS_KK[] = {
     "\xD1"
     "\x83"
     "",
+    "Home Cover",
+    "Enabled",
+    "Timeout (10s)",
+    "Disabled",
+    "Disable Home Cover",
+    "Enable Home Cover",
+    "Generate Home Cover",
     "\xD0"
     "\x90"
     "\xD0"
@@ -42023,6 +42156,13 @@ const char* const STRINGS_HU[] = {
     "t\xC3"
     "\xA1"
     "s",
+    "Home Cover",
+    "Enabled",
+    "Timeout (10s)",
+    "Disabled",
+    "Disable Home Cover",
+    "Enable Home Cover",
+    "Generate Home Cover",
     "El\xC3"
     "\xBC"
     "ls\xC5"
@@ -42861,6 +43001,13 @@ const char* const STRINGS_LT[] = {
     "Bly\xC5"
     "\xA1"
     "kumo pataisa",
+    "Home Cover",
+    "Enabled",
+    "Timeout (10s)",
+    "Disabled",
+    "Disable Home Cover",
+    "Enable Home Cover",
+    "Generate Home Cover",
     "Keisti mygtukus",
     "OPDS nar\xC5"
     "\xA1"
