@@ -1,4 +1,4 @@
-#include "EpubReaderActivity.h"
+﻿#include "EpubReaderActivity.h"
 
 #include <Epub/Page.h>
 #include <Epub/blocks/TextBlock.h>
@@ -9,6 +9,8 @@
 #include <I18n.h>
 #include <Logging.h>
 #include <esp_system.h>
+
+#include <algorithm>
 
 #include "CrossPointSettings.h"
 #include "CrossPointState.h"
@@ -30,6 +32,7 @@ namespace {
 constexpr unsigned long skipChapterMs = 700;
 // pages per minute, first item is 1 to prevent division by zero if accessed
 const std::vector<int> PAGE_TURN_LABELS = {1, 1, 3, 6, 12};
+constexpr int READING_RULER_LINE_WIDTH = 2;
 
 int clampPercent(int percent) {
   if (percent < 0) {
@@ -56,21 +59,37 @@ void EpubReaderActivity::onEnter() {
 
   epub->setupCacheDir();
 
+  // progress.bin layout (little-endian, backward-compatible):
+  //   [0-1] spineIndex   [2-3] page   [4-5] pageCount
+  //   [6-7] rulerLineIndex   [8] rulerActive (0/1)
+  bool hasSavedReadingRulerState = false;
   FsFile f;
   if (Storage.openFileForRead("ERS", epub->getCachePath() + "/progress.bin", f)) {
-    uint8_t data[6];
-    int dataSize = f.read(data, 6);
-    if (dataSize == 4 || dataSize == 6) {
+    uint8_t data[9];
+    int dataSize = f.read(data, 9);
+    if (dataSize >= 4) {
       currentSpineIndex = data[0] + (data[1] << 8);
       nextPageNumber = data[2] + (data[3] << 8);
       cachedSpineIndex = currentSpineIndex;
       LOG_DBG("ERS", "Loaded cache: %d, %d", currentSpineIndex, nextPageNumber);
     }
-    if (dataSize == 6) {
+    if (dataSize >= 6) {
       cachedChapterTotalPageCount = data[4] + (data[5] << 8);
+    }
+    if (dataSize >= 8) {
+      rulerLineIndex = data[6] + (data[7] << 8);
+    }
+    if (dataSize >= 9) {
+      hasSavedReadingRulerState = true;
+      readingRulerActive = (data[8] != 0) && (SETTINGS.readingRulerEnabled != 0);
     }
     f.close();
   }
+  // Default for books without saved ruler state: follow global setting
+  if (!hasSavedReadingRulerState) {
+    readingRulerActive = (SETTINGS.readingRulerEnabled != 0);
+  }
+  rulerLastInteraction = millis();
   // We may want a better condition to detect if we are opening for the first time.
   // This will trigger if the book is re-opened at Chapter 0.
   if (currentSpineIndex == 0) {
@@ -139,6 +158,15 @@ void EpubReaderActivity::loop() {
   if (mappedInput.wasReleased(MappedInputManager::Button::Confirm)) {
     const int currentPage = section ? section->currentPage + 1 : 0;
     const int totalPages = section ? section->pageCount : 0;
+    uint8_t currentPageTurnOption = 0;
+    if (automaticPageTurnActive && pageTurnDuration > 0) {
+      const unsigned long pagesPerMinute = (1UL * 60 * 1000) / pageTurnDuration;
+      const auto option =
+          std::find(PAGE_TURN_LABELS.begin() + 1, PAGE_TURN_LABELS.end(), static_cast<int>(pagesPerMinute));
+      if (option != PAGE_TURN_LABELS.end()) {
+        currentPageTurnOption = static_cast<uint8_t>(std::distance(PAGE_TURN_LABELS.begin(), option));
+      }
+    }
     float bookProgress = 0.0f;
     if (epub->getBookSize() > 0 && section && section->pageCount > 0) {
       const float chapterProgress = static_cast<float>(section->currentPage) / static_cast<float>(section->pageCount);
@@ -147,12 +175,23 @@ void EpubReaderActivity::loop() {
     const int bookProgressPercent = clampPercent(static_cast<int>(bookProgress + 0.5f));
     startActivityForResult(std::make_unique<EpubReaderMenuActivity>(
                                renderer, mappedInput, epub->getTitle(), currentPage, totalPages, bookProgressPercent,
-                               SETTINGS.orientation, !currentPageFootnotes.empty()),
+                               SETTINGS.orientation, currentPageTurnOption, !currentPageFootnotes.empty(),
+                               readingRulerActive, SETTINGS.readingRulerEnabled != 0),
                            [this](const ActivityResult& result) {
                              // Always apply orientation change even if the menu was cancelled
                              const auto& menu = std::get<MenuResult>(result.data);
                              applyOrientation(menu.orientation);
-                             toggleAutoPageTurn(menu.pageTurnOption);
+                             if (menu.pageTurnChanged) {
+                               toggleAutoPageTurn(menu.pageTurnOption);
+                             }
+                             if (menu.readingRulerToggled) {
+                               readingRulerActive = !readingRulerActive;
+                               if (readingRulerActive) {
+                                 rulerLastInteraction = millis();
+                                 rulerLastAutoMove = 0;
+                               }
+                               requestUpdate();
+                             }
                              if (!result.isCancelled) {
                                onReaderMenuConfirm(static_cast<EpubReaderMenuActivity::MenuAction>(menu.action));
                              }
@@ -177,7 +216,61 @@ void EpubReaderActivity::loop() {
   }
 
   auto [prevTriggered, nextTriggered] = ReaderUtils::detectPageTurn(mappedInput);
+
+  // Reading ruler: intercept short-press page turns for line-by-line navigation
+  if (readingRulerActive && !automaticPageTurnActive && section && (prevTriggered || nextTriggered)) {
+    const bool isLongPress = mappedInput.getHeldTime() > skipChapterMs;
+    if (!isLongPress) {
+      if (nextTriggered) {
+        if (rulerLineIndex < rulerLineCount - 1) {
+          moveRuler(+1);
+          return;
+        }
+        // Last line: page forward, ruler to top
+        rulerLineIndex = 0;
+        pageTurn(true);
+        rulerLastInteraction = millis();
+        rulerLastAutoMove = 0;
+        return;
+      }
+      if (prevTriggered) {
+        if (rulerLineIndex > 0) {
+          moveRuler(-1);
+          return;
+        }
+        // First line: page back, ruler to last line (resolved after render)
+        if (section->currentPage > 0 || currentSpineIndex > 0) {
+          rulerLineIndex = INT16_MAX;
+          pageTurn(false);
+          rulerLastInteraction = millis();
+          rulerLastAutoMove = 0;
+        }
+        return;
+      }
+    }
+    // Long press falls through to normal page turn / chapter skip
+  }
+
   if (!prevTriggered && !nextTriggered) {
+    // Reading ruler auto-progress: advance one line after idle timeout
+    if (readingRulerActive && section && rulerLineCount > 0) {
+      const unsigned long autoMs = SETTINGS.getRulerAutoProgressMs();
+      if (autoMs > 0) {
+        const unsigned long now = millis();
+        const unsigned long ref = rulerLastAutoMove > 0 ? rulerLastAutoMove : rulerLastInteraction;
+        if (ref > 0 && (now - ref) >= autoMs) {
+          if (rulerLineIndex < rulerLineCount - 1) {
+            moveRuler(+1);
+            rulerLastAutoMove = now;
+          } else {
+            // Last line: page forward, ruler to top
+            rulerLineIndex = 0;
+            rulerLastAutoMove = now;
+            pageTurn(true);
+          }
+        }
+      }
+    }
     return;
   }
 
@@ -192,6 +285,11 @@ void EpubReaderActivity::loop() {
   const bool skipChapter = SETTINGS.longPressChapterSkip && mappedInput.getHeldTime() > skipChapterMs;
 
   if (skipChapter) {
+    if (readingRulerActive) {
+      const unsigned long now = millis();
+      rulerLastInteraction = now;
+      rulerLastAutoMove = 0;
+    }
     lastPageTurnTime = millis();
     // We don't want to delete the section mid-render, so grab the semaphore
     {
@@ -211,8 +309,18 @@ void EpubReaderActivity::loop() {
   }
 
   if (prevTriggered) {
+    if (readingRulerActive) {
+      const unsigned long now = millis();
+      rulerLastInteraction = now;
+      rulerLastAutoMove = 0;
+    }
     pageTurn(false);
   } else {
+    if (readingRulerActive) {
+      const unsigned long now = millis();
+      rulerLastInteraction = now;
+      rulerLastAutoMove = 0;
+    }
     pageTurn(true);
   }
 }
@@ -492,6 +600,10 @@ void EpubReaderActivity::render(RenderLock&& lock) {
     return;
   }
 
+  // Reset per-page ruler geometry before any early return paths.
+  currentPageLines.clear();
+  rulerLineCount = 0;
+
   // edge case handling for sub-zero spine index
   if (currentSpineIndex < 0) {
     currentSpineIndex = 0;
@@ -679,14 +791,17 @@ void EpubReaderActivity::silentIndexNextChapterIfNeeded(const uint16_t viewportW
 void EpubReaderActivity::saveProgress(int spineIndex, int currentPage, int pageCount) {
   FsFile f;
   if (Storage.openFileForWrite("ERS", epub->getCachePath() + "/progress.bin", f)) {
-    uint8_t data[6];
+    uint8_t data[9];
     data[0] = currentSpineIndex & 0xFF;
     data[1] = (currentSpineIndex >> 8) & 0xFF;
     data[2] = currentPage & 0xFF;
     data[3] = (currentPage >> 8) & 0xFF;
     data[4] = pageCount & 0xFF;
     data[5] = (pageCount >> 8) & 0xFF;
-    f.write(data, 6);
+    data[6] = rulerLineIndex & 0xFF;
+    data[7] = (rulerLineIndex >> 8) & 0xFF;
+    data[8] = readingRulerActive ? 1 : 0;
+    f.write(data, 9);
     f.close();
     LOG_DBG("ERS", "Progress saved: Chapter %d, Page %d", spineIndex, currentPage);
   } else {
@@ -717,6 +832,41 @@ void EpubReaderActivity::renderContents(std::unique_ptr<Page> page, const int or
 
   page->render(renderer, SETTINGS.getReaderFontId(), orientedMarginLeft, orientedMarginTop);
   renderStatusBar();
+
+  // Build line geometry for reading ruler
+  currentPageLines.clear();
+  {
+    const int lineHeight =
+        static_cast<int>(renderer.getLineHeight(SETTINGS.getReaderFontId()) * SETTINGS.getReaderLineCompression());
+    for (const auto& el : page->elements) {
+      if (el->getTag() == TAG_PageLine) {
+        currentPageLines.push_back(
+            {static_cast<int16_t>(el->yPos + orientedMarginTop), static_cast<int16_t>(lineHeight)});
+      }
+    }
+    rulerLineCount = static_cast<int16_t>(currentPageLines.size());
+  }
+  cachedContentLeft = orientedMarginLeft;
+  cachedContentRight = orientedMarginRight;
+
+  // Draw reading ruler underline
+  if (readingRulerActive && !currentPageLines.empty()) {
+    if (rulerLineIndex == INT16_MAX) {
+      rulerLineIndex = rulerLineCount - 1;
+    }
+    if (rulerLineIndex >= rulerLineCount) {
+      rulerLineIndex = rulerLineCount - 1;
+    }
+    if (rulerLineIndex < 0) {
+      rulerLineIndex = 0;
+    }
+    const auto& geo = currentPageLines[rulerLineIndex];
+    const int rulerY = geo.y + geo.height + 1;
+    const int x1 = cachedContentLeft;
+    const int x2 = renderer.getScreenWidth() - cachedContentRight - 1;
+    renderer.drawLine(x1, rulerY, x2, rulerY, READING_RULER_LINE_WIDTH, true);
+  }
+
   fcm->logStats("bw_render");
   const auto tBwRender = millis();
 
@@ -791,6 +941,58 @@ void EpubReaderActivity::renderContents(std::unique_ptr<Page> page, const int or
             tPrewarm - t0, tBwRender - tPrewarm, tDisplay - tBwRender, tBwStore - tDisplay, tBwRestore - tBwStore,
             tEnd - t0);
   }
+}
+
+void EpubReaderActivity::moveRuler(int direction) {
+  const int16_t previousLineIndex = rulerLineIndex;
+  if (rulerLineCount > 0) {
+    const int newIndex = std::clamp<int>(rulerLineIndex + direction, 0, rulerLineCount - 1);
+    rulerLineIndex = static_cast<int16_t>(newIndex);
+  } else {
+    rulerLineIndex = static_cast<int16_t>(rulerLineIndex + direction);
+  }
+  rulerLastInteraction = millis();
+  rulerLastAutoMove = 0;
+  if (rulerLineIndex == previousLineIndex) {
+    return;
+  }
+  if (!refreshReadingRulerFast(previousLineIndex)) {
+    requestUpdate();
+  }
+}
+
+bool EpubReaderActivity::drawReadingRulerLine(const int16_t lineIndex, const bool state) const {
+  if (lineIndex < 0 || lineIndex >= rulerLineCount || lineIndex >= currentPageLines.size()) {
+    return false;
+  }
+
+  const auto& geo = currentPageLines[lineIndex];
+  const int rulerY = geo.y + geo.height + 1;
+  const int x1 = cachedContentLeft;
+  const int x2 = renderer.getScreenWidth() - cachedContentRight - 1;
+  renderer.drawLine(x1, rulerY, x2, rulerY, READING_RULER_LINE_WIDTH, state);
+  return true;
+}
+
+bool EpubReaderActivity::refreshReadingRulerFast(const int16_t previousLineIndex) {
+  if (!section || !readingRulerActive || currentPageLines.empty() || rulerLineCount <= 0) {
+    return false;
+  }
+  if (rulerLineIndex < 0 || rulerLineIndex >= rulerLineCount) {
+    return false;
+  }
+
+  RenderLock lock(*this);
+  const bool erasedPrevious = drawReadingRulerLine(previousLineIndex, false);
+  const bool drewCurrent = drawReadingRulerLine(rulerLineIndex, true);
+  if (!erasedPrevious && !drewCurrent) {
+    return false;
+  }
+
+  renderer.displayBuffer(HalDisplay::FAST_REFRESH);
+
+  saveProgress(currentSpineIndex, section->currentPage, section->pageCount);
+  return true;
 }
 
 void EpubReaderActivity::renderStatusBar() const {

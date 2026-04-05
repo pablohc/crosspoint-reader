@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 #include <Epub.h>
 #include <I18n.h>
 
@@ -16,6 +16,7 @@ class EpubReaderMenuActivity final : public Activity {
     FOOTNOTES,
     GO_TO_PERCENT,
     AUTO_PAGE_TURN,
+    READING_RULER,
     ROTATE_SCREEN,
     SCREENSHOT,
     DISPLAY_QR,
@@ -26,7 +27,9 @@ class EpubReaderMenuActivity final : public Activity {
 
   explicit EpubReaderMenuActivity(GfxRenderer& renderer, MappedInputManager& mappedInput, const std::string& title,
                                   const int currentPage, const int totalPages, const int bookProgressPercent,
-                                  const uint8_t currentOrientation, const bool hasFootnotes);
+                                  const uint8_t currentOrientation, const uint8_t currentPageTurnOption,
+                                  const bool hasFootnotes, const bool readingRulerActive,
+                                  const bool readingRulerEnabled);
 
   void onEnter() override;
   void onExit() override;
@@ -39,7 +42,7 @@ class EpubReaderMenuActivity final : public Activity {
     StrId labelId;
   };
 
-  static std::vector<MenuItem> buildMenuItems(bool hasFootnotes);
+  static std::vector<MenuItem> buildMenuItems(bool hasFootnotes, bool readingRulerEnabled);
 
   // Fixed menu layout
   const std::vector<MenuItem> menuItems;
@@ -50,10 +53,13 @@ class EpubReaderMenuActivity final : public Activity {
   std::string title = "Reader Menu";
   uint8_t pendingOrientation = 0;
   uint8_t selectedPageTurnOption = 0;
+  uint8_t initialPageTurnOption = 0;
   const std::vector<StrId> orientationLabels = {StrId::STR_PORTRAIT, StrId::STR_LANDSCAPE_CW, StrId::STR_INVERTED,
                                                 StrId::STR_LANDSCAPE_CCW};
   const std::vector<const char*> pageTurnLabels = {I18N.get(StrId::STR_STATE_OFF), "1", "3", "6", "12"};
   int currentPage = 0;
   int totalPages = 0;
   int bookProgressPercent = 0;
+  bool readingRulerActive = false;
+  bool initialRulerActive = false;
 };
