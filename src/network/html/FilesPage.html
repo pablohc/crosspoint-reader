@@ -1783,6 +1783,21 @@
     .log-summary-table .increased {
       color: #f39c12;
     }
+    @media (max-width: 600px) and (orientation: portrait) {
+      .file-table th:first-child,
+      .file-table td:first-child { padding-right: 3px; }
+      .file-table td.col-name,
+      .file-table th.col-name { padding-left: 3px; padding-right: 3px; }
+      .file-table th:nth-child(3),
+      .file-table td:nth-child(3) { width: 40px !important; padding-left: 3px; padding-right: 3px; overflow: hidden; }
+      .file-table th:nth-child(4),
+      .file-table td:nth-child(4) { width: 52px !important; padding-left: 3px; padding-right: 3px; overflow: hidden; }
+      .actions-col { width: 32px !important; padding: 4px 2px; }
+      .badge { padding: 2px 4px; }
+      .size-cell { text-align: right !important; }
+      .size-cell-inner { display: inline-flex; width: auto; gap: 2px; }
+      .size-cell-inner .size-value { flex: none; }
+    }
   </style>
 </head>
 <body>
@@ -2185,18 +2200,22 @@
   function formatFileSize(bytes) {
     if (bytes === 0) return '0 B';
     const k = 1024;
-    const sizes = ['B', 'KB', 'MB', 'GB', 'TB', 'PB', 'EB', 'ZB', 'YB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)).toLocaleString() + ' ' + sizes[i];
+    const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+    let i = Math.floor(Math.log(bytes) / Math.log(k));
+    let val = bytes / Math.pow(k, i);
+    if (val >= 1000 && i < sizes.length - 1) { i++; val = bytes / Math.pow(k, i); }
+    return (val % 1 === 0 ? val.toFixed(0) : val.toFixed(1)) + ' ' + sizes[i];
   }
 
   function formatFileSizeCell(bytes) {
     if (bytes === 0) return '<span class="size-value">0</span><span class="size-unit">B</span>';
     const k = 1024;
-    const sizes = ['B', 'KB', 'MB', 'GB', 'TB', 'PB', 'EB', 'ZB', 'YB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    const val = parseFloat((bytes / Math.pow(k, i)).toFixed(2)).toLocaleString();
-    return `<span class="size-value">${val}</span><span class="size-unit">${sizes[i]}</span>`;
+    const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+    let i = Math.floor(Math.log(bytes) / Math.log(k));
+    let val = bytes / Math.pow(k, i);
+    if (val >= 1000 && i < sizes.length - 1) { i++; val = bytes / Math.pow(k, i); }
+    const formatted = val % 1 === 0 ? val.toFixed(0) : val.toFixed(1);
+    return `<span class="size-value">${formatted}</span><span class="size-unit">${sizes[i]}</span>`;
   }
 
   const IMAGE_EXTS = new Set(['jpg','jpeg','png','gif','bmp','webp','avif','svg']);
