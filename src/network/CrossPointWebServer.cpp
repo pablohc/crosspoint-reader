@@ -76,7 +76,6 @@ static bool convertSleepImageToBmp(const String& filePath) {
   }
 
   String bmpPath = filePath.substring(0, filePath.lastIndexOf('.')) + ".bmp";
-  Storage.ensureDirectoryExists("/.sleep");
   FsFile bmpFile;
   if (!Storage.openFileForWrite("SLEEP", bmpPath, bmpFile)) {
     srcFile.close();
@@ -404,6 +403,8 @@ void CrossPointWebServer::handleStatus() const {
   doc["rssi"] = apMode ? 0 : WiFi.RSSI();
   doc["freeHeap"] = ESP.getFreeHeap();
   doc["uptime"] = millis() / 1000;
+  // Physical panel dimensions (landscape: 800×480).
+  // The web UI intentionally swaps W/H to derive portrait logical dimensions (480×800).
   doc["screenWidth"] = display.getDisplayWidth();
   doc["screenHeight"] = display.getDisplayHeight();
   doc["device"] = gpio.deviceIsX3() ? "x3" : "x4";
@@ -694,6 +695,9 @@ void CrossPointWebServer::handleUpload(UploadState& state) const {
       Storage.remove(filePath.c_str());
     }
 
+    // Ensure /.sleep/ exists on first sleep-image upload (new devices may lack this directory)
+    if (filePath.startsWith("/.sleep/")) Storage.ensureDirectoryExists("/.sleep");
+
     // Open file for writing - this can be slow due to FAT cluster allocation
     esp_task_wdt_reset();
     if (!Storage.openFileForWrite("WEB", filePath, state.file)) {
@@ -768,6 +772,8 @@ void CrossPointWebServer::handleUpload(UploadState& state) const {
         // Convert sleep screen images (JPG/PNG → BMP)
         if (!convertSleepImageToBmp(filePath)) {
           LOG_ERR("WEB", "[UPLOAD] Sleep image conversion failed for: %s", filePath.c_str());
+          state.error = "Sleep image conversion failed";
+          state.success = false;
         }
       }
     }
@@ -1391,6 +1397,9 @@ void CrossPointWebServer::onWebSocketEvent(uint8_t num, WStype_t type, uint8_t* 
           if (Storage.exists(filePath.c_str())) {
             Storage.remove(filePath.c_str());
           }
+
+          // Ensure /.sleep/ exists on first sleep-image upload (new devices may lack this directory)
+          if (filePath.startsWith("/.sleep/")) Storage.ensureDirectoryExists("/.sleep");
 
           // Open file for writing
           esp_task_wdt_reset();
