@@ -3,6 +3,8 @@
 #include <ArduinoJson.h>
 #include <Epub.h>
 #include <FsHelpers.h>
+#include <HalDisplay.h>
+#include <HalGPIO.h>
 #include <HalStorage.h>
 #include <JpegToBmpConverter.h>
 #include <Logging.h>
@@ -401,6 +403,9 @@ void CrossPointWebServer::handleStatus() const {
   doc["rssi"] = apMode ? 0 : WiFi.RSSI();
   doc["freeHeap"] = ESP.getFreeHeap();
   doc["uptime"] = millis() / 1000;
+  doc["screenWidth"] = display.getDisplayWidth();
+  doc["screenHeight"] = display.getDisplayHeight();
+  doc["device"] = gpio.deviceIsX3() ? "x3" : "x4";
 
   String json;
   serializeJson(doc, json);
