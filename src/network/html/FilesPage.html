@@ -2015,7 +2015,7 @@
           </label>
         </div>
         <div class="convert-settings" id="imageOptimizerSettings">
-          <span>480×800px</span>
+          <span id="sleepScreenSizeLabel">480×800px</span>
           <span>True-Grayscale</span>
           <span>JPEG 85%</span>
           <span>Auto-rotate</span>
@@ -3241,6 +3241,16 @@
 
   // Initialize quality settings handlers
   document.addEventListener('DOMContentLoaded', function() {
+    fetch('/api/status').then(r => r.json()).then(d => {
+      if (d.screenWidth && d.screenHeight) {
+        DEFAULT_MAX_WIDTH = d.screenHeight;
+        DEFAULT_MAX_HEIGHT = d.screenWidth;
+        const label = DEFAULT_MAX_WIDTH + '×' + DEFAULT_MAX_HEIGHT + 'px';
+        const labelEl = document.getElementById('sleepScreenSizeLabel');
+        if (labelEl) labelEl.textContent = label;
+      }
+    }).catch(() => {});
+
     const qualitySlider = document.getElementById('qualitySlider');
     const qualityInput = document.getElementById('qualityInput');
 
@@ -3835,29 +3845,29 @@ function renderSleepPreview() {
   let info = `${effW}×${effH}`;
   if (rotate) info += ' ↻';
   if (sleepAspectExact) {
-    info += ` → 480×800, exact fit`;
+    info += ` → ${DEFAULT_MAX_WIDTH}×${DEFAULT_MAX_HEIGHT}, exact fit`;
   } else {
     if (imageResizeMode === 'fit') {
       const scaleW = PW / effW, scaleH = PH / effH;
       if (scaleW <= scaleH) {
-        const letterbox = Math.round((PH - effH * scaleW) / 2 / PH * 800);
-        if (letterbox > 0) info += ` → 480×800, letterbox ${letterbox}px`;
-        else info += ' → 480×800, exact fit';
+        const letterbox = Math.round((PH - effH * scaleW) / 2 / PH * DEFAULT_MAX_HEIGHT);
+        if (letterbox > 0) info += ` → ${DEFAULT_MAX_WIDTH}×${DEFAULT_MAX_HEIGHT}, letterbox ${letterbox}px`;
+        else info += ` → ${DEFAULT_MAX_WIDTH}×${DEFAULT_MAX_HEIGHT}, exact fit`;
       } else {
-        const pillarbox = Math.round((PW - effW * scaleH) / 2 / PW * 480);
-        if (pillarbox > 0) info += ` → 480×800, pillarbox ${pillarbox}px`;
-        else info += ' → 480×800, exact fit';
+        const pillarbox = Math.round((PW - effW * scaleH) / 2 / PW * DEFAULT_MAX_WIDTH);
+        if (pillarbox > 0) info += ` → ${DEFAULT_MAX_WIDTH}×${DEFAULT_MAX_HEIGHT}, pillarbox ${pillarbox}px`;
+        else info += ` → ${DEFAULT_MAX_WIDTH}×${DEFAULT_MAX_HEIGHT}, exact fit`;
       }
     } else {
       const cropScaleW = PW / effW, cropScaleH = PH / effH;
       if (cropScaleW >= cropScaleH) {
-        const cropPx = Math.round((effW * cropScaleH - PW) / 2 / PW * 480);
-        if (cropPx > 0) info += ` → 480×800, crops ${cropPx}px sides`;
-        else info += ' → 480×800, exact fit';
+        const cropPx = Math.round((effW * cropScaleH - PW) / 2 / PW * DEFAULT_MAX_WIDTH);
+        if (cropPx > 0) info += ` → ${DEFAULT_MAX_WIDTH}×${DEFAULT_MAX_HEIGHT}, crops ${cropPx}px sides`;
+        else info += ` → ${DEFAULT_MAX_WIDTH}×${DEFAULT_MAX_HEIGHT}, exact fit`;
       } else {
-        const cropPx = Math.round((effH * cropScaleW - PH) / 2 / PH * 800);
-        if (cropPx > 0) info += ` → 480×800, crops ${cropPx}px top/bottom`;
-        else info += ' → 480×800, exact fit';
+        const cropPx = Math.round((effH * cropScaleW - PH) / 2 / PH * DEFAULT_MAX_HEIGHT);
+        if (cropPx > 0) info += ` → ${DEFAULT_MAX_WIDTH}×${DEFAULT_MAX_HEIGHT}, crops ${cropPx}px top/bottom`;
+        else info += ` → ${DEFAULT_MAX_WIDTH}×${DEFAULT_MAX_HEIGHT}, exact fit`;
       }
     }
   }
@@ -3941,8 +3951,8 @@ const WS_CHUNK_SIZE = 4096; // 4KB chunks - smaller for ESP32 stability
 // ============================================================================
 
 // Default conversion settings
-const DEFAULT_MAX_WIDTH = 480;
-const DEFAULT_MAX_HEIGHT = 800;
+let DEFAULT_MAX_WIDTH = 480;
+let DEFAULT_MAX_HEIGHT = 800;
 const DEFAULT_JPEG_QUALITY = 85;
 const DEFAULT_ENABLE_GRAYSCALE = true;
 // Note: Overlap is now always centered distribution (min 5%)
