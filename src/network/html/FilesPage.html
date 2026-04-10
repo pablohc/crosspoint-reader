@@ -2306,6 +2306,9 @@
     document.getElementById('folder-summary').innerHTML = `${folderCount} folders, ${currentFiles.length - folderCount} files, ${formatFileSize(totalSize)}`;
 
     renderFileTable();
+    document.getElementById('file-table').addEventListener('change', function(e) {
+      if (e.target.classList.contains('select-item')) updateToolbarState();
+    });
   }
 
   function getSortIndicator(column) {
@@ -2425,9 +2428,6 @@
 
     fileTableContent += '</table>';
     fileTable.innerHTML = fileTableContent;
-    document.getElementById('file-table').addEventListener('change', function (e) {
-      if (e.target.classList.contains('select-item')) updateToolbarState();
-    });
     updateToolbarState();
   }
 
@@ -3609,7 +3609,7 @@ let sleepImageFiles = [];     // Files to process for sleep screen
 
 let sleepPreviewImage = null;
 let sleepOrigW = 0, sleepOrigH = 0;
-let sleepNeedsRotation = false;
+let sleepTotalRotation = 0;  // total CW rotation in degrees: 0, 90, 180, or 270
 let sleepAspectExact = false;
 const SLEEP_MAX_FILE_SIZE = 10 * 1024 * 1024;
 const exifOrientationCache = new Map();
@@ -3677,13 +3677,17 @@ function readExifOrientation(file) {
 }
 
 const EXIF_ROTATION_MAP = { 1: 0, 2: 0, 3: 180, 4: 180, 5: 90, 6: 90, 7: 270, 8: 270 };
-const EXIF_FLIP_MAP = { 1: 'none', 2: 'h', 3: 'none', 4: 'h', 5: 'v', 6: 'none', 7: 'v', 8: 'none' };
 
-function needsRotation(origW, origH, exifOrientation) {
-  const rotation = EXIF_ROTATION_MAP[exifOrientation] || 0;
-  if (rotation === 90 || rotation === 270) return true;
-  if (origW > origH) return true;
-  return false;
+// Returns total CW rotation in degrees (0, 90, 180, 270) combining:
+// 1. EXIF correction to display the image upright
+// 2. Auto-rotate landscape images to portrait to fill the sleep screen vertically
+function computeTotalRotation(origW, origH, exifOrientation) {
+  const exifRot = EXIF_ROTATION_MAP[exifOrientation] || 0;
+  const exifSwaps = exifRot === 90 || exifRot === 270;
+  const displayW = exifSwaps ? origH : origW;
+  const displayH = exifSwaps ? origW : origH;
+  const autoRot = displayW > displayH ? 90 : 0;
+  return (exifRot + autoRot) % 360;
 }
 
 function setImageResizeMode(mode) {
@@ -3705,7 +3709,7 @@ function resetImageOptimizer() {
   sleepImageFiles = [];
   sleepPreviewImage = null;
   sleepOrigW = 0; sleepOrigH = 0;
-  sleepNeedsRotation = false;
+  sleepTotalRotation = 0;
   sleepAspectExact = false;
   imageResizeMode = 'fit';
   exifOrientationCache.clear();
@@ -3770,9 +3774,10 @@ async function setupImageOptimizer(imageFiles) {
         sleepPreviewImage = img;
         sleepOrigW = img.width;
         sleepOrigH = img.height;
-        sleepNeedsRotation = needsRotation(img.width, img.height, exifOrientation);
-        const effW = sleepNeedsRotation ? sleepOrigH : sleepOrigW;
-        const effH = sleepNeedsRotation ? sleepOrigW : sleepOrigH;
+        sleepTotalRotation = computeTotalRotation(img.width, img.height, exifOrientation);
+        const rotated = sleepTotalRotation === 90 || sleepTotalRotation === 270;
+        const effW = rotated ? sleepOrigH : sleepOrigW;
+        const effH = rotated ? sleepOrigW : sleepOrigH;
         sleepAspectExact = Math.abs(effW / effH - DEFAULT_MAX_WIDTH / DEFAULT_MAX_HEIGHT) < 0.01;
         const optChecked = document.getElementById('imageOptimizerEnabled').checked;
         fitCropRow.style.display = (optChecked && !sleepAspectExact) ? 'block' : 'none';
@@ -3794,23 +3799,23 @@ async function setupImageOptimizer(imageFiles) {
   }
 }
 
-function drawSleepImageOnCanvas(ctx, img, origW, origH, targetW, targetH, rotate) {
-  const effW = rotate ? origH : origW;
-  const effH = rotate ? origW : origH;
+function drawSleepImageOnCanvas(ctx, img, origW, origH, targetW, targetH, totalRotation) {
+  const rotated = totalRotation === 90 || totalRotation === 270;
+  const effW = rotated ? origH : origW;
+  const effH = rotated ? origW : origH;
   const scale = imageResizeMode === 'fit'
     ? Math.min(targetW / effW, targetH / effH)
     : Math.max(targetW / effW, targetH / effH);
-  const drawW = effW * scale, drawH = effH * scale;
-  const dx = (targetW - drawW) / 2;
-  const dy = (targetH - drawH) / 2;
-  if (rotate) {
-    ctx.translate(targetW, 0);
-    ctx.rotate(Math.PI / 2);
-    ctx.drawImage(img, 0, 0, origW, origH, (targetH - drawH) / 2, (targetW - drawW) / 2, drawH, drawW);
-  } else {
-    ctx.drawImage(img, 0, 0, origW, origH, dx, dy, drawW, drawH);
-  }
-  return { drawW, drawH };
+  // Source draw dimensions in image space (before rotation)
+  const drawSrcW = origW * scale;
+  const drawSrcH = origH * scale;
+  ctx.save();
+  ctx.translate(targetW / 2, targetH / 2);
+  ctx.rotate((totalRotation * Math.PI) / 180);
+  ctx.drawImage(img, -drawSrcW / 2, -drawSrcH / 2, drawSrcW, drawSrcH);
+  ctx.restore();
+  // Return scaled display dimensions (canvas space, after rotation)
+  return { scaledW: effW * scale, scaledH: effH * scale };
 }
 
 function renderSleepPreview() {
@@ -3819,9 +3824,9 @@ function renderSleepPreview() {
   preview.style.display = 'block';
 
   const img = sleepPreviewImage;
-  const rotate = sleepNeedsRotation;
-  const effW = rotate ? sleepOrigH : sleepOrigW;
-  const effH = rotate ? sleepOrigW : sleepOrigH;
+  const rotated = sleepTotalRotation === 90 || sleepTotalRotation === 270;
+  const effW = rotated ? sleepOrigH : sleepOrigW;
+  const effH = rotated ? sleepOrigW : sleepOrigH;
 
   const PW = 120, PH = 200;
   const c = document.createElement('canvas');
@@ -3830,19 +3835,12 @@ function renderSleepPreview() {
   ctx.fillStyle = '#fff';
   ctx.fillRect(0, 0, PW, PH);
 
-  const scale = imageResizeMode === 'fit'
-    ? Math.min(PW / effW, PH / effH)
-    : Math.max(PW / effW, PH / effH);
-  const drawW = effW * scale, drawH = effH * scale;
-
-  ctx.save();
-  drawSleepImageOnCanvas(ctx, img, sleepOrigW, sleepOrigH, PW, PH, rotate);
-  ctx.restore();
+  const { scaledW, scaledH } = drawSleepImageOnCanvas(ctx, img, sleepOrigW, sleepOrigH, PW, PH, sleepTotalRotation);
 
   if (!sleepAspectExact && imageResizeMode === 'fit') {
     ctx.fillStyle = 'rgba(100,100,100,0.3)';
-    if (drawW < PW) { ctx.fillRect(0, 0, (PW - drawW) / 2, PH); ctx.fillRect(PW - (PW - drawW) / 2, 0, (PW - drawW) / 2, PH); }
-    if (drawH < PH) { ctx.fillRect(0, 0, PW, (PH - drawH) / 2); ctx.fillRect(0, PH - (PH - drawH) / 2, PW, (PH - drawH) / 2); }
+    if (scaledW < PW) { ctx.fillRect(0, 0, (PW - scaledW) / 2, PH); ctx.fillRect(PW - (PW - scaledW) / 2, 0, (PW - scaledW) / 2, PH); }
+    if (scaledH < PH) { ctx.fillRect(0, 0, PW, (PH - scaledH) / 2); ctx.fillRect(0, PH - (PH - scaledH) / 2, PW, (PH - scaledH) / 2); }
   }
   if (!sleepAspectExact && imageResizeMode === 'crop') {
     ctx.strokeStyle = 'rgba(231,76,60,0.6)';
@@ -3853,7 +3851,7 @@ function renderSleepPreview() {
   }
 
   let info = `${effW}×${effH}`;
-  if (rotate) info += ' ↻';
+  if (sleepTotalRotation !== 0) info += ` ↻${sleepTotalRotation}°`;
   if (sleepAspectExact) {
     info += ` → ${DEFAULT_MAX_WIDTH}×${DEFAULT_MAX_HEIGHT}, exact fit`;
   } else {
@@ -3896,8 +3894,7 @@ async function processSleepImage(file) {
       clearTimeout(timeoutId);
       URL.revokeObjectURL(url);
       const exifOrientation = await readExifOrientation(file);
-      const rotation = EXIF_ROTATION_MAP[exifOrientation] || 0;
-      const rotate = (rotation === 90 || rotation === 270) || (rotation === 0 && img.width > img.height);
+      const totalRotation = computeTotalRotation(img.width, img.height, exifOrientation);
       const origW = img.width, origH = img.height;
       const outW = DEFAULT_MAX_WIDTH, outH = DEFAULT_MAX_HEIGHT;
       const c = document.createElement('canvas');
@@ -3905,31 +3902,7 @@ async function processSleepImage(file) {
       const ctx = c.getContext('2d');
       ctx.fillStyle = '#fff';
       ctx.fillRect(0, 0, outW, outH);
-      ctx.save();
-      drawSleepImageOnCanvas(ctx, img, origW, origH, outW, outH, rotate);
-      ctx.restore();
-
-      const flip = EXIF_FLIP_MAP[exifOrientation];
-      const needTransform = rotation === 180 || flip !== 'none';
-      if (needTransform) {
-        const tmp = document.createElement('canvas');
-        tmp.width = outW; tmp.height = outH;
-        const tmpCtx = tmp.getContext('2d');
-        tmpCtx.drawImage(c, 0, 0);
-        ctx.clearRect(0, 0, outW, outH);
-        if (rotation === 180) {
-          ctx.translate(outW, outH);
-          ctx.rotate(Math.PI);
-        }
-        if (flip === 'h') {
-          ctx.translate(outW, 0);
-          ctx.scale(-1, 1);
-        } else if (flip === 'v') {
-          ctx.translate(0, outH);
-          ctx.scale(1, -1);
-        }
-        ctx.drawImage(tmp, 0, 0);
-      }
+      drawSleepImageOnCanvas(ctx, img, origW, origH, outW, outH, totalRotation);
 
       const imgData = ctx.getImageData(0, 0, outW, outH);
       const d = imgData.data;
