@@ -2369,11 +2369,11 @@
         const aOrder = getFileCategory(aExt).order;
         const bOrder = getFileCategory(bExt).order;
         if (aOrder !== bOrder) return sortState.dir * (aOrder - bOrder);
-        return a.name.localeCompare(b.name);
+        return sortState.dir * a.name.localeCompare(b.name);
       }
       if (sortState.column === 'size') {
         if (a.size !== b.size) return sortState.dir * (a.size - b.size);
-        return a.name.localeCompare(b.name);
+        return sortState.dir * a.name.localeCompare(b.name);
       }
       // default: by type then name
       const aExt = a.name.includes('.') ? a.name.split('.').pop().toLowerCase() : '';

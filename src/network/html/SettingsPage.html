@@ -91,8 +91,8 @@
       font-weight: 500;
     }
     .setting-row {
-      display: flex;
-      justify-content: space-between;
+      display: grid;
+      grid-template-columns: 1fr auto;
       align-items: center;
       padding: 10px 0;
       border-bottom: 1px solid var(--border-color);
@@ -103,12 +103,11 @@
     .setting-name {
       font-weight: 500;
       color: var(--label-color);
-      flex: 1;
       min-width: 0;
       padding-right: 12px;
     }
     .setting-control {
-      flex-shrink: 0;
+      justify-self: end;
     }
     .setting-control select,
     .setting-control input[type="number"],
@@ -242,14 +241,15 @@
         font-size: 0.9em;
       }
       .setting-row {
-        flex-wrap: wrap;
+        grid-template-columns: minmax(0, 1fr) auto;
         gap: 6px;
       }
-      .setting-control select,
-      .setting-control input[type="text"],
-      .setting-control input[type="password"] {
-        min-width: 0;
-        width: unset;
+      .setting-control {
+        justify-self: end;
+      }
+      .setting-control select {
+        min-width: 120px;
+        width: 120px;
       }
     }
   </style>
@@ -326,6 +326,14 @@
     }
 
     if (setting.type === 'value') {
+      if (setting.step > 1) {
+        let html = '<select id="' + id + '" onchange="markChanged()">';
+        for (let v = setting.min; v <= setting.max; v += setting.step) {
+          html += '<option value="' + v + '"' + (v === setting.value ? ' selected' : '') + '>' + v + '</option>';
+        }
+        html += '</select>';
+        return html;
+      }
       return '<input type="number" id="' + id + '" value="' + setting.value + '"' +
         ' min="' + setting.min + '" max="' + setting.max + '" step="' + setting.step + '"' +
         ' onchange="markChanged()">';
