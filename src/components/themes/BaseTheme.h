@@ -65,6 +65,7 @@ struct ThemeMetrics {
   int keyboardKeyWidth;
   int keyboardKeyHeight;
   int keyboardKeySpacing;
+  int keyboardBottomKeySpacing;
   bool keyboardBottomAligned;
   bool keyboardCenteredText;
   int keyboardVerticalOffset;
@@ -106,6 +107,7 @@ constexpr ThemeMetrics values = {.batteryWidth = 15,
                                  .keyboardKeyWidth = 22,
                                  .keyboardKeyHeight = 30,
                                  .keyboardKeySpacing = 10,
+                                 .keyboardBottomKeySpacing = 0,
                                  .keyboardBottomAligned = true,
                                  .keyboardCenteredText = false,
                                  .keyboardVerticalOffset = -10};
