@@ -67,9 +67,12 @@ struct ThemeMetrics {
   int keyboardKeySpacing;
   bool keyboardBottomAligned;
   bool keyboardCenteredText;
+  int keyboardVerticalOffset;
 };
 
 enum UIIcon { Folder, Text, Image, Book, File, Recent, Settings, Transfer, Library, Wifi, Hotspot };
+
+enum class KeyboardKeyType { Normal, Shift, Mode, Space, Del, Ok };
 
 // Default theme implementation (Classic Theme)
 // Additional themes can inherit from this and override methods as needed
@@ -103,8 +106,9 @@ constexpr ThemeMetrics values = {.batteryWidth = 15,
                                  .keyboardKeyWidth = 22,
                                  .keyboardKeyHeight = 30,
                                  .keyboardKeySpacing = 10,
-                                 .keyboardBottomAligned = false,
-                                 .keyboardCenteredText = false};
+                                 .keyboardBottomAligned = true,
+                                 .keyboardCenteredText = false,
+                                 .keyboardVerticalOffset = -10};
 }
 
 class BaseTheme {
@@ -147,7 +151,9 @@ class BaseTheme {
                              const int textYOffset = 0) const;
   virtual void drawHelpText(const GfxRenderer& renderer, Rect rect, const char* label) const;
   virtual void drawTextField(const GfxRenderer& renderer, Rect rect, const int textWidth) const;
-  virtual void drawKeyboardKey(const GfxRenderer& renderer, Rect rect, const char* label, const bool isSelected) const;
+  virtual void drawKeyboardKey(const GfxRenderer& renderer, Rect rect, const char* label, const bool isSelected,
+                               const char* secondaryLabel = nullptr,
+                               KeyboardKeyType keyType = KeyboardKeyType::Normal) const;
   virtual bool showsFileIcons() const { return false; }
   void drawClassicalBookCover(GfxRenderer& renderer, int x, int y, int w, int h, const BookCoverParams& params,
                               bool inverted = false, int continueTextWidth = 0) const;
