@@ -311,7 +311,7 @@ void KeyboardEntryActivity::render(RenderLock&&) {
     if (cursorMode) {
       revealPos = text.length();  // no reveal in displayText; block draws actual char directly
     } else {
-      revealPos = (text.length() > 0 && cursorPos > 0) ? cursorPos - 1 : 0;
+      revealPos = (text.length() > 0 && cursorPos > 0) ? cursorPos - 1 : SIZE_MAX;
     }
     displayText = text;
     for (size_t i = 0; i < displayText.length(); i++) {
