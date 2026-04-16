@@ -1,5 +1,6 @@
 #include "KeyboardEntryActivity.h"
 
+#include <HalGPIO.h>
 #include <I18n.h>
 
 #include "MappedInputManager.h"
@@ -85,7 +86,7 @@ bool KeyboardEntryActivity::handleKeyPress() {
   if (isBottomRow(selectedRow)) {
     switch (static_cast<SpecialKeyType>(selectedCol)) {
       case SpecShift:
-        if (urlMode) return true;
+        if (urlMode || inputType == InputType::Url) return true;
         if (symMode) return true;
         shiftState = (shiftState + 1) % 2;
         return true;
@@ -93,6 +94,8 @@ bool KeyboardEntryActivity::handleKeyPress() {
         if (urlMode) {
           urlMode = false;
           symMode = false;
+          selectedRow = getTotalRowCount() - 1;
+          selectedCol = SpecMode;
           requestUpdate();
           return true;
         }
@@ -324,10 +327,12 @@ void KeyboardEntryActivity::render(RenderLock&&) {
   }
 
   const bool isPassword = (inputType == InputType::Password);
-  const int margin = metrics.contentSidePadding;
-  const int extraMargin = 10;
-  const int effectiveMargin = margin + extraMargin;
-  const int toggleGap = isPassword ? 8 : 0;
+  int availableWidth = pageWidth;
+  if (gpio.deviceIsX3()) {
+    availableWidth -= 2 * metrics.sideButtonHintsWidth;
+  }
+  const int effectiveMargin = (pageWidth - availableWidth * metrics.keyboardTextFieldWidthPercent / 100) / 2;
+  const int toggleGap = isPassword ? 4 : 0;
   const int toggleReserve = isPassword ? std::max(renderer.getTextWidth(UI_12_FONT_ID, "[abc]"),
                                                   renderer.getTextWidth(UI_12_FONT_ID, "[***]")) +
                                              toggleGap
@@ -346,7 +351,7 @@ void KeyboardEntryActivity::render(RenderLock&&) {
   int lineStartIdx = 0;
   int lineEndIdx = displayText.length();
   int textWidth = 0;
-  int cursorPixelX = metrics.contentSidePadding;
+  int cursorPixelX = effectiveMargin;
   int cursorLineY = inputStartY;
   bool cursorDrawn = false;
 
@@ -406,7 +411,7 @@ void KeyboardEntryActivity::render(RenderLock&&) {
   }
 
   const int fieldWidth = (inputHeight > 0) ? maxLineWidth : textWidth;
-  const int lineMargin = margin + extraMargin - 5;
+  const int lineMargin = effectiveMargin;
   GUI.drawTextField(renderer, Rect{0, inputStartY, pageWidth, inputHeight}, fieldWidth, cursorMode, lineMargin,
                     pageWidth - 2 * lineMargin);
 
@@ -448,7 +453,8 @@ void KeyboardEntryActivity::render(RenderLock&&) {
   const int bottomKeyHeight = metrics.keyboardBottomKeyHeight;
   const int keySpacing = metrics.keyboardKeySpacing;
   const int contentCols = getContentColCount();
-  const int keyWidth = (pageWidth * 95 / 100 - (contentCols - 1) * keySpacing) / contentCols;
+  const int keyboardWidth = pageWidth * metrics.keyboardWidthPercent / 100;
+  const int keyWidth = (keyboardWidth - (contentCols - 1) * keySpacing) / contentCols;
   const int leftMargin = (pageWidth - (contentCols * keyWidth + (contentCols - 1) * keySpacing)) / 2;
 
   const int bottomRowGap = metrics.keyboardBottomKeySpacing > 0 ? 4 : 0;
@@ -459,8 +465,8 @@ void KeyboardEntryActivity::render(RenderLock&&) {
                                  : inputStartY + inputHeight + lineHeight + metrics.verticalSpacing;
 
   const int bkSpacing = metrics.keyboardBottomKeySpacing;
-  const int contentTotalWidth =
-      COLS * ((pageWidth * 95 / 100 - (COLS - 1) * keySpacing) / COLS) + (COLS - 1) * keySpacing;
+  const int abcKeyWidth = (keyboardWidth - (COLS - 1) * keySpacing) / COLS;
+  const int contentTotalWidth = COLS * abcKeyWidth + (COLS - 1) * keySpacing;
   const int bottomKeyWidth = (contentTotalWidth - (BOTTOM_KEY_COUNT - 1) * bkSpacing) / BOTTOM_KEY_COUNT;
   const int bottomLeftMargin =
       (pageWidth - (BOTTOM_KEY_COUNT * bottomKeyWidth + (BOTTOM_KEY_COUNT - 1) * bkSpacing)) / 2;
@@ -518,7 +524,8 @@ void KeyboardEntryActivity::render(RenderLock&&) {
     const char* label;
   };
   const BottomKeyInfo bottomKeys[BOTTOM_KEY_COUNT] = {
-      {KeyboardKeyType::Shift, (symMode || urlMode) ? shiftString[0] : shiftString[shiftState]},
+      {(symMode || urlMode || inputType == InputType::Url) ? KeyboardKeyType::Disabled : KeyboardKeyType::Shift,
+       (symMode || urlMode || inputType == InputType::Url) ? shiftString[0] : shiftString[shiftState]},
       {KeyboardKeyType::Mode, urlMode ? "abc" : (symMode ? "abc" : "#@!")},
       {inputType == InputType::Url ? KeyboardKeyType::Mode : KeyboardKeyType::Space,
        inputType == InputType::Url ? "URL" : nullptr},

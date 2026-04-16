@@ -776,25 +776,17 @@ void BaseTheme::drawHelpText(const GfxRenderer& renderer, Rect rect, const char*
 
 void BaseTheme::drawTextField(const GfxRenderer& renderer, Rect rect, const int textWidth, bool cursorMode,
                               int contentStartX, int contentWidth) const {
-  (void)textWidth;
-  (void)contentStartX;
-  (void)contentWidth;
   const int lineHeight = renderer.getLineHeight(UI_12_FONT_ID);
-  const int bracketHeight = lineHeight;
-  const int fieldLeft = rect.x + 15;
-  const int fieldRight = rect.x + rect.width - 15;
-  const int topY = rect.y - 7;
-  const int bottomY = rect.y + rect.height + lineHeight + 7;
-  const int tickLen = bracketHeight / 2;
+  const int lineY = rect.y + rect.height + lineHeight + BaseMetrics::values.verticalSpacing;
   const int thickness = cursorMode ? 3 : 1;
-
-  renderer.fillRect(fieldLeft, topY, thickness, bottomY - topY + 1, true);
-  renderer.drawLine(fieldLeft, topY, fieldLeft + tickLen, topY, thickness, true);
-  renderer.drawLine(fieldLeft, bottomY, fieldLeft + tickLen, bottomY, thickness, true);
-
-  renderer.fillRect(fieldRight - thickness + 1, topY, thickness, bottomY - topY + 1, true);
-  renderer.drawLine(fieldRight, topY, fieldRight - tickLen, topY, thickness, true);
-  renderer.drawLine(fieldRight, bottomY, fieldRight - tickLen, bottomY, thickness, true);
+  if (contentWidth > 0) {
+    renderer.drawLine(rect.x + contentStartX, lineY, rect.x + contentStartX + contentWidth, lineY, thickness, true);
+  } else {
+    const int hPadding = 4;
+    const int lineW = textWidth + hPadding * 2;
+    renderer.drawLine(rect.x + (rect.width - lineW) / 2, lineY, rect.x + (rect.width + lineW) / 2, lineY, thickness,
+                      true);
+  }
 }
 
 void BaseTheme::drawKeyboardKey(const GfxRenderer& renderer, Rect rect, const char* label, const bool isSelected,
@@ -803,11 +795,14 @@ void BaseTheme::drawKeyboardKey(const GfxRenderer& renderer, Rect rect, const ch
   if (isSelected) {
     if (inactiveSelection) {
       renderer.drawRect(rect.x, rect.y, rect.width, rect.height, 2, true);
+    } else if (keyType == KeyboardKeyType::Disabled) {
+      renderer.fillRectDither(rect.x, rect.y, rect.width, rect.height, Color::LightGray);
     } else {
       renderer.fillRect(rect.x, rect.y, rect.width, rect.height, true);
     }
   } else if (keyType == KeyboardKeyType::Shift || keyType == KeyboardKeyType::Mode || keyType == KeyboardKeyType::Del ||
-             keyType == KeyboardKeyType::Space || keyType == KeyboardKeyType::Ok) {
+             keyType == KeyboardKeyType::Space || keyType == KeyboardKeyType::Ok ||
+             keyType == KeyboardKeyType::Disabled) {
     renderer.drawRect(rect.x, rect.y, rect.width, rect.height);
   }
 

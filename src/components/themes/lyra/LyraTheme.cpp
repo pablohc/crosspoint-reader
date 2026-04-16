@@ -597,7 +597,7 @@ void LyraTheme::fillPopupProgress(const GfxRenderer& renderer, const Rect& layou
 void LyraTheme::drawTextField(const GfxRenderer& renderer, Rect rect, const int textWidth, bool cursorMode,
                               int contentStartX, int contentWidth) const {
   int lineY = rect.y + rect.height + renderer.getLineHeight(UI_12_FONT_ID) + LyraMetrics::values.verticalSpacing;
-  const int thickness = cursorMode ? 3 : 2;
+  const int thickness = cursorMode ? 3 : 1;
   if (contentWidth > 0) {
     renderer.drawLine(rect.x + contentStartX, lineY, rect.x + contentStartX + contentWidth, lineY, thickness, true);
   } else {
@@ -613,11 +613,14 @@ void LyraTheme::drawKeyboardKey(const GfxRenderer& renderer, Rect rect, const ch
   if (isSelected) {
     if (inactiveSelection) {
       renderer.fillRoundedRect(rect.x, rect.y, rect.width, rect.height, cornerRadius, Color::LightGray);
+    } else if (keyType == KeyboardKeyType::Disabled) {
+      renderer.fillRoundedRect(rect.x, rect.y, rect.width, rect.height, cornerRadius, Color::LightGray);
     } else {
       renderer.fillRoundedRect(rect.x, rect.y, rect.width, rect.height, cornerRadius, Color::Black);
     }
   } else if (keyType == KeyboardKeyType::Shift || keyType == KeyboardKeyType::Mode || keyType == KeyboardKeyType::Del ||
-             keyType == KeyboardKeyType::Space || keyType == KeyboardKeyType::Ok) {
+             keyType == KeyboardKeyType::Space || keyType == KeyboardKeyType::Ok ||
+             keyType == KeyboardKeyType::Disabled) {
     renderer.drawRoundedRect(rect.x, rect.y, rect.width, rect.height, 1, cornerRadius, true);
   }
 
