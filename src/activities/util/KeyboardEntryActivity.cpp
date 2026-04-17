@@ -15,6 +15,7 @@ void KeyboardEntryActivity::onEnter() {
   symMode = false;
   urlMode = false;
   cursorMode = false;
+  togglePos = false;
   passwordVisible = false;
   shiftState = 0;
   selectedRow = 0;
@@ -22,6 +23,10 @@ void KeyboardEntryActivity::onEnter() {
   delPressCount = 0;
   hintVisible = false;
   hintShowTime = 0;
+  rightHeld = false;
+  rightLongHandled = false;
+  savedCursorPos = 0;
+  rightStartCursorPos = 0;
   requestUpdate();
 }
 
@@ -53,6 +58,7 @@ char KeyboardEntryActivity::getSelectedChar() const {
 
 char KeyboardEntryActivity::getAlternativeChar() const {
   if (symMode || urlMode) return '\0';
+  if (inputType == InputType::Url && selectedRow > 0) return '\0';
 
   const KeyDef(*layout)[COLS] = abcLayout;
 
@@ -216,8 +222,8 @@ void KeyboardEntryActivity::loop() {
   if (mappedInput.wasPressed(MappedInputManager::Button::Down)) {
     downHeld = true;
     if (cursorMode) {
-      if (cursorPos > text.length()) {
-        cursorPos = text.length();
+      if (togglePos) {
+        togglePos = false;
       }
       passwordVisible = false;
       cursorMode = false;
@@ -248,33 +254,63 @@ void KeyboardEntryActivity::loop() {
   }
 
   buttonNavigator.onPressAndContinuous({MappedInputManager::Button::Left}, [this] {
-    if (cursorMode) {
-      if (cursorPos > 0) {
-        cursorPos--;
-        requestUpdate();
-      }
-      return;
-    }
+    if (cursorMode) return;
     int maxCol = isBottomRow(selectedRow) ? BOTTOM_KEY_COUNT - 1 : getContentColCount() - 1;
     selectedCol = ButtonNavigator::previousIndex(selectedCol, maxCol + 1);
     requestUpdate();
   });
 
-  buttonNavigator.onPressAndContinuous({MappedInputManager::Button::Right}, [this] {
+  if (mappedInput.wasReleased(MappedInputManager::Button::Left)) {
     if (cursorMode) {
-      if (cursorPos < text.length()) {
-        cursorPos++;
+      if (togglePos) {
+        cursorPos = savedCursorPos;
+        togglePos = false;
         requestUpdate();
-      } else if (cursorPos == text.length() && inputType == InputType::Password) {
-        cursorPos = text.length() + 1;
+      } else if (cursorPos > 0) {
+        cursorPos--;
         requestUpdate();
       }
-      return;
     }
+  }
+
+  if (mappedInput.wasPressed(MappedInputManager::Button::Right)) {
+    if (cursorMode && inputType == InputType::Password && !togglePos) {
+      rightHeld = true;
+      rightLongHandled = false;
+      rightStartCursorPos = cursorPos;
+    }
+  }
+
+  buttonNavigator.onPressAndContinuous({MappedInputManager::Button::Right}, [this] {
+    if (cursorMode) return;
     int maxCol = isBottomRow(selectedRow) ? BOTTOM_KEY_COUNT - 1 : getContentColCount() - 1;
     selectedCol = ButtonNavigator::nextIndex(selectedCol, maxCol + 1);
     requestUpdate();
   });
+
+  if (rightHeld && !rightLongHandled && mappedInput.isPressed(MappedInputManager::Button::Right) &&
+      mappedInput.getHeldTime() > LONG_PRESS_MS) {
+    if (cursorMode && inputType == InputType::Password && !togglePos) {
+      savedCursorPos = rightStartCursorPos;
+      togglePos = true;
+      rightLongHandled = true;
+      requestUpdate();
+    }
+  }
+
+  if (mappedInput.wasReleased(MappedInputManager::Button::Right)) {
+    if (cursorMode && inputType == InputType::Password) {
+      if (!rightLongHandled && !togglePos && cursorPos < text.length()) {
+        cursorPos++;
+        requestUpdate();
+      }
+      rightHeld = false;
+      rightLongHandled = false;
+      return;
+    }
+    rightHeld = false;
+    rightLongHandled = false;
+  }
 
   if (mappedInput.wasPressed(MappedInputManager::Button::Confirm)) {
     confirmHeld = true;
@@ -304,8 +340,7 @@ void KeyboardEntryActivity::loop() {
       if (handleKeyPress()) {
         requestUpdate();
       }
-    } else if (confirmHeld && !confirmLongHandled && cursorMode && inputType == InputType::Password &&
-               cursorPos > text.length()) {
+    } else if (confirmHeld && !confirmLongHandled && cursorMode && inputType == InputType::Password && togglePos) {
       passwordVisible = !passwordVisible;
       requestUpdate();
     }
@@ -410,7 +445,7 @@ void KeyboardEntryActivity::render(RenderLock&&) {
       }
 
       const int lineStartX = centerText ? effectiveMargin + (maxLineWidth - textWidth) / 2 : effectiveMargin;
-      if (isCursorLine && cursorMode && isPassword && !passwordVisible) {
+      if (isCursorLine && cursorMode && isPassword && !passwordVisible && !togglePos) {
         // Draw text in 3 parts to avoid block cursor overflowing onto next char.
         // displayText uses '*' for all chars; actual char may be wider than '*'.
         // Part 1: chars before cursor position
@@ -444,14 +479,14 @@ void KeyboardEntryActivity::render(RenderLock&&) {
   GUI.drawTextField(renderer, Rect{0, inputStartY, pageWidth, inputHeight}, fieldWidth, cursorMode, lineMargin,
                     pageWidth - 2 * lineMargin);
 
-  if (cursorMode && cursorPos <= displayText.length()) {
+  if (cursorMode && !togglePos && cursorPos <= displayText.length()) {
     static constexpr int blockPadding = 1;
     renderer.fillRect(cursorPixelX - blockPadding, cursorLineY, cursorCharWidth + blockPadding * 2, lineHeight, true);
     if (cursorPos < text.length()) {
       const char buf[2] = {text[cursorPos], '\0'};
       renderer.drawText(UI_12_FONT_ID, cursorPixelX, cursorLineY, buf, false);
     }
-  } else if (!cursorMode && cursorPos <= displayText.length()) {
+  } else if (cursorPos <= displayText.length()) {
     static constexpr int serifW = 3;
     const int cX = cursorPixelX;
     const int cY = cursorLineY;
@@ -468,7 +503,7 @@ void KeyboardEntryActivity::render(RenderLock&&) {
     const int toggleWidth = renderer.getTextWidth(UI_12_FONT_ID, toggleLabel);
     const int toggleX = pageWidth - effectiveMargin - toggleWidth;
     const int toggleY = inputStartY + inputHeight;
-    const bool toggleSelected = cursorMode && cursorPos > text.length();
+    const bool toggleSelected = cursorMode && togglePos;
 
     if (toggleSelected) {
       renderer.fillRect(toggleX - 2, toggleY, toggleWidth + 5, lineHeight + 3, true);
@@ -478,18 +513,26 @@ void KeyboardEntryActivity::render(RenderLock&&) {
     }
   }
 
-  if (hintVisible) {
+  if (hintVisible && !text.empty()) {
     const int hintLh = renderer.getLineHeight(SMALL_FONT_ID);
     const int underlineY = inputStartY + inputHeight + lineHeight + metrics.verticalSpacing;
     const int hintY = underlineY + 4;
+    int hintLineY = hintY;
     if (cursorMode) {
-      const char* line1 = "Use < or > to move cursor";
-      const char* line2 = "Press DOWN to return to keyboard";
-      renderer.drawCenteredText(SMALL_FONT_ID, hintY, line1, true);
-      renderer.drawCenteredText(SMALL_FONT_ID, hintY + hintLh, line2, true);
+      renderer.drawCenteredText(SMALL_FONT_ID, hintLineY, "Press < or > to move cursor", true);
+      hintLineY += hintLh;
+      if (inputType == InputType::Password) {
+        const char* passTip;
+        if (togglePos) {
+          passTip = "Press < for go back current position";
+        } else {
+          passTip = passwordVisible ? "Hold > and then press [***] to hide Password"
+                                    : "Hold > and then press [abc] to show Password";
+        }
+        renderer.drawCenteredText(SMALL_FONT_ID, hintLineY, passTip, true);
+      }
     } else {
-      const char* line1 = "Long press UP for cursor mode";
-      renderer.drawCenteredText(SMALL_FONT_ID, hintY, line1, true);
+      renderer.drawCenteredText(SMALL_FONT_ID, hintY, "Hold UP to edit entry", true);
     }
   }
 
@@ -507,6 +550,58 @@ void KeyboardEntryActivity::render(RenderLock&&) {
                                        (keyHeight + keySpacing) * getContentRowCount() - bottomKeyHeight -
                                        bottomRowGap + metrics.keyboardVerticalOffset
                                  : inputStartY + inputHeight + lineHeight + metrics.verticalSpacing;
+
+  const int tipsLh = renderer.getLineHeight(SMALL_FONT_ID);
+  const int underlineBottom = inputStartY + inputHeight + lineHeight + metrics.verticalSpacing + 4;
+  auto drawTip = [&](const char* tip, int y) { renderer.drawCenteredText(SMALL_FONT_ID, y, tip, true); };
+
+  int tipCount = 0;
+  if (cursorMode) {
+    tipCount = 1;
+  } else if (urlMode) {
+    tipCount = 1 + (!text.empty() ? 1 : 0);
+  } else if (symMode) {
+    tipCount = !text.empty() ? 1 : 0;
+  } else {
+    tipCount = 1 + (inputType == InputType::Url ? 1 : 0) + (!text.empty() ? 1 : 0);
+  }
+
+  if (tipCount > 0) {
+    int y = (underlineBottom + keyboardStartY) / 2 - (tipCount + 1) * tipsLh / 2;
+    drawTip("Tips:", y);
+    y += tipsLh;
+    if (cursorMode) {
+      drawTip("Press DOWN to return to keyboard", y);
+    } else if (urlMode) {
+      drawTip("Press ABC to exit URL mode", y);
+      y += tipsLh;
+      if (!text.empty()) {
+        drawTip("Hold DEL to clear all text", y);
+      }
+    } else if (symMode) {
+      if (!text.empty()) {
+        drawTip("Hold DEL to clear all text", y);
+      }
+    } else {
+      const char* altCharTip;
+      if (inputType == InputType::Url) {
+        altCharTip = "Hold SELECT for secondary char";
+      } else if (shiftState > 0) {
+        altCharTip = "Hold SELECT for lowercase or secondary char";
+      } else {
+        altCharTip = "Hold SELECT for UPPERCASE or secondary char";
+      }
+      drawTip(altCharTip, y);
+      y += tipsLh;
+      if (inputType == InputType::Url) {
+        drawTip("Press URL for snippets", y);
+        y += tipsLh;
+      }
+      if (!text.empty()) {
+        drawTip("Hold DEL to clear all text", y);
+      }
+    }
+  }
 
   const int bkSpacing = metrics.keyboardBottomKeySpacing;
   const int abcKeyWidth = (keyboardWidth - (COLS - 1) * keySpacing) / COLS;

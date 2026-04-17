@@ -51,11 +51,16 @@ class KeyboardEntryActivity : public Activity {
   bool confirmLongHandled = false;
 
   bool cursorMode = false;
+  bool togglePos = false;
   size_t cursorPos = 0;
   bool upHeld = false;
   bool upLongHandled = false;
   bool downHeld = false;
   bool downLongHandled = false;
+  bool rightHeld = false;
+  bool rightLongHandled = false;
+  size_t savedCursorPos = 0;
+  size_t rightStartCursorPos = 0;
 
   bool urlMode = false;
   static constexpr int URL_SNIPPET_COUNT = 9;
