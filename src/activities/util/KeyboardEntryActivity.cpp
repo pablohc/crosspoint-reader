@@ -3,6 +3,8 @@
 #include <HalGPIO.h>
 #include <I18n.h>
 
+#include <algorithm>
+
 #include "MappedInputManager.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
@@ -377,7 +379,7 @@ void KeyboardEntryActivity::render(RenderLock&&) {
     if (cursorMode) {
       revealPos = text.length();  // no reveal in displayText; block draws actual char directly
     } else {
-      revealPos = (text.length() > 0 && cursorPos > 0) ? cursorPos - 1 : SIZE_MAX;
+      revealPos = (text.length() > 0 && cursorPos > 0) ? cursorPos - 1 : std::string::npos;
     }
     displayText = text;
     for (size_t i = 0; i < displayText.length(); i++) {
