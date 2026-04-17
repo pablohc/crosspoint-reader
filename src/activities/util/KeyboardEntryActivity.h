@@ -62,6 +62,10 @@ class KeyboardEntryActivity : public Activity {
   static constexpr const char* const urlSnippets[URL_SNIPPET_COUNT] = {
       "https://", "www.", ".com", "http://", "192.168.", ".org", "/opds", ":8080", ".net"};
 
+  int delPressCount = 0;
+  bool hintVisible = false;
+  unsigned long hintShowTime = 0;
+
   void onComplete(std::string text);
   void onCancel();
 

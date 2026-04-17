@@ -19,6 +19,9 @@ void KeyboardEntryActivity::onEnter() {
   shiftState = 0;
   selectedRow = 0;
   selectedCol = 0;
+  delPressCount = 0;
+  hintVisible = false;
+  hintShowTime = 0;
   requestUpdate();
 }
 
@@ -86,11 +89,15 @@ bool KeyboardEntryActivity::handleKeyPress() {
   if (isBottomRow(selectedRow)) {
     switch (static_cast<SpecialKeyType>(selectedCol)) {
       case SpecShift:
+        delPressCount = 0;
+        hintVisible = false;
         if (urlMode || inputType == InputType::Url) return true;
         if (symMode) return true;
         shiftState = (shiftState + 1) % 2;
         return true;
       case SpecMode: {
+        delPressCount = 0;
+        hintVisible = false;
         if (urlMode) {
           urlMode = false;
           symMode = false;
@@ -110,6 +117,8 @@ bool KeyboardEntryActivity::handleKeyPress() {
         return true;
       }
       case SpecSpace:
+        delPressCount = 0;
+        hintVisible = false;
         if (inputType == InputType::Url) {
           urlMode = !urlMode;
           if (urlMode) {
@@ -123,12 +132,19 @@ bool KeyboardEntryActivity::handleKeyPress() {
         }
         return true;
       case SpecDel:
+        delPressCount++;
+        if (delPressCount >= 2) {
+          hintVisible = true;
+          hintShowTime = millis();
+        }
         if (cursorPos > 0 && !text.empty()) {
           text.erase(cursorPos - 1, 1);
           cursorPos--;
         }
         return true;
       case SpecOk:
+        delPressCount = 0;
+        hintVisible = false;
         onComplete(text);
         return false;
       default:
@@ -137,12 +153,17 @@ bool KeyboardEntryActivity::handleKeyPress() {
   }
 
   if (urlMode) {
+    delPressCount = 0;
+    hintVisible = false;
     const int idx = selectedCol + selectedRow * 3;
     if (idx < URL_SNIPPET_COUNT) {
       insertString(urlSnippets[idx]);
     }
     return true;
   }
+
+  delPressCount = 0;
+  hintVisible = false;
 
   return insertChar(getSelectedChar());
 }
@@ -169,6 +190,8 @@ void KeyboardEntryActivity::loop() {
       mappedInput.getHeldTime() > LONG_PRESS_MS) {
     cursorMode = true;
     upLongHandled = true;
+    hintVisible = true;
+    hintShowTime = millis();
     requestUpdate();
   }
 
@@ -198,6 +221,7 @@ void KeyboardEntryActivity::loop() {
       }
       passwordVisible = false;
       cursorMode = false;
+      hintVisible = false;
       downLongHandled = true;
       requestUpdate();
     } else {
@@ -291,6 +315,11 @@ void KeyboardEntryActivity::loop() {
 
   if (mappedInput.wasPressed(MappedInputManager::Button::Back)) {
     onCancel();
+  }
+
+  if (hintVisible && !cursorMode && millis() - hintShowTime > 4000) {
+    hintVisible = false;
+    requestUpdate();
   }
 }
 
@@ -446,6 +475,21 @@ void KeyboardEntryActivity::render(RenderLock&&) {
       renderer.drawText(UI_12_FONT_ID, toggleX, toggleY, toggleLabel, false);
     } else {
       renderer.drawText(UI_12_FONT_ID, toggleX, toggleY, toggleLabel, true);
+    }
+  }
+
+  if (hintVisible) {
+    const int hintLh = renderer.getLineHeight(SMALL_FONT_ID);
+    const int underlineY = inputStartY + inputHeight + lineHeight + metrics.verticalSpacing;
+    const int hintY = underlineY + 4;
+    if (cursorMode) {
+      const char* line1 = "Use < or > to move cursor";
+      const char* line2 = "Press DOWN to return to keyboard";
+      renderer.drawCenteredText(SMALL_FONT_ID, hintY, line1, true);
+      renderer.drawCenteredText(SMALL_FONT_ID, hintY + hintLh, line2, true);
+    } else {
+      const char* line1 = "Long press UP for cursor mode";
+      renderer.drawCenteredText(SMALL_FONT_ID, hintY, line1, true);
     }
   }
 
