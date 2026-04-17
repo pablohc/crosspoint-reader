@@ -227,9 +227,7 @@ void KeyboardEntryActivity::loop() {
   if (mappedInput.wasPressed(MappedInputManager::Button::Down)) {
     downHeld = true;
     if (cursorMode) {
-      if (togglePos) {
-        togglePos = false;
-      }
+      togglePos = false;
       passwordVisible = false;
       cursorMode = false;
       hintVisible = false;
@@ -522,8 +520,8 @@ void KeyboardEntryActivity::render(RenderLock&&) {
     const int hintLh = renderer.getLineHeight(SMALL_FONT_ID);
     const int underlineY = inputStartY + inputHeight + lineHeight + metrics.verticalSpacing;
     const int hintY = underlineY + 4;
-    int hintLineY = hintY;
     if (cursorMode) {
+      int hintLineY = hintY;
       renderer.drawCenteredText(SMALL_FONT_ID, hintLineY, "Press < or > to move cursor", true);
       hintLineY += hintLh;
       if (inputType == InputType::Password) {
