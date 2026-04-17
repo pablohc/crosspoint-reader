@@ -648,10 +648,9 @@ void LyraTheme::drawKeyboardKey(const GfxRenderer& renderer, Rect rect, const ch
   }
 
   const bool hasSecondary = secondaryLabel != nullptr && secondaryLabel[0] != '\0';
-  const int primaryOffset = 0;
   const int textWidth = renderer.getTextWidth(UI_12_FONT_ID, label);
   const int textX = rect.x + (rect.width - textWidth) / 2;
-  const int textY = rect.y + (rect.height - renderer.getLineHeight(UI_12_FONT_ID)) / 2 + primaryOffset;
+  const int textY = rect.y + (rect.height - renderer.getLineHeight(UI_12_FONT_ID)) / 2;
   renderer.drawText(UI_12_FONT_ID, textX, textY, label, !invert);
 
   if (hasSecondary) {

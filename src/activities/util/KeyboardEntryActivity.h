@@ -14,7 +14,7 @@ struct KeyDef {
   char secondary;
 };
 
-enum SpecialKeyType { SpecShift, SpecMode, SpecSpace, SpecDel, SpecOk };
+enum class SpecialKeyType { Shift, Mode, Space, Del, Ok };
 
 enum class InputType { Text, Password, Url };
 

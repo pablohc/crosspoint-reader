@@ -50,13 +50,17 @@ void CalibreSettingsActivity::loop() {
 
 void CalibreSettingsActivity::handleSelection() {
   if (selectedIndex == 0) {
-    // OPDS Server URL
+    // OPDS Server URL - prefill with https:// if empty to save typing
+    const std::string currentUrl = SETTINGS.opdsServerUrl;
+    const std::string prefillUrl = currentUrl.empty() ? "https://" : currentUrl;
     startActivityForResult(std::make_unique<KeyboardEntryActivity>(renderer, mappedInput, tr(STR_CALIBRE_WEB_URL),
-                                                                   SETTINGS.opdsServerUrl, 127, InputType::Url),
+                                                                   prefillUrl, 127, InputType::Url),
                            [this](const ActivityResult& result) {
                              if (!result.isCancelled) {
                                const auto& kb = std::get<KeyboardResult>(result.data);
-                               strncpy(SETTINGS.opdsServerUrl, kb.text.c_str(), sizeof(SETTINGS.opdsServerUrl) - 1);
+                               const std::string urlToSave =
+                                   (kb.text == "https://" || kb.text == "http://") ? "" : kb.text;
+                               strncpy(SETTINGS.opdsServerUrl, urlToSave.c_str(), sizeof(SETTINGS.opdsServerUrl) - 1);
                                SETTINGS.opdsServerUrl[sizeof(SETTINGS.opdsServerUrl) - 1] = '\0';
                                SETTINGS.saveToFile();
                              }
