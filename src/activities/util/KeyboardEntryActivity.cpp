@@ -531,10 +531,10 @@ void KeyboardEntryActivity::render(RenderLock&&) {
       if (inputType == InputType::Password) {
         const char* passTip;
         if (togglePos) {
-          passTip = "Press < for go back current position";
+          passTip = "Press < to return to cursor position";
         } else {
-          passTip = passwordVisible ? "Hold > and then press [***] to hide Password"
-                                    : "Hold > and then press [abc] to show Password";
+          passTip =
+              passwordVisible ? "Hold > then press [***] to hide password" : "Hold > then press [abc] to show password";
         }
         renderer.drawCenteredText(SMALL_FONT_ID, hintLineY, passTip, true);
       }
