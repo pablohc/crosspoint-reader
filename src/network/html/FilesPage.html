@@ -2307,7 +2307,7 @@
       totalSize += file.size;
     });
 
-    const fileCount = files.length - folderCount;
+    const fileCount = currentFiles.length - folderCount;
     const folderLabel = folderCount === 1 ? 'folder' : 'folders';
     const fileLabel = fileCount === 1 ? 'file' : 'files';
     document.getElementById('folder-summary').innerHTML = `${folderCount} ${folderLabel}, ${fileCount} ${fileLabel}, ${formatFileSize(totalSize)}`;
