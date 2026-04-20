@@ -3663,7 +3663,7 @@ function readExifOrientation(file) {
           const marker = view.getUint16(offset, false);
           if (marker === 0xFFE1) {
             const length = view.getUint16(offset + 2, false);
-            const tiffStart = offset + 4;
+            const tiffStart = offset + 10;
             if (tiffStart + 8 > view.byteLength) { cacheAndResolve(1); return; }
             const isLE = view.getUint16(tiffStart, false) === 0x4949;
             const ifdOffset = view.getUint32(tiffStart + 4, isLE);
