@@ -278,11 +278,16 @@
       .replaceAll("'", "&#039;");
   }
 
+  let _hideTimer;
+
   function showNotification(message, type) {
+    clearTimeout(_hideTimer);
     let notification = document.getElementById('notification');
     if (!notification) {
       notification = document.createElement('div');
       notification.id = 'notification';
+      notification.setAttribute('role', 'status');
+      notification.setAttribute('aria-live', 'polite');
       notification.style.cssText =
         'position:fixed;top:20px;right:20px;padding:12px 20px;border-radius:4px;color:white;font-weight:500;z-index:10000;max-width:300px;box-shadow:0 2px 8px rgba(0,0,0,0.2);transition:all 0.3s ease;';
       document.body.appendChild(notification);
