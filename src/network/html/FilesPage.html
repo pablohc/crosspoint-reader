@@ -5555,7 +5555,7 @@ async function uploadSleepImages(files) {
         continue;
       }
 
-      let processedFile = await processSleepImage(file);
+      processedFile = await processSleepImage(file);
 
       let baseName = processedFile.name.replace(/\.jpg$/i, '');
       let baseNameLower = baseName.toLowerCase();
@@ -5565,7 +5565,7 @@ async function uploadSleepImages(files) {
         baseName = `${baseName} (${counter})`;
         const newName = baseName + '.jpg';
         processedFile = new File([processedFile], newName, { type: 'image/jpeg' });
-        existingBaseNames.add(baseNameLower);
+        existingBaseNames.add(baseName.toLowerCase());
         renames.push({ original: file.name, renamed: newName });
       } else {
         existingBaseNames.add(baseNameLower);
