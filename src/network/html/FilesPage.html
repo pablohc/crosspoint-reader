@@ -215,6 +215,17 @@
     .modal.picker-mode {
       max-width: 920px;
     }
+    .sr-only {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
+    }
     .modal.drag-over {
       border-color: var(--accent-color);
     }
@@ -1865,8 +1876,8 @@
     <div class="upload-form">
       <p class="file-info">Select a file to upload to <strong id="uploadPathDisplay"></strong></p>
       <div class="drop-zone" onclick="document.getElementById('fileInput').click()">
-        <input type="file" id="fileInput" onchange="validateFile()" multiple style="display:none;">
-        <label for="fileInput" class="choose-file-btn" onclick="event.stopPropagation()">📁 Choose Files</label>
+        <input type="file" id="fileInput" class="sr-only" onchange="validateFile()" multiple tabindex="-1" aria-hidden="true">
+        <button type="button" class="choose-file-btn" onclick="event.stopPropagation(); document.getElementById('fileInput').click()">📁 Choose Files</button>
         <div class="drag-drop-hint">or drag &amp; drop files here</div>
       </div>
       <div class="picker-columns" id="pickerColumns" style="display:none;">
