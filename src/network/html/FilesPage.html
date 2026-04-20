@@ -6144,12 +6144,14 @@ function retryAllFailedUploads() {
   validateFile();
 }
 
+  function isValidName(name) {
+    return /^(?!\.{1,2}$)[^"*:<>?\/\\|]+$/.test(name);
+  }
+
   function createFolder() {
     const folderName = document.getElementById('folderName').value.trim();
 
-    // Validate folder name
-    const validName = /^(?!\.{1,2}$)[^"*:<>?\/\\|]+$/.test(folderName);
-    if (!validName) {
+    if (!isValidName(folderName)) {
       showNotification('Folder name cannot contain " * : < > ? / \\ | and must not be . or ..', 'warning');
       return;
     }
@@ -6207,7 +6209,7 @@ function retryAllFailedUploads() {
     const originalBase = isFolder ? baseName : (baseName.includes('.') ? baseName.substring(0, baseName.lastIndexOf('.')) : baseName);
     const newName = input.value.trim();
     const btn = document.getElementById('confirmRenameBtn');
-    btn.disabled = !newName || newName === originalBase;
+    btn.disabled = !newName || newName === originalBase || !isValidName(newName);
   }
 
   function closeRenameModal() {
@@ -6219,8 +6221,8 @@ function retryAllFailedUploads() {
     const ext = document.getElementById('renameExtension').value;
     const newName = document.getElementById('renameNewName').value.trim() + ext;
 
-    if (newName.includes('/') || newName.includes('\\')) {
-      showNotification('File name cannot include slashes.', 'warning');
+    if (!isValidName(newName)) {
+      showNotification('Name cannot contain " * : < > ? / \\ | and must not be . or ..', 'warning');
       return;
     }
 
