@@ -79,10 +79,11 @@ static bool convertSleepImageToBmp(const String& filePath) {
   }
 
   String bmpPath = filePath.substring(0, filePath.lastIndexOf('.')) + ".bmp";
+  String bmpTmpPath = bmpPath + ".tmp";
   FsFile bmpFile;
-  if (!Storage.openFileForWrite("SLEEP", bmpPath, bmpFile)) {
+  if (!Storage.openFileForWrite("SLEEP", bmpTmpPath, bmpFile)) {
     srcFile.close();
-    LOG_DBG("WEB", "[SLEEP] Cannot create BMP: %s", bmpPath.c_str());
+    LOG_DBG("WEB", "[SLEEP] Cannot create temp BMP: %s", bmpTmpPath.c_str());
     return false;
   }
 
@@ -97,10 +98,25 @@ static bool convertSleepImageToBmp(const String& filePath) {
   srcFile.close();
 
   if (success) {
-    Storage.remove(filePath.c_str());
-    LOG_DBG("WEB", "[SLEEP] Conversion complete: %s", bmpPath.c_str());
+    FsFile tmp = Storage.open(bmpTmpPath.c_str());
+    if (tmp) {
+      Storage.remove(bmpPath.c_str());
+      if (tmp.rename(bmpPath.c_str())) {
+        Storage.remove(filePath.c_str());
+        LOG_DBG("WEB", "[SLEEP] Conversion complete: %s", bmpPath.c_str());
+      } else {
+        Storage.remove(bmpTmpPath.c_str());
+        LOG_ERR("WEB", "[SLEEP] Rename failed: %s", bmpTmpPath.c_str());
+        success = false;
+      }
+      tmp.close();
+    } else {
+      Storage.remove(bmpTmpPath.c_str());
+      LOG_ERR("WEB", "[SLEEP] Cannot reopen temp BMP: %s", bmpTmpPath.c_str());
+      success = false;
+    }
   } else {
-    Storage.remove(bmpPath.c_str());
+    Storage.remove(bmpTmpPath.c_str());
     LOG_DBG("WEB", "[SLEEP] Conversion failed for: %s", filePath.c_str());
   }
 
