@@ -11,6 +11,16 @@
 #include <HalStorage.h>
 #include <Logging.h>
 
+static inline void computeSrcRange(uint32_t dstCoord, uint32_t scaleInv, uint32_t maxSrc,
+                                    uint32_t& srcStart, uint32_t& srcEnd) {
+  srcStart = (static_cast<uint32_t>(dstCoord) * scaleInv) >> 16;
+  srcEnd = (static_cast<uint32_t>(dstCoord + 1) * scaleInv) >> 16;
+  if (srcStart >= maxSrc) srcStart = maxSrc - 1;
+  if (srcEnd > maxSrc) srcEnd = maxSrc;
+  if (srcEnd <= srcStart) srcEnd = srcStart + 1;
+  if (srcEnd > maxSrc) srcEnd = maxSrc;
+}
+
 bool Xtc::load() {
   LOG_DBG("XTC", "Loading XTC: %s", filepath.c_str());
 
@@ -453,29 +463,12 @@ bool Xtc::generateThumbBmp(int height) const {
       goto fallback_2bit_thumb;
     }
 
-    int16_t* errRow0 = static_cast<int16_t*>(malloc((thumbWidth + 4) * sizeof(int16_t)));
-    int16_t* errRow1 = static_cast<int16_t*>(malloc((thumbWidth + 4) * sizeof(int16_t)));
-    int16_t* errRow2 = static_cast<int16_t*>(malloc((thumbWidth + 4) * sizeof(int16_t)));
-    if (!errRow0 || !errRow1 || !errRow2) {
-      LOG_ERR("XTC", "Failed to alloc dither buffers, falling back to 2-bit BMP");
-      free(plane1Buf);
-      free(plane2Buf);
-      free(errRow0);
-      free(errRow1);
-      free(errRow2);
-      goto fallback_2bit_thumb;
-    }
-    memset(errRow0, 0, (thumbWidth + 4) * sizeof(int16_t));
-    memset(errRow1, 0, (thumbWidth + 4) * sizeof(int16_t));
-    memset(errRow2, 0, (thumbWidth + 4) * sizeof(int16_t));
+    Atkinson1BitDitherer ditherer(thumbWidth);
 
     FsFile thumbBmp;
     if (!Storage.openFileForWrite("XTC", getThumbBmpPath(height), thumbBmp)) {
       free(plane1Buf);
       free(plane2Buf);
-      free(errRow0);
-      free(errRow1);
-      free(errRow2);
       return false;
     }
 
@@ -488,28 +481,17 @@ bool Xtc::generateThumbBmp(int height) const {
     if (!rowBuf) {
       free(plane1Buf);
       free(plane2Buf);
-      free(errRow0);
-      free(errRow1);
-      free(errRow2);
       thumbBmp.close();
       return false;
     }
 
     for (uint16_t dstY = 0; dstY < thumbHeight; dstY++) {
       memset(rowBuf, 0xFF, rowSize);
-      uint32_t srcYS = (static_cast<uint32_t>(dstY) * scaleInv_fp2) >> 16;
-      uint32_t srcYE = (static_cast<uint32_t>(dstY + 1) * scaleInv_fp2) >> 16;
-      if (srcYS >= pageInfo.height) srcYS = pageInfo.height - 1;
-      if (srcYE > pageInfo.height) srcYE = pageInfo.height;
-      if (srcYE <= srcYS) srcYE = srcYS + 1;
-      if (srcYE > pageInfo.height) srcYE = pageInfo.height;
+      uint32_t srcYS, srcYE;
+      computeSrcRange(dstY, scaleInv_fp2, pageInfo.height, srcYS, srcYE);
       for (uint16_t dstX = 0; dstX < thumbWidth; dstX++) {
-        uint32_t srcXS = (static_cast<uint32_t>(dstX) * scaleInv_fp2) >> 16;
-        uint32_t srcXE = (static_cast<uint32_t>(dstX + 1) * scaleInv_fp2) >> 16;
-        if (srcXS >= pageInfo.width) srcXS = pageInfo.width - 1;
-        if (srcXE > pageInfo.width) srcXE = pageInfo.width;
-        if (srcXE <= srcXS) srcXE = srcXS + 1;
-        if (srcXE > pageInfo.width) srcXE = pageInfo.width;
+        uint32_t srcXS, srcXE;
+        computeSrcRange(dstX, scaleInv_fp2, pageInfo.width, srcXS, srcXE);
         int lumSum = 0, total = 0;
         for (uint32_t sy = srcYS; sy < srcYE; sy++)
           for (uint32_t sx = srcXS; sx < srcXE; sx++) {
@@ -522,41 +504,19 @@ bool Xtc::generateThumbBmp(int height) const {
             }
           }
         const int avgLum = (total > 0) ? (lumSum * 255 / total) / 255 : 255;
-        int adjusted = avgLum;
-        adjusted = ((adjusted - 128) * 120) / 100 + 128;
-        if (adjusted < 0) adjusted = 0;
-        if (adjusted > 255) adjusted = 255;
-        adjusted += errRow0[dstX + 2];
-        if (adjusted < 0) adjusted = 0;
-        if (adjusted > 255) adjusted = 255;
-        const bool dark = adjusted < 128;
-        const int quantizedValue = dark ? 0 : 255;
-        const int error = (adjusted - quantizedValue) >> 3;
-        errRow0[dstX + 3] += error;
-        errRow0[dstX + 4] += error;
-        errRow1[dstX + 1] += error;
-        errRow1[dstX + 2] += error;
-        errRow1[dstX + 3] += error;
-        errRow2[dstX + 2] += error;
-        if (dark) {
+        const uint8_t bit = ditherer.processPixel(avgLum, dstX);
+        if (!bit) {
           const size_t bi = dstX / 8;
           if (bi < rowSize) rowBuf[bi] &= ~(1 << (7 - (dstX % 8)));
         }
       }
       thumbBmp.write(rowBuf, rowSize);
-      int16_t* tmp = errRow0;
-      errRow0 = errRow1;
-      errRow1 = errRow2;
-      errRow2 = tmp;
-      memset(errRow2, 0, (thumbWidth + 4) * sizeof(int16_t));
+      ditherer.nextRow();
     }
 
     free(rowBuf);
     free(plane1Buf);
     free(plane2Buf);
-    free(errRow0);
-    free(errRow1);
-    free(errRow2);
     thumbBmp.close();
     LOG_DBG("XTC", "Generated 1-bit thumb BMP with dithering (%dx%d): %s", thumbWidth, thumbHeight,
             getThumbBmpPath(height).c_str());
@@ -739,40 +699,18 @@ bool Xtc::generateThumbBmp(int height) const {
     return false;
   }
 
-  int16_t* errRow0 = static_cast<int16_t*>(malloc((thumbWidth + 4) * sizeof(int16_t)));
-  int16_t* errRow1 = static_cast<int16_t*>(malloc((thumbWidth + 4) * sizeof(int16_t)));
-  int16_t* errRow2 = static_cast<int16_t*>(malloc((thumbWidth + 4) * sizeof(int16_t)));
-  if (!errRow0 || !errRow1 || !errRow2) {
-    free(pageBuffer);
-    free(rowBuffer);
-    free(errRow0);
-    free(errRow1);
-    free(errRow2);
-    return false;
-  }
-  memset(errRow0, 0, (thumbWidth + 4) * sizeof(int16_t));
-  memset(errRow1, 0, (thumbWidth + 4) * sizeof(int16_t));
-  memset(errRow2, 0, (thumbWidth + 4) * sizeof(int16_t));
-
+  Atkinson1BitDitherer ditherer(thumbWidth);
   const uint32_t scaleInv_fp = static_cast<uint32_t>(65536.0f / scale);
   const size_t srcRowBytes = (pageInfo.width + 7) / 8;
 
   for (uint16_t dstY = 0; dstY < thumbHeight; dstY++) {
     memset(rowBuffer, 0xFF, rowSize);
-    uint32_t srcYStart = (static_cast<uint32_t>(dstY) * scaleInv_fp) >> 16;
-    uint32_t srcYEnd = (static_cast<uint32_t>(dstY + 1) * scaleInv_fp) >> 16;
-    if (srcYStart >= pageInfo.height) srcYStart = pageInfo.height - 1;
-    if (srcYEnd > pageInfo.height) srcYEnd = pageInfo.height;
-    if (srcYEnd <= srcYStart) srcYEnd = srcYStart + 1;
-    if (srcYEnd > pageInfo.height) srcYEnd = pageInfo.height;
+    uint32_t srcYStart, srcYEnd;
+    computeSrcRange(dstY, scaleInv_fp, pageInfo.height, srcYStart, srcYEnd);
 
     for (uint16_t dstX = 0; dstX < thumbWidth; dstX++) {
-      uint32_t srcXStart = (static_cast<uint32_t>(dstX) * scaleInv_fp) >> 16;
-      uint32_t srcXEnd = (static_cast<uint32_t>(dstX + 1) * scaleInv_fp) >> 16;
-      if (srcXStart >= pageInfo.width) srcXStart = pageInfo.width - 1;
-      if (srcXEnd > pageInfo.width) srcXEnd = pageInfo.width;
-      if (srcXEnd <= srcXStart) srcXEnd = srcXStart + 1;
-      if (srcXEnd > pageInfo.width) srcXEnd = pageInfo.width;
+      uint32_t srcXStart, srcXEnd;
+      computeSrcRange(dstX, scaleInv_fp, pageInfo.width, srcXStart, srcXEnd);
 
       uint32_t graySum = 0, totalCount = 0;
       for (uint32_t srcY = srcYStart; srcY < srcYEnd && srcY < pageInfo.height; srcY++) {
@@ -785,40 +723,19 @@ bool Xtc::generateThumbBmp(int height) const {
         }
       }
 
-      int adjusted = (totalCount > 0) ? static_cast<int>(graySum * 255 / totalCount) / 255 : 255;
-      adjusted = ((adjusted - 128) * 120) / 100 + 128;
-      if (adjusted < 0) adjusted = 0;
-      if (adjusted > 255) adjusted = 255;
-      adjusted += errRow0[dstX + 2];
-      if (adjusted < 0) adjusted = 0;
-      if (adjusted > 255) adjusted = 255;
-      const bool dark = adjusted < 128;
-      const int quantizedValue = dark ? 0 : 255;
-      const int error = (adjusted - quantizedValue) >> 3;
-      errRow0[dstX + 3] += error;
-      errRow0[dstX + 4] += error;
-      errRow1[dstX + 1] += error;
-      errRow1[dstX + 2] += error;
-      errRow1[dstX + 3] += error;
-      errRow2[dstX + 2] += error;
-      if (dark) {
+      const int avgGray = (totalCount > 0) ? static_cast<int>(graySum * 255 / totalCount) / 255 : 255;
+      const uint8_t bit = ditherer.processPixel(avgGray, dstX);
+      if (!bit) {
         const size_t bi = dstX / 8;
         if (bi < rowSize) rowBuffer[bi] &= ~(1 << (7 - (dstX % 8)));
       }
     }
     thumbBmp.write(rowBuffer, rowSize);
-    int16_t* tmp = errRow0;
-    errRow0 = errRow1;
-    errRow1 = errRow2;
-    errRow2 = tmp;
-    memset(errRow2, 0, (thumbWidth + 4) * sizeof(int16_t));
+    ditherer.nextRow();
   }
 
   free(rowBuffer);
   free(pageBuffer);
-  free(errRow0);
-  free(errRow1);
-  free(errRow2);
   LOG_DBG("XTC", "Generated 1-bit thumb BMP with Atkinson dithering (%dx%d): %s", thumbWidth, thumbHeight,
           getThumbBmpPath(height).c_str());
   return true;
