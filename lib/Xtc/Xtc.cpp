@@ -186,7 +186,13 @@ bool Xtc::generateCoverBmp() const {
           const uint8_t bit1 = (plane1[bo] >> (7 - (y % 8))) & 1;
           rowBuf[x / 4] |= static_cast<uint8_t>((bit1 << 1) << (6 - (x % 4) * 2));
         }
-        tempFile.write(rowBuf, rowSize2);
+        if (tempFile.write(rowBuf, rowSize2) != rowSize2) {
+          LOG_ERR("XTC", "Failed to write temp cover row %u", y);
+          tempFile.close();
+          free(plane1);
+          Storage.remove(tempPath.c_str());
+          return false;
+        }
       }
       tempFile.close();
       free(plane1);
@@ -221,44 +227,59 @@ bool Xtc::generateCoverBmp() const {
       // Write 2-bit BMP header
       const uint32_t imageSize2 = rowSize2 * pageInfo.height;
       const uint32_t fileSize2 = 14 + 40 + 16 + imageSize2;
-      coverFile.write('B');
-      coverFile.write('M');
-      coverFile.write(reinterpret_cast<const uint8_t*>(&fileSize2), 4);
-      uint32_t rsv2 = 0;
-      coverFile.write(reinterpret_cast<const uint8_t*>(&rsv2), 4);
-      uint32_t doff2 = 14 + 40 + 16;
-      coverFile.write(reinterpret_cast<const uint8_t*>(&doff2), 4);
-      uint32_t dibSz2 = 40;
-      coverFile.write(reinterpret_cast<const uint8_t*>(&dibSz2), 4);
+      static constexpr uint8_t bmpHeader2[70] = {
+          'B', 'M', 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+          40, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+          1, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+          0, 0, 0, 0, 4, 0, 0, 0, 4, 0, 0, 0,
+          0xFF, 0xFF, 0xFF, 0x00, 0xAA, 0xAA, 0xAA, 0x00,
+          0x55, 0x55, 0x55, 0x00, 0x00, 0x00, 0x00, 0x00};
+      uint8_t hdr[70];
+      memcpy(hdr, bmpHeader2, 70);
+      memcpy(hdr + 2, &fileSize2, 4);
+      const uint32_t doff2 = 14 + 40 + 16;
+      memcpy(hdr + 10, &doff2, 4);
       int32_t ww2 = pageInfo.width;
-      coverFile.write(reinterpret_cast<const uint8_t*>(&ww2), 4);
+      memcpy(hdr + 18, &ww2, 4);
       int32_t hh2 = -static_cast<int32_t>(pageInfo.height);
-      coverFile.write(reinterpret_cast<const uint8_t*>(&hh2), 4);
-      uint16_t pl2 = 1;
-      coverFile.write(reinterpret_cast<const uint8_t*>(&pl2), 2);
-      uint16_t bpp2 = 2;
-      coverFile.write(reinterpret_cast<const uint8_t*>(&bpp2), 2);
-      uint32_t cmp2 = 0, ppm2 = 2835, cu2 = 4, ci2 = 4;
-      coverFile.write(reinterpret_cast<const uint8_t*>(&cmp2), 4);
-      coverFile.write(reinterpret_cast<const uint8_t*>(&imageSize2), 4);
-      coverFile.write(reinterpret_cast<const uint8_t*>(&ppm2), 4);
-      coverFile.write(reinterpret_cast<const uint8_t*>(&ppm2), 4);
-      coverFile.write(reinterpret_cast<const uint8_t*>(&cu2), 4);
-      coverFile.write(reinterpret_cast<const uint8_t*>(&ci2), 4);
-      static constexpr uint8_t pal2[16] = {0xFF, 0xFF, 0xFF, 0x00, 0xAA, 0xAA, 0xAA, 0x00,
-                                           0x55, 0x55, 0x55, 0x00, 0x00, 0x00, 0x00, 0x00};
-      coverFile.write(pal2, 16);
+      memcpy(hdr + 22, &hh2, 4);
+      memcpy(hdr + 34, &imageSize2, 4);
+      const uint32_t ppm2 = 2835;
+      memcpy(hdr + 38, &ppm2, 4);
+      memcpy(hdr + 42, &ppm2, 4);
+      if (coverFile.write(hdr, 70) != 70) {
+        LOG_ERR("XTC", "Failed to write 2-bit BMP header");
+        coverFile.close();
+        tempFile.close();
+        free(plane2);
+        Storage.remove(tempPath.c_str());
+        return false;
+      }
       // For each row: read pass1 row (bit1 only), OR in bit2, write to final
       uint8_t rowBuf[256];
       for (uint16_t y = 0; y < pageInfo.height; y++) {
         memset(rowBuf, 0, rowSize2);
-        tempFile.read(rowBuf, rowSize2);
+        if (tempFile.read(rowBuf, rowSize2) != rowSize2) {
+          LOG_ERR("XTC", "Failed to read temp cover row %u", y);
+          coverFile.close();
+          tempFile.close();
+          free(plane2);
+          Storage.remove(tempPath.c_str());
+          return false;
+        }
         for (uint16_t x = 0; x < pageInfo.width; x++) {
           const size_t bo = (pageInfo.width - 1 - x) * colBytes + y / 8;
           const uint8_t bit2 = (plane2[bo] >> (7 - (y % 8))) & 1;
           rowBuf[x / 4] |= static_cast<uint8_t>(bit2 << (6 - (x % 4) * 2));
         }
-        coverFile.write(rowBuf, rowSize2);
+        if (coverFile.write(rowBuf, rowSize2) != rowSize2) {
+          LOG_ERR("XTC", "Failed to write cover row %u", y);
+          coverFile.close();
+          tempFile.close();
+          free(plane2);
+          Storage.remove(tempPath.c_str());
+          return false;
+        }
       }
       coverFile.close();
       tempFile.close();
