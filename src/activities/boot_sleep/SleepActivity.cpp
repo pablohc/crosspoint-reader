@@ -538,6 +538,7 @@ void SleepActivity::onScreenshotRequest() {
       file.close();
     }
   }
+  // Device enters deep sleep next; on wake the new activity will full-refresh anyway.
   renderer.clearScreen();
   renderer.cleanupGrayscaleWithFrameBuffer();
 }
