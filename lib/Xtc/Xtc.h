@@ -72,6 +72,7 @@ class Xtc {
   uint32_t getPageCount() const;
   uint16_t getPageWidth() const;
   uint16_t getPageHeight() const;
+  uint16_t getCoverHeight() const;
   uint8_t getBitDepth() const;  // 1 = XTC (1-bit), 2 = XTCH (2-bit)
 
   /**

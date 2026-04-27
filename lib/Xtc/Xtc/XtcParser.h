@@ -42,6 +42,7 @@ class XtcParser {
   uint16_t getPageCount() const { return m_header.pageCount; }
   uint16_t getWidth() const { return m_defaultWidth; }
   uint16_t getHeight() const { return m_defaultHeight; }
+  uint16_t getCoverHeight() const { return m_coverHeight; }
   uint8_t getBitDepth() const { return m_bitDepth; }  // 1 = XTC/XTG, 2 = XTCH/XTH
 
   // Page information
@@ -116,6 +117,7 @@ class XtcParser {
   std::string m_author;
   uint16_t m_defaultWidth;
   uint16_t m_defaultHeight;
+  uint16_t m_coverHeight;
   uint8_t m_bitDepth;  // 1 = XTC/XTG (1-bit), 2 = XTCH/XTH (2-bit)
   bool m_hasChapters;
   bool m_chaptersLoaded;

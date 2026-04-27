@@ -19,6 +19,7 @@ XtcParser::XtcParser()
     : m_isOpen(false),
       m_defaultWidth(DISPLAY_WIDTH),
       m_defaultHeight(DISPLAY_HEIGHT),
+      m_coverHeight(DISPLAY_HEIGHT),
       m_bitDepth(1),
       m_hasChapters(false),
       m_chaptersLoaded(false),
@@ -99,6 +100,7 @@ XtcError XtcParser::open(const char* filepath) {
 void XtcParser::close() {
   closeFile();
   m_isOpen = false;
+  m_coverHeight = DISPLAY_HEIGHT;
   m_chaptersLoaded = false;
   m_chapters.clear();
   m_title.clear();
@@ -218,6 +220,7 @@ XtcError XtcParser::readFirstPageInfo() {
 
   m_defaultWidth = entry.width;
   m_defaultHeight = entry.height;
+  m_coverHeight = entry.height;
 
   LOG_DBG("XTC", "Page table validated: %u pages, default %dx%d", m_header.pageCount, m_defaultWidth, m_defaultHeight);
   return XtcError::OK;

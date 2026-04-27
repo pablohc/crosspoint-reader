@@ -672,6 +672,13 @@ uint16_t Xtc::getPageHeight() const {
   return parser->getHeight();
 }
 
+uint16_t Xtc::getCoverHeight() const {
+  if (!loaded || !parser) {
+    return xtc::DISPLAY_HEIGHT;
+  }
+  return parser->getCoverHeight();
+}
+
 uint8_t Xtc::getBitDepth() const {
   if (!loaded || !parser) {
     return 1;  // Default to 1-bit

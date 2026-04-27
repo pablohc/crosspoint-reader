@@ -151,9 +151,16 @@ void XtcReaderActivity::render(RenderLock&&) {
 }
 
 void XtcReaderActivity::renderPage() {
-  const uint16_t pageWidth = xtc->getPageWidth();
-  const uint16_t pageHeight = xtc->getPageHeight();
+  const uint16_t pageWidth = xtc::DISPLAY_WIDTH;
+  uint16_t pageHeight = xtc::DISPLAY_HEIGHT;
   const uint8_t bitDepth = xtc->getBitDepth();
+
+  if (currentPage == 0) {
+    const uint16_t coverHeight = xtc->getCoverHeight();
+    if (coverHeight < pageHeight) {
+      pageHeight = coverHeight;
+    }
+  }
 
   if (bitDepth == 2) {
     // Load each XTCH plane separately to stay within heap limits.
