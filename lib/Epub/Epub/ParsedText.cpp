@@ -92,7 +92,7 @@ void ParsedText::addWord(std::string word, const EpdFontFamily::Style fontStyle,
 // Consumes data to minimize memory usage
 void ParsedText::layoutAndExtractLines(const GfxRenderer& renderer, const int fontId, const uint16_t viewportWidth,
                                        const std::function<void(std::shared_ptr<TextBlock>)>& processLine,
-                                       const bool includeLastLine) {
+                                       const bool includeLastLine, const size_t maxLines) {
   if (words.empty()) {
     return;
   }
@@ -110,7 +110,10 @@ void ParsedText::layoutAndExtractLines(const GfxRenderer& renderer, const int fo
   } else {
     lineBreakIndices = computeLineBreaks(renderer, fontId, pageWidth, wordWidths, wordContinues);
   }
-  const size_t lineCount = includeLastLine ? lineBreakIndices.size() : lineBreakIndices.size() - 1;
+  size_t lineCount = includeLastLine ? lineBreakIndices.size() : lineBreakIndices.size() - 1;
+  if (maxLines > 0 && lineCount > maxLines) {
+    lineCount = maxLines;
+  }
 
   for (size_t i = 0; i < lineCount; ++i) {
     extractLine(i, pageWidth, wordWidths, wordContinues, lineBreakIndices, processLine, renderer, fontId);

@@ -62,6 +62,7 @@ class ChapterHtmlSlimParser {
     bool hasUnderline = false, underline = false;
   };
   std::vector<StyleStackEntry> inlineStyleStack;
+  std::vector<BlockStyle> blockStyleStack;
   CssStyle currentCssStyle;
   bool effectiveBold = false;
   bool effectiveItalic = false;
@@ -83,6 +84,19 @@ class ChapterHtmlSlimParser {
   int currentFootnoteLinkTextLen = 0;
   std::vector<std::pair<int, FootnoteEntry>> pendingFootnotes;  // <wordIndex, entry>
   int wordsExtractedInBlock = 0;
+
+  struct PendingDropCap {
+    std::string imagePath;
+    int16_t displayWidth;
+    int16_t displayHeight;
+  };
+  int figleftDepth = INT_MAX;
+  bool hasPendingDropCap = false;
+  PendingDropCap pendingDropCap;
+
+  bool captionTableMode = false;
+  bool collectingCaption = false;
+  std::string captionBuffer;
 
   void updateEffectiveInlineStyle();
   void startNewTextBlock(const BlockStyle& blockStyle);
@@ -124,6 +138,6 @@ class ChapterHtmlSlimParser {
 
   ~ChapterHtmlSlimParser() = default;
   bool parseAndBuildPages();
-  void addLineToPage(std::shared_ptr<TextBlock> line);
+  void addLineToPage(std::shared_ptr<TextBlock> line, int16_t extraXOffset = 0);
   const std::vector<std::pair<std::string, uint16_t>>& getAnchors() const { return anchorData; }
 };

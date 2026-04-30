@@ -131,10 +131,13 @@ void ChapterHtmlSlimParser::startNewTextBlock(const BlockStyle& blockStyle) {
   if (currentTextBlock) {
     // already have a text block running and it is empty - just reuse it
     if (currentTextBlock->isEmpty()) {
-      // Merge with existing block style to accumulate CSS styling from parent block elements.
-      // This handles cases like <div style="margin-bottom:2em"><h1>text</h1></div> where the
-      // div's margin should be preserved, even though it has no direct text content.
-      currentTextBlock->setBlockStyle(currentTextBlock->getBlockStyle().getCombinedBlockStyle(blockStyle));
+      // The stack accumulates horizontal margins and text properties from ancestors.
+      // Vertical margins are per-element and not inherited through the stack, but
+      // container elements deposit their vertical margins on the empty block when they
+      // open. Merge those into the new style so the first child in a container inherits
+      // the container's vertical spacing.
+      const auto style = currentTextBlock->getBlockStyle();
+      currentTextBlock->setBlockStyle(style.getCombinedBlockStyle(blockStyle, BlockStyle::CombineAxis::Vertical));
 
       if (!pendingAnchorId.empty()) {
         anchorData.push_back({std::move(pendingAnchorId), static_cast<uint16_t>(completedPageCount)});
@@ -219,6 +222,16 @@ void XMLCALL ChapterHtmlSlimParser::startElement(void* userData, const XML_Char*
     self->tableDepth += 1;
     self->tableRowIndex = 0;
     self->tableColIndex = 0;
+
+    // Detect caption+image tables: borderless (border-width: 0px) with data-summary
+    // Category A: 1x2 table with caption text in cell 1 and image in cell 2
+    const char* tableStyle = getAttribute(atts, "style");
+    if (tableStyle && strstr(tableStyle, "border-width: 0px") && getAttribute(atts, "data-summary")) {
+      self->captionTableMode = true;
+      self->captionBuffer.clear();
+      self->collectingCaption = false;
+    }
+
     self->depth += 1;
     return;
   }
@@ -235,6 +248,14 @@ void XMLCALL ChapterHtmlSlimParser::startElement(void* userData, const XML_Char*
       self->flushPartWordBuffer();
     }
     self->tableColIndex += 1;
+
+    // Caption+image table: first cell of first row is the caption
+    if (self->captionTableMode && self->tableRowIndex == 1 && self->tableColIndex == 1) {
+      self->collectingCaption = true;
+      self->captionBuffer.clear();
+      self->depth += 1;
+      return;
+    }
 
     auto tableCellBlockStyle = BlockStyle();
     tableCellBlockStyle.textAlignDefined = true;
@@ -344,18 +365,29 @@ void XMLCALL ChapterHtmlSlimParser::startElement(void* userData, const XML_Char*
                 const bool hasCssHeight = imgStyle.hasImageHeight();
                 const bool hasCssWidth = imgStyle.hasImageWidth();
 
+                // Compute effective container width for percentage-based image sizes.
+                // If the image is inside a block with horizontal margins/padding (e.g.
+                // <div style="margin: 1em 40%">), percentage widths like width:100%
+                // should resolve against the container width, not the full viewport.
+                int containerWidth = self->viewportWidth;
+                if (self->currentTextBlock) {
+                  const int inset = self->currentTextBlock->getBlockStyle().totalHorizontalInset();
+                  if (inset > 0 && inset < self->viewportWidth) {
+                    containerWidth = self->viewportWidth - inset;
+                  }
+                }
+
                 if (hasCssHeight && hasCssWidth && dims.width > 0 && dims.height > 0) {
                   // Both CSS height and width set: resolve both, then clamp to viewport preserving requested ratio
                   displayHeight = static_cast<int>(
                       imgStyle.imageHeight.toPixels(emSize, static_cast<float>(self->viewportHeight)) + 0.5f);
-                  displayWidth = static_cast<int>(
-                      imgStyle.imageWidth.toPixels(emSize, static_cast<float>(self->viewportWidth)) + 0.5f);
+                  displayWidth =
+                      static_cast<int>(imgStyle.imageWidth.toPixels(emSize, static_cast<float>(containerWidth)) + 0.5f);
                   if (displayHeight < 1) displayHeight = 1;
                   if (displayWidth < 1) displayWidth = 1;
-                  if (displayWidth > self->viewportWidth || displayHeight > self->viewportHeight) {
-                    float scaleX = (displayWidth > self->viewportWidth)
-                                       ? static_cast<float>(self->viewportWidth) / displayWidth
-                                       : 1.0f;
+                  if (displayWidth > containerWidth || displayHeight > self->viewportHeight) {
+                    float scaleX =
+                        (displayWidth > containerWidth) ? static_cast<float>(containerWidth) / displayWidth : 1.0f;
                     float scaleY = (displayHeight > self->viewportHeight)
                                        ? static_cast<float>(self->viewportHeight) / displayHeight
                                        : 1.0f;
@@ -380,20 +412,20 @@ void XMLCALL ChapterHtmlSlimParser::startElement(void* userData, const XML_Char*
                         static_cast<int>(displayHeight * (static_cast<float>(dims.width) / dims.height) + 0.5f);
                     if (displayWidth < 1) displayWidth = 1;
                   }
-                  if (displayWidth > self->viewportWidth) {
-                    displayWidth = self->viewportWidth;
+                  if (displayWidth > containerWidth) {
+                    displayWidth = containerWidth;
                     // Rescale height to preserve aspect ratio when width is clamped
                     displayHeight =
                         static_cast<int>(displayWidth * (static_cast<float>(dims.height) / dims.width) + 0.5f);
-                    if (displayHeight < 1) displayHeight = 1;
+                    if (displayWidth < 1) displayWidth = 1;
                   }
                   if (displayWidth < 1) displayWidth = 1;
                   LOG_DBG("EHP", "Display size from CSS height: %dx%d", displayWidth, displayHeight);
                 } else if (hasCssWidth && !hasCssHeight && dims.width > 0 && dims.height > 0) {
-                  // Use CSS width (resolve % against viewport width) and derive height from aspect ratio
-                  displayWidth = static_cast<int>(
-                      imgStyle.imageWidth.toPixels(emSize, static_cast<float>(self->viewportWidth)) + 0.5f);
-                  if (displayWidth > self->viewportWidth) displayWidth = self->viewportWidth;
+                  // Use CSS width (resolve % against container width) and derive height from aspect ratio
+                  displayWidth =
+                      static_cast<int>(imgStyle.imageWidth.toPixels(emSize, static_cast<float>(containerWidth)) + 0.5f);
+                  if (displayWidth > containerWidth) displayWidth = containerWidth;
                   if (displayWidth < 1) displayWidth = 1;
                   displayHeight =
                       static_cast<int>(displayWidth * (static_cast<float>(dims.height) / dims.width) + 0.5f);
@@ -407,8 +439,8 @@ void XMLCALL ChapterHtmlSlimParser::startElement(void* userData, const XML_Char*
                   if (displayHeight < 1) displayHeight = 1;
                   LOG_DBG("EHP", "Display size from CSS width: %dx%d", displayWidth, displayHeight);
                 } else {
-                  // Scale to fit viewport while maintaining aspect ratio
-                  int maxWidth = self->viewportWidth;
+                  // Scale to fit container while maintaining aspect ratio
+                  int maxWidth = containerWidth;
                   int maxHeight = self->viewportHeight;
                   float scaleX = (dims.width > maxWidth) ? (float)maxWidth / dims.width : 1.0f;
                   float scaleY = (dims.height > maxHeight) ? (float)maxHeight / dims.height : 1.0f;
@@ -420,6 +452,16 @@ void XMLCALL ChapterHtmlSlimParser::startElement(void* userData, const XML_Char*
                   LOG_DBG("EHP", "Display size: %dx%d (scale %.2f)", displayWidth, displayHeight, scale);
                 }
 
+                if (self->figleftDepth != INT_MAX && displayWidth <= 100 && displayHeight <= 100) {
+                  LOG_DBG("EHP", "Drop cap detected: %dx%d", displayWidth, displayHeight);
+                  self->hasPendingDropCap = true;
+                  self->pendingDropCap.imagePath = cachedImagePath;
+                  self->pendingDropCap.displayWidth = displayWidth;
+                  self->pendingDropCap.displayHeight = displayHeight;
+                  self->depth += 1;
+                  return;
+                }
+
                 // Flush any pending text block so it appears before the image
                 if (self->partWordBufferIndex > 0) {
                   self->flushPartWordBuffer();
@@ -429,9 +471,24 @@ void XMLCALL ChapterHtmlSlimParser::startElement(void* userData, const XML_Char*
                   self->startNewTextBlock(parentBlockStyle);
                 }
 
+                // Apply vertical margins from the container to the image.
+                // Top margin lives on the empty text block (deposited via vertical merge
+                // in startNewTextBlock). Bottom margin was stripped by withoutBottom() for
+                // deferred application at element close, so read it from the stack.
+                int16_t imageMarginTop = 0;
+                int16_t imageMarginBottom = 0;
+                if (self->currentTextBlock && self->currentTextBlock->isEmpty()) {
+                  const auto& bs = self->currentTextBlock->getBlockStyle();
+                  imageMarginTop = bs.topInset();
+                  if (self->blockStyleStack.size() > 1) {
+                    imageMarginBottom = self->blockStyleStack.back().bottomInset();
+                  }
+                }
+
                 // Create page for image - only break if image won't fit remaining space
                 if (self->currentPage && !self->currentPage->elements.empty() &&
-                    (self->currentPageNextY + displayHeight > self->viewportHeight)) {
+                    (self->currentPageNextY + imageMarginTop + displayHeight + imageMarginBottom >
+                     self->viewportHeight)) {
                   self->completePageFn(std::move(self->currentPage), self->xpathParagraphIndex);
                   self->completedPageCount++;
                   self->currentPage.reset(new Page());
@@ -449,6 +506,9 @@ void XMLCALL ChapterHtmlSlimParser::startElement(void* userData, const XML_Char*
                   self->currentPageNextY = 0;
                 }
 
+                // Apply top margin from container block
+                self->currentPageNextY += imageMarginTop;
+
                 // Create ImageBlock and add to page
                 auto imageBlock = std::make_shared<ImageBlock>(cachedImagePath, displayWidth, displayHeight);
                 if (!imageBlock) {
@@ -462,7 +522,18 @@ void XMLCALL ChapterHtmlSlimParser::startElement(void* userData, const XML_Char*
                   return;
                 }
                 self->currentPage->elements.push_back(pageImage);
-                self->currentPageNextY += displayHeight;
+                self->currentPageNextY += displayHeight + imageMarginBottom;
+
+                // The image consumed the empty block's accumulated vertical spacing.
+                // Reset the block so the Vertical merge in startNewTextBlock doesn't
+                // re-apply the same margins to the next text paragraph.
+                if (self->currentTextBlock && self->currentTextBlock->isEmpty()) {
+                  BlockStyle resetStyle;
+                  resetStyle.alignment = (self->paragraphAlignment == static_cast<uint8_t>(CssTextAlign::None))
+                                             ? CssTextAlign::Justify
+                                             : static_cast<CssTextAlign>(self->paragraphAlignment);
+                  self->currentTextBlock->setBlockStyle(resetStyle);
+                }
 
                 self->depth += 1;
                 return;
@@ -480,7 +551,9 @@ void XMLCALL ChapterHtmlSlimParser::startElement(void* userData, const XML_Char*
       // Fallback to alt text if image processing fails
       if (!alt.empty()) {
         alt = "[Image: " + alt + "]";
-        self->startNewTextBlock(centeredBlockStyle);
+        self->startNewTextBlock(self->blockStyleStack.back()
+                                    .getCombinedBlockStyle(centeredBlockStyle, BlockStyle::CombineAxis::Horizontal)
+                                    .withoutBottom());
         self->italicUntilDepth = std::min(self->italicUntilDepth, self->depth);
         self->depth += 1;
         self->characterData(userData, alt.c_str(), alt.length());
@@ -570,19 +643,32 @@ void XMLCALL ChapterHtmlSlimParser::startElement(void* userData, const XML_Char*
     if (self->embeddedStyle && cssStyle.hasTextAlign()) {
       headerBlockStyle.alignment = cssStyle.textAlign;
     }
-    self->startNewTextBlock(headerBlockStyle);
+    const auto accumulated =
+        self->blockStyleStack.back().getCombinedBlockStyle(headerBlockStyle, BlockStyle::CombineAxis::Horizontal);
+    self->blockStyleStack.push_back(accumulated);
+    self->startNewTextBlock(accumulated.withoutBottom());
     self->boldUntilDepth = std::min(self->boldUntilDepth, self->depth);
     self->updateEffectiveInlineStyle();
   } else if (matches(name, BLOCK_TAGS, NUM_BLOCK_TAGS)) {
+    if (strcmp(name, "div") == 0 && classAttr.find("figleft") != std::string::npos && self->embeddedStyle) {
+      self->figleftDepth = self->depth;
+      self->blockStyleStack.push_back(self->blockStyleStack.back());
+      self->startNewTextBlock(self->blockStyleStack.back().withoutBottom());
+      self->depth += 1;
+      return;
+    }
     if (strcmp(name, "br") == 0) {
       if (self->partWordBufferIndex > 0) {
         // flush word preceding <br/> to currentTextBlock before calling startNewTextBlock
         self->flushPartWordBuffer();
       }
-      self->startNewTextBlock(self->currentTextBlock->getBlockStyle());
+      self->startNewTextBlock(self->blockStyleStack.back().withoutBottom());
     } else {
       self->currentCssStyle = cssStyle;
-      self->startNewTextBlock(userAlignmentBlockStyle);
+      const auto accumulated = self->blockStyleStack.back().getCombinedBlockStyle(userAlignmentBlockStyle,
+                                                                                  BlockStyle::CombineAxis::Horizontal);
+      self->blockStyleStack.push_back(accumulated);
+      self->startNewTextBlock(accumulated.withoutBottom());
       self->updateEffectiveInlineStyle();
 
       if (strcmp(name, "li") == 0) {
@@ -691,6 +777,12 @@ void XMLCALL ChapterHtmlSlimParser::characterData(void* userData, const XML_Char
 
   // Skip content of nested table
   if (self->tableDepth > 1) {
+    return;
+  }
+
+  // Collecting caption text from first cell of a caption+image table
+  if (self->collectingCaption) {
+    self->captionBuffer.append(s, len);
     return;
   }
 
@@ -840,7 +932,7 @@ void XMLCALL ChapterHtmlSlimParser::characterData(void* userData, const XML_Char
   // There should be enough here to build out 1-2 full pages and doing this will free up a lot of
   // memory.
   // Spotted when reading Intermezzo, there are some really long text blocks in there.
-  if (self->currentTextBlock->size() > 750) {
+  if (!self->hasPendingDropCap && self->currentTextBlock->size() > 750) {
     LOG_DBG("EHP", "Text block too long, splitting into multiple pages");
     const int horizontalInset = self->currentTextBlock->getBlockStyle().totalHorizontalInset();
     const uint16_t effectiveWidth = (horizontalInset < self->viewportWidth)
@@ -934,6 +1026,7 @@ void XMLCALL ChapterHtmlSlimParser::endElement(void* userData, const XML_Char* n
   }
 
   if (self->tableDepth == 1 && (strcmp(name, "td") == 0 || strcmp(name, "th") == 0)) {
+    self->collectingCaption = false;
     self->nextWordContinues = false;
   }
 
@@ -942,6 +1035,48 @@ void XMLCALL ChapterHtmlSlimParser::endElement(void* userData, const XML_Char* n
   }
 
   if (self->tableDepth == 1 && strcmp(name, "table") == 0) {
+    // Render collected caption as centered italic paragraph below the image
+    if (self->captionTableMode && !self->captionBuffer.empty()) {
+      // Trim leading/trailing whitespace from caption
+      std::string caption = self->captionBuffer;
+      size_t start = caption.find_first_not_of(" \t\r\n");
+      size_t end = caption.find_last_not_of(" \t\r\n");
+      if (start != std::string::npos && end != std::string::npos) {
+        caption = caption.substr(start, end - start + 1);
+      }
+
+      if (!caption.empty()) {
+        auto captionBlockStyle = BlockStyle();
+        captionBlockStyle.textAlignDefined = true;
+        captionBlockStyle.alignment = CssTextAlign::Center;
+        captionBlockStyle.textIndentDefined = true;
+        captionBlockStyle.textIndent = 0;
+        self->startNewTextBlock(captionBlockStyle);
+
+        // Strip <i>...</i> tags from caption if present (they're already captured as text)
+        while (true) {
+          size_t openTag = caption.find("<i>");
+          if (openTag == std::string::npos) break;
+          caption.erase(openTag, 3);
+          size_t closeTag = caption.find("</i>");
+          if (closeTag != std::string::npos) caption.erase(closeTag, 4);
+        }
+
+        // Render caption as italic — push italic style, add words, pop
+        self->italicUntilDepth = std::min(self->italicUntilDepth, self->depth);
+        // Feed caption character by character through the normal word-building path
+        self->characterData(userData, caption.c_str(), static_cast<int>(caption.length()));
+        if (self->partWordBufferIndex > 0) {
+          self->flushPartWordBuffer();
+        }
+        self->italicUntilDepth = INT_MAX;
+        self->makePages();
+      }
+    }
+
+    self->captionTableMode = false;
+    self->collectingCaption = false;
+    self->captionBuffer.clear();
     self->tableDepth -= 1;
     self->tableRowIndex = 0;
     self->tableColIndex = 0;
@@ -975,29 +1110,48 @@ void XMLCALL ChapterHtmlSlimParser::endElement(void* userData, const XML_Char* n
     self->currentCssStyle.reset();
     self->updateEffectiveInlineStyle();
 
-    // Reset alignment on empty text blocks to prevent stale alignment from bleeding
-    // into the next sibling element. This fixes issue #1026 where an empty <h1> (default
-    // Center) followed by an image-only <p> causes Center to persist through the chain
-    // of empty block reuse into subsequent text paragraphs.
-    // Margins/padding are preserved so parent element spacing still accumulates correctly.
-    if (self->currentTextBlock && self->currentTextBlock->isEmpty()) {
-      auto style = self->currentTextBlock->getBlockStyle();
-      style.textAlignDefined = false;
-      style.alignment = (self->paragraphAlignment == static_cast<uint8_t>(CssTextAlign::None))
-                            ? CssTextAlign::Justify
-                            : static_cast<CssTextAlign>(self->paragraphAlignment);
-      self->currentTextBlock->setBlockStyle(style);
+    // br is self-closing and not a container — it doesn't push/pop the stack.
+    if (strcmp(name, "br") != 0 && self->blockStyleStack.size() > 1) {
+      // Apply closing element's bottom margin to the current text block so
+      // container spacing appears after the element's content (on the last child),
+      // not on the first child via the empty-block merge in startNewTextBlock.
+      if (self->currentTextBlock) {
+        const auto style = self->currentTextBlock->getBlockStyle();
+        self->currentTextBlock->setBlockStyle(style.addBottom(self->blockStyleStack.back()));
+      }
+      self->blockStyleStack.pop_back();
+    }
+
+    // Content elements (p, li, h1-h6) that close with no visible content should
+    // not leak their vertical margins to the next sibling via the empty-block merge
+    // in startNewTextBlock. Reset vertical margins so the next element starts clean.
+    // Container elements (div, blockquote) are excluded — their margins must
+    // propagate to children.
+    if (strcmp(name, "br") != 0 && strcmp(name, "div") != 0 && strcmp(name, "blockquote") != 0 &&
+        self->currentTextBlock && self->currentTextBlock->isEmpty()) {
+      BlockStyle resetStyle = self->blockStyleStack.back();
+      resetStyle.marginTop = resetStyle.marginBottom = 0;
+      resetStyle.paddingTop = resetStyle.paddingBottom = 0;
+      self->currentTextBlock->setBlockStyle(resetStyle);
     }
   }
 }
 
 bool ChapterHtmlSlimParser::parseAndBuildPages() {
+  // Initialize block style stack with a root entry representing "no ancestor block elements".
+  // The user's paragraph alignment is set as the default so child elements without explicit
+  // text-align inherit it correctly through getCombinedBlockStyle.
+  BlockStyle rootBlockStyle;
+  rootBlockStyle.alignment = (this->paragraphAlignment == static_cast<uint8_t>(CssTextAlign::None))
+                                 ? CssTextAlign::Justify
+                                 : static_cast<CssTextAlign>(this->paragraphAlignment);
+  blockStyleStack.clear();
+  blockStyleStack.reserve(8);
+  blockStyleStack.push_back(rootBlockStyle);
+
   auto paragraphAlignmentBlockStyle = BlockStyle();
   paragraphAlignmentBlockStyle.textAlignDefined = true;
-  // Resolve None sentinel to Justify for initial block (no CSS context yet)
-  const auto align = (this->paragraphAlignment == static_cast<uint8_t>(CssTextAlign::None))
-                         ? CssTextAlign::Justify
-                         : static_cast<CssTextAlign>(this->paragraphAlignment);
+  const auto align = rootBlockStyle.alignment;
   paragraphAlignmentBlockStyle.alignment = align;
   startNewTextBlock(paragraphAlignmentBlockStyle);
 
@@ -1079,7 +1233,7 @@ bool ChapterHtmlSlimParser::parseAndBuildPages() {
   return true;
 }
 
-void ChapterHtmlSlimParser::addLineToPage(std::shared_ptr<TextBlock> line) {
+void ChapterHtmlSlimParser::addLineToPage(std::shared_ptr<TextBlock> line, int16_t extraXOffset) {
   const int lineHeight = renderer.getLineHeight(fontId) * lineCompression;
 
   if (!currentPage) {
@@ -1103,8 +1257,7 @@ void ChapterHtmlSlimParser::addLineToPage(std::shared_ptr<TextBlock> line) {
   }
   pendingFootnotes.erase(pendingFootnotes.begin(), footnoteIt);
 
-  // Apply horizontal left inset (margin + padding) as x position offset
-  const int16_t xOffset = line->getBlockStyle().leftInset();
+  const int16_t xOffset = line->getBlockStyle().leftInset() + extraXOffset;
   currentPage->elements.push_back(std::make_shared<PageLine>(line, xOffset, currentPageNextY));
   currentPageNextY += lineHeight;
 }
@@ -1122,23 +1275,74 @@ void ChapterHtmlSlimParser::makePages() {
 
   const int lineHeight = renderer.getLineHeight(fontId) * lineCompression;
 
-  // Apply top spacing before the paragraph (stored in pixels)
+  // Block style for spacing calculations
   const BlockStyle& blockStyle = currentTextBlock->getBlockStyle();
-  if (blockStyle.marginTop > 0) {
-    currentPageNextY += blockStyle.marginTop;
-  }
-  if (blockStyle.paddingTop > 0) {
-    currentPageNextY += blockStyle.paddingTop;
-  }
+  const int16_t topSpacing = blockStyle.marginTop + blockStyle.paddingTop;
 
   // Calculate effective width accounting for horizontal margins/padding
   const int horizontalInset = blockStyle.totalHorizontalInset();
   const uint16_t effectiveWidth =
       (horizontalInset < viewportWidth) ? static_cast<uint16_t>(viewportWidth - horizontalInset) : viewportWidth;
 
-  currentTextBlock->layoutAndExtractLines(
-      renderer, fontId, effectiveWidth,
-      [this](const std::shared_ptr<TextBlock>& textBlock) { addLineToPage(textBlock); });
+  if (hasPendingDropCap) {
+    const uint16_t dropCapEffectiveWidth = effectiveWidth - pendingDropCap.displayWidth;
+    const int16_t baseXOffset = blockStyle.leftInset();
+
+    if (!currentPage->elements.empty() &&
+        currentPageNextY + topSpacing + pendingDropCap.displayHeight > viewportHeight) {
+      completePageFn(std::move(currentPage), xpathParagraphIndex);
+      completedPageCount++;
+      currentPage.reset(new Page());
+      if (!currentPage) {
+        LOG_ERR("EHP", "Failed to create new page for drop cap");
+        return;
+      }
+      currentPageNextY = 0;
+    }
+
+    currentPageNextY += topSpacing;
+
+    const int16_t firstLineY = currentPageNextY;
+
+    auto dropCapImageBlock =
+        std::make_shared<ImageBlock>(pendingDropCap.imagePath, pendingDropCap.displayWidth, pendingDropCap.displayHeight);
+    if (!dropCapImageBlock) {
+      LOG_ERR("EHP", "Failed to create drop cap ImageBlock");
+      hasPendingDropCap = false;
+    } else {
+      currentPage->elements.push_back(
+          std::make_shared<PageImage>(dropCapImageBlock, baseXOffset, firstLineY));
+
+      BlockStyle dropCapStyle = currentTextBlock->getBlockStyle();
+      dropCapStyle.textIndentDefined = true;
+      dropCapStyle.textIndent = 0;
+      currentTextBlock->setBlockStyle(dropCapStyle);
+
+      currentPageNextY += pendingDropCap.displayHeight - lineHeight;
+
+      currentTextBlock->layoutAndExtractLines(
+          renderer, fontId, dropCapEffectiveWidth,
+          [this](const std::shared_ptr<TextBlock>& textBlock) {
+            addLineToPage(textBlock, pendingDropCap.displayWidth);
+          },
+          true, 1);
+
+      if (!currentTextBlock->isEmpty()) {
+        currentTextBlock->layoutAndExtractLines(
+            renderer, fontId, effectiveWidth,
+            [this](const std::shared_ptr<TextBlock>& textBlock) { addLineToPage(textBlock); });
+      }
+
+      hasPendingDropCap = false;
+    }
+  } else {
+    // Apply top spacing before the paragraph (stored in pixels)
+    currentPageNextY += topSpacing;
+
+    currentTextBlock->layoutAndExtractLines(
+        renderer, fontId, effectiveWidth,
+        [this](const std::shared_ptr<TextBlock>& textBlock) { addLineToPage(textBlock); });
+  }
 
   // Fallback: transfer any remaining pending footnotes to current page.
   // Normally addLineToPage handles this via word-index tracking, but this catches
