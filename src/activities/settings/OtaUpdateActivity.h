@@ -15,6 +15,8 @@ class OtaUpdateActivity : public Activity {
     SHUTTING_DOWN
   };
 
+  static constexpr unsigned long RETRY_LONG_PRESS_MS = 1500;
+
   // Can't initialize this to 0 or the first render doesn't happen
   static constexpr unsigned int UNINITIALIZED_PERCENTAGE = 111;
 
@@ -23,6 +25,7 @@ class OtaUpdateActivity : public Activity {
   OtaUpdater updater;
 
   void onWifiSelectionComplete(bool success);
+  void handleRetryStateInput();
 
  public:
   explicit OtaUpdateActivity(GfxRenderer& renderer, MappedInputManager& mappedInput)
