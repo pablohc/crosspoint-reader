@@ -132,7 +132,7 @@ class CrossPointSettings {
   };
 
   // Short power button press actions
-  enum SHORT_PWRBTN { IGNORE = 0, SLEEP = 1, PAGE_TURN = 2, FORCE_REFRESH = 3, SHORT_PWRBTN_COUNT };
+  enum SHORT_PWRBTN { IGNORE = 0, SLEEP = 1, PAGE_TURN = 2, FORCE_REFRESH = 3, CLIPPING = 4, SHORT_PWRBTN_COUNT };
 
   // Hide battery percentage
   enum HIDE_BATTERY_PERCENTAGE { HIDE_NEVER = 0, HIDE_READER = 1, HIDE_ALWAYS = 2, HIDE_BATTERY_PERCENTAGE_COUNT };
@@ -152,7 +152,12 @@ class CrossPointSettings {
   enum IMAGE_RENDERING { IMAGES_DISPLAY = 0, IMAGES_PLACEHOLDER = 1, IMAGES_SUPPRESS = 2, IMAGE_RENDERING_COUNT };
 
   enum TILT_PAGE_TURN { TILT_OFF = 0, TILT_NORMAL = 1, TILT_NVERTED = 2, TILT_PAGE_TURN_COUNT };
-
+  // Clipping storage mode
+  enum CLIPPING_STORAGE : uint8_t { SINGLE_FILE = 0, PER_BOOK = 1, CLIPPING_STORAGE_COUNT };
+  // Clip selector navigation scheme
+  enum CLIP_NAV_MODE : uint8_t { CLIP_NAV_DIRECTIONAL = 0, CLIP_NAV_CONTINUOUS = 1, CLIP_NAV_MODE_COUNT };
+  // Annotation underline visibility
+  enum ANNOTATION_VISIBILITY : uint8_t { ANNOT_VISIBLE = 0, ANNOT_HIDDEN = 1, ANNOTATION_VISIBILITY_COUNT };
   // Sleep screen settings
   uint8_t sleepScreen = DARK;
   // Sleep screen cover mode settings
@@ -220,7 +225,10 @@ class CrossPointSettings {
   uint8_t tiltPageTurn = TILT_OFF;
   // Language setting (Language enum index, default 0 = EN)
   uint8_t language = 0;
-
+  // Clippings settings
+  uint8_t clippingStorage = SINGLE_FILE;
+  uint8_t clipNavMode = CLIP_NAV_DIRECTIONAL;
+  uint8_t annotationVisibility = ANNOT_VISIBLE;
   ~CrossPointSettings() = default;
 
   // Get singleton instance

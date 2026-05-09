@@ -54,8 +54,23 @@ struct FilePathResult {
   std::string path;
 };
 
-using ResultVariant = std::variant<std::monostate, WifiResult, KeyboardResult, MenuResult, ChapterResult, PercentResult,
-                                   PageResult, SyncResult, NetworkModeResult, FootnoteResult, FilePathResult>;
+struct ClippingResult {
+  std::string text;
+  int fromWordIdx = -1;
+  int toWordIdx = -1;
+  uint16_t sectionPage = 0;
+  uint16_t endSectionPage = 0;
+  std::string startText;
+  std::string endText;
+  std::string beforeStartText;
+  std::string afterEndText;
+  std::string midText;
+  uint16_t wordCount = 0;
+};
+
+using ResultVariant =
+    std::variant<std::monostate, WifiResult, KeyboardResult, MenuResult, ChapterResult, PercentResult, PageResult,
+                 SyncResult, NetworkModeResult, FootnoteResult, FilePathResult, ClippingResult>;
 
 struct ActivityResult {
   bool isCancelled = false;

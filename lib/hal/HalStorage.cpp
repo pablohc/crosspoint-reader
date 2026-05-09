@@ -4,6 +4,7 @@
 #include <FS.h>  // need to be included before SdFat.h for compatibility with FS.h's File class
 #include <Logging.h>
 #include <SDCardManager.h>
+#include <freertos/task.h>
 
 #include <cassert>
 
@@ -24,10 +25,22 @@ bool HalStorage::ready() const { return SDCard.ready(); }
 
 // For the rest of the methods, we acquire the mutex to ensure thread safety
 
+static uint32_t lockLogCount = 0;
+
 class HalStorage::StorageLock {
  public:
-  StorageLock() { xSemaphoreTake(HalStorage::getInstance().storageMutex, portMAX_DELAY); }
-  ~StorageLock() { xSemaphoreGive(HalStorage::getInstance().storageMutex); }
+  StorageLock() {
+    if (lockLogCount++ % 10000 == 0) {
+      LOG_DBG("LOCK", "SL take from %s (#%u)", pcTaskGetName(nullptr), lockLogCount);
+    }
+    xSemaphoreTake(HalStorage::getInstance().storageMutex, portMAX_DELAY);
+  }
+  ~StorageLock() {
+    if (lockLogCount++ % 10000 == 0) {
+      LOG_DBG("LOCK", "SL give from %s (#%u)", pcTaskGetName(nullptr), lockLogCount);
+    }
+    xSemaphoreGive(HalStorage::getInstance().storageMutex);
+  }
 };
 
 #define HAL_STORAGE_WRAPPED_CALL(method, ...) \
