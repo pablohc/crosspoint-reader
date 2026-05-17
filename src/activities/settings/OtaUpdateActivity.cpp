@@ -5,6 +5,7 @@
 #include <WiFi.h>
 
 #include "MappedInputManager.h"
+#include "activities/credits/CreditsActivity.h"
 #include "activities/network/WifiSelectionActivity.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
@@ -124,11 +125,11 @@ void OtaUpdateActivity::render(RenderLock&&) {
         (std::to_string(updater.getProcessedSize()) + " / " + std::to_string(updater.getTotalSize())).c_str());
   } else if (state == NO_UPDATE) {
     renderer.drawCenteredText(UI_10_FONT_ID, top, tr(STR_NO_UPDATE), true, EpdFontFamily::BOLD);
-    const auto labels = mappedInput.mapLabels(tr(STR_BACK), "", "", "");
+    const auto labels = mappedInput.mapLabels(tr(STR_BACK), "Retry", "", "");
     GUI.drawButtonHints(renderer, labels.btn1, labels.btn2, labels.btn3, labels.btn4);
   } else if (state == FAILED) {
     renderer.drawCenteredText(UI_10_FONT_ID, top, tr(STR_UPDATE_FAILED), true, EpdFontFamily::BOLD);
-    const auto labels = mappedInput.mapLabels(tr(STR_BACK), "", "", "");
+    const auto labels = mappedInput.mapLabels(tr(STR_BACK), "Retry", "", "");
     GUI.drawButtonHints(renderer, labels.btn1, labels.btn2, labels.btn3, labels.btn4);
   } else if (state == FINISHED) {
     renderer.drawCenteredText(UI_10_FONT_ID, top, tr(STR_UPDATE_COMPLETE), true, EpdFontFamily::BOLD);
@@ -186,21 +187,32 @@ void OtaUpdateActivity::loop() {
     return;
   }
 
-  if (state == FAILED) {
-    if (mappedInput.wasPressed(MappedInputManager::Button::Back)) {
-      finish();
-    }
-    return;
-  }
-
-  if (state == NO_UPDATE) {
-    if (mappedInput.wasPressed(MappedInputManager::Button::Back)) {
-      finish();
-    }
+  if (state == FAILED || state == NO_UPDATE) {
+    handleRetryStateInput();
     return;
   }
 
   if (state == SHUTTING_DOWN) {
     ESP.restart();
+  }
+}
+
+void OtaUpdateActivity::handleRetryStateInput() {
+  if (mappedInput.wasPressed(MappedInputManager::Button::Back)) {
+    finish();
+    return;
+  }
+  if (mappedInput.isPressed(MappedInputManager::Button::Confirm) && mappedInput.getHeldTime() >= RETRY_LONG_PRESS_MS) {
+    startActivityForResult(std::make_unique<CreditsActivity>(renderer, mappedInput), [this](const ActivityResult&) {});
+    return;
+  }
+  if (mappedInput.wasReleased(MappedInputManager::Button::Confirm) && mappedInput.getHeldTime() < RETRY_LONG_PRESS_MS) {
+    {
+      RenderLock lock(*this);
+      state = WIFI_SELECTION;
+    }
+    WiFi.mode(WIFI_STA);
+    startActivityForResult(std::make_unique<WifiSelectionActivity>(renderer, mappedInput),
+                           [this](const ActivityResult& result) { onWifiSelectionComplete(!result.isCancelled); });
   }
 }
