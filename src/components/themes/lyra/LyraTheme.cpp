@@ -331,19 +331,13 @@ void LyraTheme::drawButtonHints(GfxRenderer& renderer, const char* btn1, const c
   for (int i = 0; i < 4; i++) {
     const int x = buttonPositions[i];
     if (labels[i] != nullptr && labels[i][0] != '\0') {
-      // Draw the filled background and border for a FULL-sized button
       renderer.fillRoundedRect(x, pageHeight - buttonY, buttonWidth, buttonHeight, cornerRadius, Color::White);
-      renderer.drawRoundedRect(x, pageHeight - buttonY, buttonWidth, buttonHeight, 1, cornerRadius, true, true, false,
-                               false, true);
       const int textWidth = renderer.getTextWidth(SMALL_FONT_ID, labels[i]);
       const int textX = x + (buttonWidth - 1 - textWidth) / 2;
       renderer.drawText(SMALL_FONT_ID, textX, pageHeight - buttonY + textYOffset, labels[i]);
     } else {
-      // Draw the filled background and border for a SMALL-sized button
       renderer.fillRoundedRect(x, pageHeight - smallButtonHeight, buttonWidth, smallButtonHeight, cornerRadius,
                                Color::White);
-      renderer.drawRoundedRect(x, pageHeight - smallButtonHeight, buttonWidth, smallButtonHeight, 1, cornerRadius, true,
-                               true, false, false, true);
     }
   }
 
@@ -361,16 +355,12 @@ void LyraTheme::drawSideButtonHints(const GfxRenderer& renderer, const char* top
     constexpr int x3ButtonY = 155;
 
     if (topBtn != nullptr && topBtn[0] != '\0') {
-      renderer.drawRoundedRect(buttonMargin, x3ButtonY, buttonWidth, buttonHeight, 1, cornerRadius, false, true, false,
-                               true, true);
       const int textWidth = renderer.getTextWidth(SMALL_FONT_ID, topBtn);
       renderer.drawTextRotated90CW(SMALL_FONT_ID, buttonMargin, x3ButtonY + (buttonHeight + textWidth) / 2, topBtn);
     }
 
     if (bottomBtn != nullptr && bottomBtn[0] != '\0') {
       const int rightX = screenWidth - buttonWidth;
-      renderer.drawRoundedRect(rightX, x3ButtonY, buttonWidth, buttonHeight, 1, cornerRadius, true, false, true, false,
-                               true);
       const int textWidth = renderer.getTextWidth(SMALL_FONT_ID, bottomBtn);
       renderer.drawTextRotated90CW(SMALL_FONT_ID, rightX, x3ButtonY + (buttonHeight + textWidth) / 2, bottomBtn);
     }
@@ -379,15 +369,7 @@ void LyraTheme::drawSideButtonHints(const GfxRenderer& renderer, const char* top
     const char* labels[] = {topBtn, bottomBtn};
     const int x = screenWidth - buttonWidth;
 
-    if (topBtn != nullptr && topBtn[0] != '\0') {
-      renderer.drawRoundedRect(x, topHintButtonY, buttonWidth, buttonHeight, 1, cornerRadius, true, false, true, false,
-                               true);
-    }
-
-    if (bottomBtn != nullptr && bottomBtn[0] != '\0') {
-      renderer.drawRoundedRect(x, topHintButtonY + buttonHeight + 5, buttonWidth, buttonHeight, 1, cornerRadius, true,
-                               false, true, false, true);
-    }
+    
 
     for (int i = 0; i < 2; i++) {
       if (labels[i] != nullptr && labels[i][0] != '\0') {
@@ -418,8 +400,9 @@ void LyraTheme::drawRecentBookCover(GfxRenderer& renderer, Rect rect, const std:
     if (!coverRendered) {
       std::string coverPath = book.coverBmpPath;
       bool hasCover = true;
-      int tileX = LyraMetrics::values.contentSidePadding;
-      if (coverPath.empty()) {
+      int tileX = rect.x + LyraMetrics::values.contentSidePadding;
+      const bool skipCover = book.coverDisabled;
+      if (coverPath.empty() || skipCover) {
         hasCover = false;
       } else {
         const std::string coverBmpPath = UITheme::getCoverThumbPath(coverPath, LyraMetrics::values.homeCoverHeight);
@@ -430,12 +413,16 @@ void LyraTheme::drawRecentBookCover(GfxRenderer& renderer, Rect rect, const std:
           Bitmap bitmap(file);
           if (bitmap.parseHeaders() == BmpReaderError::Ok) {
             coverWidth = bitmap.getWidth();
-            renderer.drawBitmap(bitmap, tileX + hPaddingInSelection, tileY + hPaddingInSelection, coverWidth,
-                                LyraMetrics::values.homeCoverHeight);
+            if (!renderer.drawBitmap(bitmap, tileX + hPaddingInSelection, tileY + hPaddingInSelection, coverWidth,
+                                     LyraMetrics::values.homeCoverHeight)) {
+              hasCover = false;
+            }
           } else {
             hasCover = false;
           }
           file.close();
+        } else {
+          hasCover = false;
         }
       }
 
@@ -451,13 +438,13 @@ void LyraTheme::drawRecentBookCover(GfxRenderer& renderer, Rect rect, const std:
         renderer.drawIcon(CoverIcon, tileX + hPaddingInSelection + 24, tileY + hPaddingInSelection + 24, 32, 32);
       }
 
+      coverRendered = true;
       coverBufferStored = storeCoverBuffer();
-      coverRendered = coverBufferStored;  // Only consider it rendered if we successfully stored the buffer
     }
 
     bool bookSelected = (selectorIndex == 0);
 
-    int tileX = LyraMetrics::values.contentSidePadding;
+    int tileX = rect.x + LyraMetrics::values.contentSidePadding;
     int textWidth = tileWidth - 2 * hPaddingInSelection - LyraMetrics::values.verticalSpacing - coverWidth;
 
     if (bookSelected) {
@@ -557,6 +544,25 @@ Rect LyraTheme::drawPopup(const GfxRenderer& renderer, const char* message) cons
   renderer.displayBuffer();
 
   return Rect{x, y, w, h};
+}
+
+void LyraTheme::drawDialogBackground(const GfxRenderer& renderer, Rect rect) const {
+  constexpr int outline = 2;
+  renderer.fillRoundedRect(rect.x - outline, rect.y - outline, rect.width + outline * 2, rect.height + outline * 2,
+                           cornerRadius + outline, Color::Black);
+  renderer.fillRoundedRect(rect.x, rect.y, rect.width, rect.height, cornerRadius, Color::White);
+}
+
+void LyraTheme::drawPopupSelection(const GfxRenderer& renderer, int fontId, Rect rect, const char* text,
+                                   bool selected) const {
+  const int textH = renderer.getLineHeight(fontId);
+  const int textW = renderer.getTextWidth(fontId, text);
+  const int textY = rect.y + (rect.height - textH) / 2;
+  const int textX = rect.x + (rect.width - textW) / 2;
+  if (selected) {
+    renderer.fillRoundedRect(rect.x, rect.y, rect.width, rect.height, cornerRadius, Color::LightGray);
+  }
+  renderer.drawText(fontId, textX, textY, text, true);
 }
 
 void LyraTheme::fillPopupProgress(const GfxRenderer& renderer, const Rect& layout, const int progress) const {

@@ -18,21 +18,15 @@ class CrossPointSettings {
   CrossPointSettings& operator=(const CrossPointSettings&) = delete;
 
   enum SLEEP_SCREEN_MODE {
-    DARK = 0,
-    LIGHT = 1,
-    CUSTOM = 2,
-    COVER = 3,
-    BLANK = 4,
-    COVER_CUSTOM = 5,
+    LOGO = 0,
+    CUSTOM = 1,
+    COVER_FIT = 2,
+    COVER_CROP = 3,
+    COVER_CUSTOM = 4,
+    BLANK = 5,
     SLEEP_SCREEN_MODE_COUNT
   };
-  enum SLEEP_SCREEN_COVER_MODE { FIT = 0, CROP = 1, SLEEP_SCREEN_COVER_MODE_COUNT };
-  enum SLEEP_SCREEN_COVER_FILTER {
-    NO_FILTER = 0,
-    BLACK_AND_WHITE = 1,
-    INVERTED_BLACK_AND_WHITE = 2,
-    SLEEP_SCREEN_COVER_FILTER_COUNT
-  };
+  enum SLEEP_SCREEN_FILTER { FILTER_NONE = 0, FILTER_CONTRAST = 1, FILTER_NEGATIVE = 2, SLEEP_SCREEN_FILTER_COUNT };
 
   // Status bar enum - legacy
   enum STATUS_BAR_MODE {
@@ -134,7 +128,7 @@ class CrossPointSettings {
   };
 
   // Short power button press actions
-  enum SHORT_PWRBTN { IGNORE = 0, SLEEP = 1, PAGE_TURN = 2, FORCE_REFRESH = 3, SHORT_PWRBTN_COUNT };
+  enum SHORT_PWRBTN { IGNORE = 0, SLEEP = 1, PAGE_TURN = 2, FORCE_REFRESH = 3, MENU = 4, SHORT_PWRBTN_COUNT };
 
   // Hide battery percentage
   enum HIDE_BATTERY_PERCENTAGE { HIDE_NEVER = 0, HIDE_READER = 1, HIDE_ALWAYS = 2, HIDE_BATTERY_PERCENTAGE_COUNT };
@@ -148,19 +142,20 @@ class CrossPointSettings {
   };
 
   // UI Theme
-  enum UI_THEME { CLASSIC = 0, LYRA = 1, LYRA_3_COVERS = 2, ROUNDEDRAFF = 3 };
+  enum UI_THEME { CLASSIC = 0, LYRA = 1 };
 
   // Image rendering in EPUB reader
   enum IMAGE_RENDERING { IMAGES_DISPLAY = 0, IMAGES_PLACEHOLDER = 1, IMAGES_SUPPRESS = 2, IMAGE_RENDERING_COUNT };
 
   enum TILT_PAGE_TURN { TILT_OFF = 0, TILT_NORMAL = 1, TILT_NVERTED = 2, TILT_PAGE_TURN_COUNT };
 
+  // Home screen cover rendering mode
+  enum COVER_MODE { COVER_ENABLED = 0, COVER_TIMEOUT = 1, COVER_DISABLED = 2, COVER_MODE_COUNT };
+
   // Sleep screen settings
-  uint8_t sleepScreen = DARK;
-  // Sleep screen cover mode settings
-  uint8_t sleepScreenCoverMode = FIT;
-  // Sleep screen cover filter
-  uint8_t sleepScreenCoverFilter = NO_FILTER;
+  uint8_t sleepScreen = LOGO;
+  // Sleep screen filter
+  uint8_t sleepScreenFilter = FILTER_NONE;
   // Status bar settings (statusBar retained for migration only)
   uint8_t statusBar = FULL;
   uint8_t statusBarChapterPageCount = 1;
@@ -226,6 +221,8 @@ class CrossPointSettings {
   uint8_t tiltPageTurn = TILT_OFF;
   // Language setting (Language enum index, default 0 = EN)
   uint8_t language = 0;
+  // Home screen cover rendering mode
+  uint8_t coverMode = COVER_ENABLED;
 
   ~CrossPointSettings() = default;
 
