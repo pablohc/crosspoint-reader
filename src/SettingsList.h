@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include <HalTiltSensor.h>
 #include <I18n.h>
@@ -69,7 +69,7 @@ inline SettingInfo buildFontFamilySetting(const SdCardFontRegistry* registry) {
           return static_cast<uint8_t>(CrossPointSettings::BUILTIN_FONT_COUNT + i);
         }
       }
-      // SD font name not found in registry — fall through to built-in
+      // SD font name not found in registry â€” fall through to built-in
     }
     return SETTINGS.fontFamily < CrossPointSettings::BUILTIN_FONT_COUNT ? SETTINGS.fontFamily : 0;
   };
@@ -120,7 +120,6 @@ inline std::vector<SettingInfo> getSettingsList(const SdCardFontRegistry* regist
             {StrId::STR_PAGES_1, StrId::STR_PAGES_5, StrId::STR_PAGES_10, StrId::STR_PAGES_15, StrId::STR_PAGES_30},
             "refreshFrequency", StrId::STR_CAT_DISPLAY),
         SettingInfo::Enum(StrId::STR_UI_THEME, &CrossPointSettings::uiTheme,
-                          {StrId::STR_THEME_CLASSIC, StrId::STR_THEME_LYRA, StrId::STR_THEME_LYRA_EXTENDED},
                           "uiTheme", StrId::STR_CAT_DISPLAY),
         SettingInfo::Enum(
             StrId::STR_HOME_COVER, &CrossPointSettings::coverMode,
