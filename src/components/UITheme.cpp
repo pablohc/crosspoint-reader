@@ -11,7 +11,7 @@
 #include "components/themes/BaseTheme.h"
 #include "components/themes/lyra/Lyra3CoversTheme.h"
 #include "components/themes/lyra/LyraTheme.h"
-#include "components/themes/roundedraff/RoundedRaffTheme.h"
+
 
 UITheme UITheme::instance;
 
@@ -36,11 +36,6 @@ void UITheme::setTheme(CrossPointSettings::UI_THEME type) {
       LOG_DBG("UI", "Using Lyra theme");
       currentTheme = std::make_unique<LyraTheme>();
       currentMetrics = &LyraMetrics::values;
-      break;
-    case CrossPointSettings::UI_THEME::ROUNDEDRAFF:
-      LOG_DBG("UI", "Using RoundedRaff theme");
-      currentTheme = std::make_unique<RoundedRaffTheme>();
-      currentMetrics = &RoundedRaffMetrics::values;
       break;
     case CrossPointSettings::UI_THEME::LYRA_3_COVERS:
       LOG_DBG("UI", "Using Lyra 3 Covers theme");
