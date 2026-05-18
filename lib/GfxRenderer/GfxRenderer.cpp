@@ -1546,6 +1546,7 @@ void GfxRenderer::renderGrayscale(GrayscaleDriveMode mode, void (*renderFn)(cons
   // matches stock V5.5.9 SPI order. Same pattern as renderGrayscaleSinglePass.
   if (spec.factoryMode) {
     display.displayGrayBufferFactoryActivate();
+    displayState = DisplayState::FactoryLut;
   } else {
     displayGrayBuffer(spec.lut, spec.factoryMode);
   }
@@ -1621,6 +1622,7 @@ void GfxRenderer::renderGrayscaleSinglePass(GrayscaleDriveMode mode, void (*rend
     secondaryFrameBuffer = nullptr;
     g_differentialQuantize = false;
     display.displayGrayBufferFactoryActivate();
+    displayState = DisplayState::FactoryLut;
     display.clearGrayscaleModeFlag();
     setRenderMode(BW);
     return;
@@ -1708,6 +1710,7 @@ void GfxRenderer::displayXtchPlanes(const uint8_t* plane1, const uint8_t* plane2
   }
 
   display.displayGrayBufferFactoryActivate();
+  displayState = DisplayState::FactoryLut;
   setRenderMode(BW);
 }
 
