@@ -201,6 +201,10 @@ def build_family(
     if family.get("force_autohint", False):
         cmd.append("--force-autohint")
 
+    smoothing = family.get("smoothing", 0)
+    if smoothing != 0:
+        cmd.extend(["--smoothing", str(smoothing)])
+
     # Run fontconvert_sdcard.py
     start = time.monotonic()
     try:

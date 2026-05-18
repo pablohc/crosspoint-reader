@@ -93,6 +93,29 @@ families:
       italic:     {url: "https://raw.githubusercontent.com/google/fonts/main/ofl/gentiumbookplus/GentiumBookPlus-Italic.ttf"}
       bolditalic: {url: "https://raw.githubusercontent.com/google/fonts/main/ofl/gentiumbookplus/GentiumBookPlus-BoldItalic.ttf"}
 
+  - name: Bookerly
+    description: "Classic serif optimized for e-ink screens (Latin)"
+    intervals: latin-ext
+    sizes: [10, 12, 14]
+    force_autohint: true
+    styles:
+      regular:    {path: "builtinFonts/source/Bookerly/Bookerly-Regular.ttf"}
+      bold:       {path: "builtinFonts/source/Bookerly/Bookerly-Bold.ttf"}
+      italic:     {path: "builtinFonts/source/Bookerly/Bookerly-Italic.ttf"}
+      bolditalic: {path: "builtinFonts/source/Bookerly/Bookerly-BoldItalic.ttf"}
+
+  - name: Bookerly (smooth)
+    description: "Classic serif, smoothed AA (Latin)"
+    intervals: latin-ext
+    sizes: [10, 12, 14]
+    force_autohint: true
+    smoothing: 2
+    styles:
+      regular:    {path: "builtinFonts/source/Bookerly/Bookerly-Regular.ttf"}
+      bold:       {path: "builtinFonts/source/Bookerly/Bookerly-Bold.ttf"}
+      italic:     {path: "builtinFonts/source/Bookerly/Bookerly-Italic.ttf"}
+      bolditalic: {path: "builtinFonts/source/Bookerly/Bookerly-BoldItalic.ttf"}
+
   - name: IBMPlexSerif
     description: "Professional serif (Latin, Greek, Cyrillic)"
     intervals: latin-ext,greek,cyrillic
