@@ -35,6 +35,9 @@ class EpubReaderActivity final : public Activity {
   bool lastPageWasFactoryGray = false;
   int lastFactoryMarginTop = 0;
   int lastFactoryMarginLeft = 0;
+  // Set when the reader is left at end-of-book and SETTINGS.moveFinishedToReadFolder is on.
+  // Consumed in onExit() to relocate the finished book into /Read/.
+  bool pendingReadFolderMove = false;
 
   // Footnote support
   std::vector<FootnoteEntry> currentPageFootnotes;
