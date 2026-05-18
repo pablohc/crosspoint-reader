@@ -874,4 +874,3 @@ void BaseTheme::drawClassicalBookCover(GfxRenderer& renderer, int x, int y, int 
     textY += lineH;
   }
 }
-

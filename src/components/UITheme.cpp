@@ -11,7 +11,6 @@
 #include "components/themes/BaseTheme.h"
 #include "components/themes/lyra/LyraTheme.h"
 
-
 UITheme UITheme::instance;
 
 UITheme::UITheme() {
